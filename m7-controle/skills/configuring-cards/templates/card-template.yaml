@@ -1,0 +1,127 @@
+# Card de Performance - {nome}
+# Especificacao: ESP-PERF-002 v1.1
+# Gerado por m7-controle (E1 — configuring-cards)
+
+metadata:
+  id: card_{vert}_{nivel}_{seq}
+  codigo: CARD-{VERT}-{NIVEL}-{SEQ}
+  name: "{nome legivel}"
+  description: "{descricao do proposito e escopo do Card}"
+  version: "1.0.0"
+  status: draft          # draft | active | archived
+  owner: "{nome.sobrenome}"
+  vertical_crm: "{Investimentos | Credito | Universo | Seguros & Consorcios}"
+  vertical_code: "{INV | CRE | UNI | SEG}"
+  nivel: "{N1 | N2 | N3 | N4}"
+  subnivel: null         # Opcional: B2B, B2C, SQUAD01...
+  created_at: "YYYY-MM-DD"
+  updated_at: "YYYY-MM-DD"
+  tags: []
+
+kpi_references:
+  - indicator_id: "{id_na_biblioteca}"
+    papel: kpi_principal   # kpi_principal | ppi | ppi_segunda_ordem | contexto
+    tipo_realizacao: aditivo   # aditivo | nao_aditivo | parcialmente_aditivo
+    criterio_desvio_critico: "pct_atingimento < 0.90"
+    quebras_obrigatorias: [equipe, squad, assessor]
+    correlacionado_com:
+      - id: "{outro_indicator_id}"
+        tipo: direta       # direta | inversa | contexto
+        explicacao: "{mecanismo causal entre os dois indicadores}"
+    regras_meta:
+      tipo_agregacao: sum  # sum | avg | max | recalcular
+      # formula_agregacao: ""   # Apenas se tipo_agregacao = recalcular
+      # peso: 1.0               # Apenas se tipo_agregacao = avg
+
+arvore_de_indicadores:
+  "{indicator_id}":
+    formula_conceitual: "{decomposicao, ex: CapLiq = Cap Novas + Cap Base - Resgates}"
+    componentes:
+      - nome: "{nome_componente}"
+        descricao: "{o que e e como se comporta}"
+        influenciadores_diretos:
+          - indicator_id: "{id_ou_null}"
+            tipo: PPI       # KPI | PPI | PPI_segunda_ordem | externo
+            explicacao: "{mecanismo causal}"
+            status: disponivel   # disponivel | a_mapear | externo
+        sub_componentes: []   # Ate 2 niveis de profundidade maximo
+
+logica_de_analise:
+  criterio_desvio_critico:
+    "{indicator_id}": "pct_atingimento < 0.90"
+
+  kpis_analisar_juntos:
+    - grupo: ["{id1}", "{id2}"]
+      racional: "{por que analisar juntos — mecanismo causal ou correlacao}"
+      sequencia_analise:
+        - step: 1
+          acao: "{descricao da acao analitica}"
+          pergunta_chave: "{pergunta que este passo responde}"
+        - step: 2
+          acao: "{descricao}"
+          pergunta_chave: "{pergunta}"
+        - step: 3
+          acao: "{descricao}"
+          pergunta_chave: "{pergunta}"
+
+  kpis_analisar_separados: null
+  # - indicator_id: "{id}"
+  #   sequencia_analise:
+  #     - step: 1
+  #       acao: "..."
+  #       pergunta_chave: "..."
+
+  kpis_analisar_como_contexto: []
+  # - indicator_id: "{id}"
+  #   condicao_consulta: "{quando consultar este KPI}"
+
+  profundidade_maxima_arvore: 3
+  nota_aditividade_parcial: null
+  # Preencher se algum KPI e parcialmente_aditivo:
+  # "Percentuais devem ser recalculados a partir das contagens agregadas, nao somados."
+
+distribuicao:
+  destinatarios:
+    - cargo: "{cargo ou papel}"
+      escopo: "{niveis visiveis, ex: N1-N2}"
+      foco: "{o que o destinatario deve extrair}"
+  formato: WBR            # WBR | MBR | dashboard | custom
+  frequencia: semanal     # diaria | semanal | quinzenal | mensal
+  canal: email            # email | slack | sharepoint | misto
+  conteudo_obrigatorio:
+    - "Semaforo geral"
+    - "Desvios criticos com causa-raiz"
+    - "Status de contramedidas"
+    - "Projecoes de atingimento"
+
+parametros_execucao:
+  passos:
+    - passo: 1
+      nome: Coleta
+      descricao: "Executar scripts dos indicadores referenciados via collect.py"
+      dependencias: ["Biblioteca de Indicadores", "ClickHouse"]
+    - passo: 2
+      nome: "Validacao de Qualidade"
+      descricao: "Executar quality_checks de cada indicador + checks de aditividade"
+      dependencias: ["Passo 1"]
+      gate: true   # Pipeline para se falhar
+    - passo: 3
+      nome: "Calculo de Metricas Derivadas"
+      descricao: "Acumulados YTD, comparativos MoM, percentuais derivados"
+      dependencias: ["Passo 2 aprovado"]
+    - passo: 4
+      nome: "Analise Correlacional"
+      descricao: "Executar sequencia_analise dos kpis_analisar_juntos"
+      dependencias: ["Passo 3"]
+    - passo: 5
+      nome: "Analise Independente"
+      descricao: "Executar sequencia_analise dos kpis_analisar_separados"
+      dependencias: ["Passo 3"]
+    - passo: 6
+      nome: "Geracao do Relatorio"
+      descricao: "Montar WBR/MBR conforme formato e conteudo_obrigatorio"
+      dependencias: ["Passos 4 e 5"]
+    - passo: 7
+      nome: "Distribuicao"
+      descricao: "Enviar conforme canal e destinatarios"
+      dependencias: ["Passo 6"]

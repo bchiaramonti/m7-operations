@@ -1,0 +1,273 @@
+# ─────────────────────────────────────────────────────────
+# IDENTIDADE E METADADOS
+# ─────────────────────────────────────────────────────────
+
+id: {{id_snake_case}}
+name: {{Nome Legivel em Portugues}}
+status: draft
+updated_at: {{YYYY-MM-DD}}
+owner: {{nome.sobrenome}}
+domain: {{comercial|receita|clientes|operacional|risco|pessoas}}
+tags:
+  - {{tag1}}
+  - {{tag2}}
+  - {{tag3}}
+
+description: >
+  {{O que mede, como calcula, qual decisao suporta.
+  Deve ser compreensivel por humanos e agentes AI.}}
+
+unit: {{BRL|pct|count|ratio|days|score}}
+granularity: "{{dimensao / periodo}}"
+source_type: sql
+source_layer: bronze
+refresh_frequency: {{realtime|daily|weekly|monthly}}
+
+# ─────────────────────────────────────────────────────────
+# QUERY E PARAMETROS
+# ─────────────────────────────────────────────────────────
+
+dependencies:
+  - m7Bronze.{{tabela_1}}
+  - m7Bronze.{{tabela_2}}
+
+parameters:
+  - name: data_inicio
+    type: date
+    default: "2025-01-01"
+    description: Data minima do filtro de meses (formato YYYY-MM-DD)
+
+query: |
+  SELECT * FROM (
+
+  -- N1/N2/N3 via GROUPING SETS
+  SELECT
+      mes,
+      CASE
+          WHEN GROUPING(equipe) = 1 AND GROUPING(squad) = 1 THEN 'N1-Escritorio'
+          WHEN GROUPING(squad) = 1 THEN 'N2-Equipe'
+          ELSE 'N3-Squad'
+      END AS nivel,
+      'M7 Investimentos' AS escritorio,
+      equipe,
+      squad,
+      NULL AS assessor,
+      NULL AS codigo_xp,
+      SUM(meta_val) AS meta,
+      SUM(real_val) AS realizado,
+      CASE WHEN SUM(meta_val) > 0
+           THEN round(SUM(real_val) / SUM(meta_val), 4)
+           ELSE NULL END AS pct_atingimento
+  FROM (
+      SELECT
+          toDate(me.mes) AS mes,
+          CASE
+              WHEN me.id_equipe IN (350, 352) THEN 'B2B'
+              WHEN me.id_equipe IN (349, 351) THEN 'B2C'
+              ELSE 'Outros'
+          END AS equipe,
+          CASE
+              WHEN me.id_equipe IN (348, 353) THEN 'Outros'
+              ELSE eq.nome_equipe
+          END AS squad,
+          CAST(me.{{campo_meta}} AS Float64) AS meta_val,
+          CAST(COALESCE(r.realizado, 0) AS Float64) AS real_val
+      FROM m7Bronze.vw_investimento_tb_meta_equipe me
+      JOIN m7Bronze.vw_investimento_tb_equipe eq ON me.id_equipe = eq.id_equipe
+      LEFT JOIN (
+          {{-- Subquery de realizado agregado por equipe e mes --}}
+          SELECT
+              CAST(c.id_equipe AS Int32) AS id_equipe,
+              toStartOfMonth({{tabela_fato}}.data) AS mes,
+              SUM({{tabela_fato}}.{{campo_valor}}) AS realizado
+          FROM m7Bronze.{{tabela_fato}}
+          JOIN m7Bronze.vw_investimento_tb_colaborador c
+              ON {{tabela_fato}}.id_colaborador = CAST(c.id_colaborador AS Int32)
+          JOIN m7Bronze.vw_investimento_tb_equipe e
+              ON CAST(c.id_equipe AS Int32) = e.id_equipe
+          WHERE e.id_equipe IN (348, 349, 350, 351, 352, 353)
+          GROUP BY CAST(c.id_equipe AS Int32), toStartOfMonth({{tabela_fato}}.data)
+      ) r ON me.id_equipe = r.id_equipe AND toDate(me.mes) = r.mes
+      WHERE me.id_equipe IN (348, 349, 350, 351, 352, 353)
+  ) base_n3
+  GROUP BY GROUPING SETS (
+      (mes, equipe, squad),
+      (mes, equipe),
+      (mes)
+  )
+
+  UNION ALL
+
+  -- N4 - Assessor com meta
+  SELECT
+      toDate(ma.mes) AS mes,
+      'N4-Assessor' AS nivel,
+      'M7 Investimentos' AS escritorio,
+      CASE
+          WHEN e.id_equipe IN (350, 352) THEN 'B2B'
+          WHEN e.id_equipe IN (349, 351) THEN 'B2C'
+          ELSE 'Outros'
+      END AS equipe,
+      CASE
+          WHEN e.id_equipe IN (348, 353) THEN 'Outros'
+          ELSE e.nome_equipe
+      END AS squad,
+      c.nome AS assessor,
+      c.codigo_xp_a00000 AS codigo_xp,
+      CAST(ma.{{campo_meta}} AS Float64) AS meta,
+      CAST(COALESCE(r.realizado, 0) AS Float64) AS realizado,
+      CASE WHEN ma.{{campo_meta}} > 0
+           THEN round(COALESCE(r.realizado, 0) / ma.{{campo_meta}}, 4)
+           ELSE NULL END AS pct_atingimento
+  FROM m7Bronze.vw_investimento_tb_meta_assessor ma
+  JOIN m7Bronze.vw_investimento_tb_colaborador c
+      ON CAST(ma.id_colaborador AS String) = c.id_colaborador
+  JOIN m7Bronze.vw_investimento_tb_equipe e
+      ON CAST(c.id_equipe AS Int32) = e.id_equipe
+  LEFT JOIN (
+      SELECT id_colaborador, toStartOfMonth(data) AS mes, SUM({{campo_valor}}) AS realizado
+      FROM m7Bronze.{{tabela_fato}}
+      GROUP BY id_colaborador, toStartOfMonth(data)
+  ) r ON ma.id_colaborador = r.id_colaborador AND toDate(ma.mes) = r.mes
+  WHERE e.id_equipe IN (348, 349, 350, 351, 352, 353)
+
+  UNION ALL
+
+  -- N4 - Assessores com realizado mas sem meta (meta=0)
+  SELECT
+      toStartOfMonth(f.data) AS mes,
+      'N4-Assessor' AS nivel,
+      'M7 Investimentos' AS escritorio,
+      CASE
+          WHEN CAST(c.id_equipe AS Int32) IN (350, 352) THEN 'B2B'
+          WHEN CAST(c.id_equipe AS Int32) IN (349, 351) THEN 'B2C'
+          ELSE 'Outros'
+      END AS equipe,
+      CASE
+          WHEN CAST(c.id_equipe AS Int32) IN (348, 353) THEN 'Outros'
+          ELSE e.nome_equipe
+      END AS squad,
+      c.nome AS assessor,
+      c.codigo_xp_a00000 AS codigo_xp,
+      CAST(0 AS Float64) AS meta,
+      CAST(SUM(f.{{campo_valor}}) AS Float64) AS realizado,
+      NULL AS pct_atingimento
+  FROM m7Bronze.{{tabela_fato}} f
+  JOIN m7Bronze.vw_investimento_tb_colaborador c
+      ON f.id_colaborador = CAST(c.id_colaborador AS Int32)
+  JOIN m7Bronze.vw_investimento_tb_equipe e
+      ON CAST(c.id_equipe AS Int32) = e.id_equipe
+  WHERE CAST(c.id_equipe AS Int32) IN (348, 349, 350, 351, 352, 353)
+    AND (f.id_colaborador, toStartOfMonth(f.data)) NOT IN (
+        SELECT CAST(id_colaborador AS Int32), toDate(mes)
+        FROM m7Bronze.vw_investimento_tb_meta_assessor
+    )
+  GROUP BY toStartOfMonth(f.data), c.nome, c.codigo_xp_a00000,
+           CAST(c.id_equipe AS Int32), e.nome_equipe
+
+  ) AS cubo
+  WHERE mes >= @data_inicio
+  ORDER BY mes, nivel, equipe, squad, assessor
+
+# ─────────────────────────────────────────────────────────
+# GUIA DE ANALISE E QUALIDADE
+# ─────────────────────────────────────────────────────────
+
+analysis_guide: >
+  {{Principal KPI de [dominio]. Mede [o que].
+  Benchmark M7 (2026): [valor de referencia].
+  Faixas de atingimento: >=100% = superacao, 80-99% = dentro do esperado,
+  <80% = atencao, <60% = alarmante.
+  Sazonalidade: [meses tipicamente fortes/fracos e razoes].
+  Caveats: [regras de aditividade, excecoes, limitacoes].}}
+
+quality_checks:
+  - "realizado N1 deve ser igual a Sum(realizado N2) para o mesmo mes"
+  - "realizado N2 deve ser igual a Sum(realizado N3) para mesma equipe e mes"
+  - "realizado N3 deve ser igual a Sum(realizado N4) para mesmo squad e mes"
+  - "meta N1 deve ser igual a Sum(meta N2) para o mesmo mes"
+  - "pct_atingimento NULL apenas quando meta = 0"
+  - "todo assessor N4 deve ter equipe e squad nao-NULL"
+  - "{{check especifico do indicador}}"
+
+# ─────────────────────────────────────────────────────────
+# EXPLANATORY CONTEXT (obrigatorio para status "validated")
+# ─────────────────────────────────────────────────────────
+
+explanatory_context:
+
+  related_indicators:
+    - indicator_id: {{indicador_relacionado_1}}
+      relationship: {{leading|lagging|correlated|inverse|component}}
+      explanation: >
+        {{Mecanismo da relacao em linguagem natural.}}
+    - indicator_id: {{indicador_relacionado_2}}
+      relationship: {{leading|lagging|correlated|inverse|component}}
+      explanation: >
+        {{Mecanismo da relacao em linguagem natural.}}
+
+  segmentation_dimensions:
+    - dimension: Equipe
+      source_column: equipe
+      typical_segments: [B2B, B2C, Outros]
+      diagnostic_value: high
+      rationale: >
+        B2B e B2C tem perfis distintos. Divergencias revelam se o
+        problema e estrutural (canal inteiro) ou pontual.
+    - dimension: Squad
+      source_column: squad
+      typical_segments: [Alta Renda, Mesa, Private, Corporate]
+      diagnostic_value: high
+      rationale: >
+        Squads sao a unidade operacional de gestao. Permitem identificar
+        qual time especifico esta descolado.
+    - dimension: Assessor
+      source_column: assessor
+      typical_segments: [Top 10, Bottom 10, Com captacao negativa, Sem meta]
+      diagnostic_value: high
+      rationale: >
+        Nivel mais granular. Permite identificar concentracao e
+        assessores em dificuldade.
+
+  external_factors:
+    - factor: {{Fator Externo 1}}
+      impact_direction: >
+        {{Como tipicamente afeta o indicador.}}
+      data_source: "web_search: '{{termo de busca}}'"
+
+  investigation_playbook:
+    - step: 1
+      action: >
+        Comparar N1 mes atual vs mes anterior e vs mesmo mes ano anterior (MoM e YoY).
+      expected_insight: >
+        Tendencia geral — crescendo, retraindo ou estavel?
+      tools:
+        - "query: {{id}} com filtro nivel='N1-Escritorio'"
+    - step: 2
+      action: >
+        Segmentar por equipe (N2) — comparar B2B vs B2C.
+      expected_insight: >
+        Qual canal esta puxando ou freando o resultado?
+      tools:
+        - "query: {{id}} com filtro nivel='N2-Equipe'"
+    - step: 3
+      action: >
+        Drill-down no squad (N3) da equipe com maior desvio.
+      expected_insight: >
+        Qual time especifico concentra o problema/oportunidade?
+      tools:
+        - "query: {{id}} com filtro nivel='N3-Squad'"
+    - step: 4
+      action: >
+        Analisar assessores (N4) do squad identificado.
+      expected_insight: >
+        Concentracao em poucos assessores? Assessores com resultado negativo?
+      tools:
+        - "query: {{id}} com filtro nivel='N4-Assessor'"
+    - step: 5
+      action: >
+        Cruzar com {{indicador_relacionado_1}} dos assessores identificados.
+      expected_insight: >
+        {{O que o cruzamento deve revelar.}}
+      tools:
+        - "indicator: {{indicador_relacionado_1}}"

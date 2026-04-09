@@ -1,0 +1,21 @@
+{
+  "name": "m7-ritual-gestao",
+  "version": "1.7.2",
+  "description": "Rituais de gestao M7. Operacionaliza o processo G2.3 com 2 etapas: preparacao de materiais pre-ritual (HTML + Briefing) a partir do WBR gerado pelo m7-controle (E2), e registro de decisoes pos-ritual em ata estruturada com atualizacao do plano-de-acao.csv (E5). Cadencia semanal: terca (materiais), quinta (registro).",
+  "author": {
+    "name": "Bruno Chiaramonti"
+  },
+  "homepage": "https://github.com/bchiaramonti/claude-plugins",
+  "repository": "https://github.com/bchiaramonti/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "ritual",
+    "gestao",
+    "wbr",
+    "html",
+    "briefing",
+    "ata",
+    "plano-de-acao",
+    "m7"
+  ]
+}

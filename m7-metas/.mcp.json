@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "clickhouse-m7bronze": {
+      "type": "http",
+      "url": "<clickhouse-mcp-url>",
+      "description": "ClickHouse warehouse - camadas Bronze/Silver/Gold. Usado para testar queries e explorar views."
+    },
+    "bitrix24-crm": {
+      "type": "http",
+      "url": "<bitrix24-mcp-url>",
+      "description": "Bitrix24 CRM - deals, pipeline, contatos. Usado para testar tools MCP e validar output_fields."
+    }
+  }
+}

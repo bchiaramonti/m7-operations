@@ -1,0 +1,112 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "m7-operations",
+  "owner": {
+    "name": "Bruno Chiaramonti"
+  },
+  "metadata": {
+    "description": "Claude Code marketplace for M7 operations: performance management, commission processing, and management rituals."
+  },
+  "plugins": [
+    {
+      "name": "m7-controle",
+      "description": "Ciclo de controle de performance M7. Operacionaliza o processo G2.2 com 7 etapas: Cards de Performance, coleta paralela via scripts Python standalone, analise de desvios com semaforo e segmentacao, acompanhamento de acoes, projecao YAML-driven com dependencias cruzadas, consolidacao do WBR com periodo/granularidade configuravel e licoes aprendidas mensais cross-vertical.",
+      "version": "5.4.0",
+      "author": {
+        "name": "Bruno Chiaramonti"
+      },
+      "source": "./m7-controle",
+      "category": "performance-management",
+      "homepage": "https://github.com/bchiaramonti/claude-plugins",
+      "keywords": [
+        "performance",
+        "wbr",
+        "kpi",
+        "indicators",
+        "cards",
+        "weekly-review",
+        "clickhouse",
+        "bitrix24",
+        "m7"
+      ]
+    },
+    {
+      "name": "m7-ritual-gestao",
+      "description": "Rituais de gestao M7. Operacionaliza o processo G2.3 com 2 etapas: preparacao de materiais pre-ritual (HTML + Briefing) a partir do WBR gerado pelo m7-controle (E2), e registro de decisoes pos-ritual em ata estruturada + PDF visual com atualizacao do plano-de-acao.csv (E5). Cadencia semanal: terca (materiais), quinta (registro).",
+      "version": "1.7.2",
+      "author": {
+        "name": "Bruno Chiaramonti"
+      },
+      "source": "./m7-ritual-gestao",
+      "category": "performance-management",
+      "homepage": "https://github.com/bchiaramonti/claude-plugins",
+      "keywords": [
+        "ritual",
+        "gestao",
+        "wbr",
+        "pptx",
+        "briefing",
+        "ata",
+        "plano-de-acao",
+        "m7"
+      ]
+    },
+    {
+      "name": "m7-metas",
+      "description": "Criacao e manutencao de indicadores na Biblioteca M7 conforme ESP-PERF-001. Entrevista guiada, validacao contra schema v2.0, ciclo de maturidade (draft > validated > promoted_to_gold) e templates por source_type (sql, mcp, hybrid).",
+      "version": "1.0.1",
+      "author": {
+        "name": "Bruno Chiaramonti"
+      },
+      "source": "./m7-metas",
+      "category": "performance-management",
+      "homepage": "https://github.com/bchiaramonti/claude-plugins",
+      "keywords": [
+        "indicadores",
+        "kpi",
+        "metas",
+        "performance",
+        "m7",
+        "biblioteca",
+        "esp-perf-001"
+      ]
+    },
+    {
+      "name": "m7-plano-acao",
+      "description": "Registro e acompanhamento de Acoes de Melhoria M7. CRUD no plano-de-acao.csv com backup automatico, briefing diario e relatorio de KPIs. Use when managing improvement actions, registering new actions, or reviewing action plan status.",
+      "version": "2.0.1",
+      "author": {
+        "name": "Bruno Chiaramonti"
+      },
+      "source": "./m7-plano-acao",
+      "category": "performance-management",
+      "homepage": "https://github.com/bchiaramonti/claude-plugins",
+      "keywords": [
+        "plano-de-acao",
+        "melhorias",
+        "csv",
+        "m7"
+      ]
+    },
+    {
+      "name": "m7-comissionamento",
+      "description": "Processamento mensal de comissionamento M7 Investimentos. Estrutura competencias, valida arquivos raw, processa receitas Split C com ETL multicamadas (Bronze/Silver/Gold), gera comissao oficial Louro Tech e resumo financeiro por assessor. Use quando for processar ciclos mensais de comissionamento da M7.",
+      "version": "1.0.2",
+      "author": {
+        "name": "Bruno Chiaramonti"
+      },
+      "source": "./m7-comissionamento",
+      "category": "finance",
+      "homepage": "https://github.com/bchiaramonti/claude-plugins",
+      "keywords": [
+        "comissionamento",
+        "comissoes",
+        "split-c",
+        "etl",
+        "medallion",
+        "louro-tech",
+        "m7"
+      ]
+    }
+  ]
+}

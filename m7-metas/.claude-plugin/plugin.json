@@ -1,0 +1,11 @@
+{
+  "name": "m7-metas",
+  "version": "1.0.1",
+  "description": "Criacao e manutencao de indicadores na Biblioteca M7 conforme ESP-PERF-001. Entrevista guiada, validacao contra schema v2.0, ciclo de maturidade (draft > validated > promoted_to_gold) e templates por source_type (sql, mcp, hybrid).",
+  "author": {
+    "name": "Bruno Chiaramonti",
+    "email": "bruno.chiaramonti@multisete.com"
+  },
+  "keywords": ["indicadores", "kpi", "metas", "performance", "m7", "biblioteca", "esp-perf-001"],
+  "mcpServers": "./.mcp.json"
+}

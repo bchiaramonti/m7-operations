@@ -1,0 +1,240 @@
+# ─────────────────────────────────────────────────────────
+# IDENTIDADE E METADADOS
+# ─────────────────────────────────────────────────────────
+
+id: {{id_snake_case}}
+name: {{Nome Legivel em Portugues}}
+status: draft
+updated_at: {{YYYY-MM-DD}}
+owner: {{nome.sobrenome}}
+domain: {{comercial|receita|clientes|operacional|risco|pessoas}}
+tags:
+  - {{tag1}}
+  - {{tag2}}
+  - {{tag3}}
+
+description: >
+  {{O que mede, como calcula, qual decisao suporta.
+  Fonte primaria: Bitrix24 (dados transacionais).
+  Enriquecido com: ClickHouse (hierarquia comercial para segmentacao).}}
+
+unit: {{BRL|pct|count|ratio|days|score}}
+granularity: "{{dimensao / periodo}}"
+source_type: hybrid
+source_layer: api
+refresh_frequency: {{realtime|daily|weekly|monthly}}
+
+# ─────────────────────────────────────────────────────────
+# EXTRACTION (source_type: hybrid)
+# ─────────────────────────────────────────────────────────
+
+dependencies:
+  - mcp: {{bitrix24_tool_1}}
+  - mcp: {{bitrix24_tool_2}}
+  - sql: m7Bronze.vw_investimento_tb_colaborador
+  - sql: m7Bronze.vw_investimento_tb_equipe
+
+parameters:
+  - name: data_inicio
+    type: date
+    default: "2025-01-01"
+    description: Data minima do filtro
+  - name: data_fim
+    type: date
+    default: "today"
+    description: Data maxima do filtro
+
+extraction:
+  description: >
+    {{Dados transacionais extraidos do Bitrix24, enriquecidos com
+    hierarquia comercial do ClickHouse para segmentacao por
+    equipe/squad/assessor. A fonte primaria e o Bitrix porque
+    [razao: dados nao replicados no warehouse, tempo real, etc].}}
+
+  steps:
+    # ── Steps MCP (fonte primaria) ──────────────────────
+    - id: 1
+      source: mcp
+      tool: {{bitrix24_get_deals_from_date_range}}
+      params:
+        date_from: "@data_inicio"
+        date_to: "@data_fim"
+      filters:
+        {{CAMPO}}: "{{valor}}"
+      output_name: {{raw_data}}
+      output_fields: [{{ID, OPPORTUNITY, ASSIGNED_BY_ID, CATEGORY_ID, STAGE_ID, DATE_CREATE}}]
+      note: "{{Paginacao automatica pelo MCP}}"
+
+    - id: 2
+      source: mcp
+      tool: bitrix24_get_all_users
+      params: {}
+      output_name: bitrix_users
+      output_fields: [ID, NAME, LAST_NAME, EMAIL]
+      note: "Cache possivel — muda raramente"
+
+    # ── Steps SQL (dimensoes para segmentacao) ──────────
+    - id: 3
+      source: sql
+      query: |
+        SELECT id_colaborador, nome, codigo_xp_a00000, id_equipe
+        FROM vw_investimento_tb_colaborador
+        WHERE CAST(id_equipe AS Int32) IN (348, 349, 350, 351, 352, 353)
+      output_name: dim_colaboradores
+      output_fields: [id_colaborador, nome, codigo_xp_a00000, id_equipe]
+
+    - id: 4
+      source: sql
+      query: |
+        SELECT id_equipe, nome_equipe
+        FROM vw_investimento_tb_equipe
+        WHERE id_equipe IN (348, 349, 350, 351, 352, 353)
+      output_name: dim_equipe
+      output_fields: [id_equipe, nome_equipe]
+
+  # ── Ponte entre os dois mundos ────────────────────────
+  bridge: |
+    A ponte entre Bitrix e ClickHouse e:
+      bitrix_users.EMAIL -> dim_colaboradores.email_corporativo
+      OU bitrix_users.ID -> tabela de-para bitrix_id -> codigo_xp
+
+    Uma vez resolvido o colaborador, a hierarquia vem do ClickHouse:
+      colaborador.id_equipe -> dim_equipe.nome_equipe
+      id_equipe -> B2B/B2C (349,351=B2C | 350,352=B2B)
+
+    Cobertura esperada: >90%. Registros sem match ficam em "Outros".
+
+  transform: |
+    # 1. Ponte: Bitrix user -> colaborador CH
+    users_map = bitrix_users.merge(dim_colaboradores,
+        left_on='EMAIL', right_on='email_corporativo')
+
+    # 2. Enriquecer dados com hierarquia
+    data = {{raw_data}}.merge(users_map, left_on='ASSIGNED_BY_ID', right_on='BITRIX_ID')
+    data = data.merge(dim_equipe, on='id_equipe')
+
+    # 3. Classificar segmento
+    data['equipe'] = data['id_equipe'].map({
+        350: 'B2B', 352: 'B2B',
+        349: 'B2C', 351: 'B2C',
+        348: 'Outros', 353: 'Outros'
+    })
+
+    # 4. Calcular metricas
+    data['mes'] = data['DATE_CREATE'].dt.to_period('M')
+    result = data.groupby(['mes', 'equipe', 'squad', 'assessor']).agg(
+        {{metrica}}=('{{campo}}', '{{agg_func}}')
+    )
+
+    # 5. Verificar cobertura do bridge
+    coverage = len(users_map) / len(bitrix_users)
+    assert coverage >= 0.90, f"Bridge coverage {coverage:.1%} < 90%"
+
+  output_schema:
+    columns: [mes, nivel, equipe, squad, assessor, {{metrica}}]
+    types: [date, string, string, string, string, {{float64|int}}]
+    sort: [mes, nivel, equipe, squad, assessor]
+
+# ─────────────────────────────────────────────────────────
+# GUIA DE ANALISE E QUALIDADE
+# ─────────────────────────────────────────────────────────
+
+analysis_guide: >
+  {{O que mede e por que importa.
+  Benchmark M7 (2026): [valor de referencia].
+  Faixas: >=100% superacao, 80-99% normal, <80% atencao, <60% alarme.
+  Sazonalidade: [padroes conhecidos].
+  Caveats: dados do Bitrix podem ter latencia de [X].
+  A cobertura do bridge pode variar se novos assessores nao
+  tiverem email corporativo cadastrado no ClickHouse.}}
+
+quality_checks:
+  - "cobertura do bridge >= 90%"
+  - "output_fields presentes na resposta do MCP"
+  - "paginacao retornou todos os registros (comparar count com total)"
+  - "nenhum registro com campos obrigatorios NULL"
+  - "registros sem match classificados em 'Outros'"
+  - "{{check de aditividade: N1 = Sum(N2)}}"
+  - "{{check especifico do indicador}}"
+
+# ─────────────────────────────────────────────────────────
+# EXPLANATORY CONTEXT (obrigatorio para status "validated")
+# ─────────────────────────────────────────────────────────
+
+explanatory_context:
+
+  related_indicators:
+    - indicator_id: {{indicador_relacionado_1}}
+      relationship: {{leading|lagging|correlated|inverse|component}}
+      explanation: >
+        {{Mecanismo da relacao.}}
+    - indicator_id: {{indicador_relacionado_2}}
+      relationship: {{leading|lagging|correlated|inverse|component}}
+      explanation: >
+        {{Mecanismo da relacao.}}
+
+  segmentation_dimensions:
+    - dimension: Equipe
+      source_column: equipe
+      typical_segments: [B2B, B2C, Outros]
+      diagnostic_value: high
+      rationale: >
+        B2B e B2C tem perfis distintos. Divergencias revelam se o
+        problema e estrutural (canal inteiro) ou pontual.
+    - dimension: Squad
+      source_column: squad
+      typical_segments: [Alta Renda, Mesa, Private, Corporate]
+      diagnostic_value: high
+      rationale: >
+        Squads sao a unidade operacional de gestao.
+    - dimension: Assessor
+      source_column: assessor
+      typical_segments: [Top 10, Bottom 10, Sem match no bridge]
+      diagnostic_value: high
+      rationale: >
+        Nivel mais granular. Em hybrid, verificar tambem assessores
+        sem match no bridge (podem estar subrepresentados).
+
+  external_factors:
+    - factor: {{Fator Externo 1}}
+      impact_direction: >
+        {{Como tipicamente afeta o indicador.}}
+      data_source: "{{web_search: 'termo' ou URL}}"
+
+  investigation_playbook:
+    - step: 1
+      action: >
+        Verificar cobertura do bridge (steps 2-3 do extraction).
+      expected_insight: >
+        Se coverage < 90%, o indicador pode estar subrepresentando
+        assessores recentes. Identificar quais faltam.
+      tools:
+        - "extraction: steps 2,3 — LEFT JOIN e contar NULLs"
+    - step: 2
+      action: >
+        Visao geral N1 — MoM e YoY.
+      expected_insight: >
+        Tendencia geral do indicador.
+      tools:
+        - "extraction: all steps, transform com filtro nivel='N1'"
+    - step: 3
+      action: >
+        Segmentar por equipe (N2).
+      expected_insight: >
+        Qual canal esta puxando ou freando?
+      tools:
+        - "extraction: all steps, transform com groupby='equipe'"
+    - step: 4
+      action: >
+        Drill-down no squad da equipe com maior desvio.
+      expected_insight: >
+        Qual time especifico concentra o problema?
+      tools:
+        - "extraction: all steps, transform com filtro equipe='{{valor}}'"
+    - step: 5
+      action: >
+        Cruzar com {{indicador_relacionado_1}}.
+      expected_insight: >
+        {{O que o cruzamento deve revelar.}}
+      tools:
+        - "indicator: {{indicador_relacionado_1}}"

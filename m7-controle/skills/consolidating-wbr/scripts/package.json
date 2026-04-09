@@ -1,0 +1,9 @@
+{
+  "name": "m7-controle-wbr-pdf",
+  "version": "1.0.0",
+  "description": "HTML to PDF converter for WBR Narrativo using Puppeteer",
+  "private": true,
+  "dependencies": {
+    "puppeteer": "^22.0.0"
+  }
+}

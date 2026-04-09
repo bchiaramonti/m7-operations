@@ -1,0 +1,188 @@
+# ─────────────────────────────────────────────────────────
+# IDENTIDADE E METADADOS
+# ─────────────────────────────────────────────────────────
+
+id: {{id_snake_case}}
+name: {{Nome Legivel em Portugues}}
+status: draft
+updated_at: {{YYYY-MM-DD}}
+owner: {{nome.sobrenome}}
+domain: {{comercial|receita|clientes|operacional|risco|pessoas}}
+tags:
+  - {{tag1}}
+  - {{tag2}}
+  - {{tag3}}
+
+description: >
+  {{O que mede, como calcula, qual decisao suporta.
+  Deve ser compreensivel por humanos e agentes AI.}}
+
+unit: {{BRL|pct|count|ratio|days|score}}
+granularity: "{{dimensao / periodo}}"
+source_type: mcp
+source_layer: api
+refresh_frequency: {{realtime|daily|weekly|monthly}}
+
+# ─────────────────────────────────────────────────────────
+# EXTRACTION (source_type: mcp)
+# ─────────────────────────────────────────────────────────
+
+dependencies:
+  - mcp: {{tool_1}}
+  - mcp: {{tool_2}}
+
+parameters:
+  - name: data_inicio
+    type: date
+    default: "2025-01-01"
+    description: Data minima do filtro
+  - name: data_fim
+    type: date
+    default: "today"
+    description: Data maxima do filtro
+
+extraction:
+  description: >
+    {{Breve descricao do que a extracao faz e por que usa MCP
+    em vez de ClickHouse (dados nao disponiveis no warehouse,
+    necessidade de dados em tempo real, etc).}}
+
+  steps:
+    - id: 1
+      source: mcp
+      tool: {{bitrix24_get_deals_from_date_range}}
+      params:
+        date_from: "@data_inicio"
+        date_to: "@data_fim"
+      filters:
+        {{CAMPO}}: "{{valor}}"
+      output_name: {{raw_data}}
+      output_fields: [{{ID, CAMPO_1, CAMPO_2, CAMPO_3}}]
+      note: "{{Paginacao automatica pelo MCP}}"
+
+    - id: 2
+      source: mcp
+      tool: {{bitrix24_get_all_users}}
+      params: {}
+      output_name: {{users}}
+      output_fields: [{{ID, NAME, LAST_NAME, EMAIL}}]
+      note: "{{Cache possivel — muda raramente}}"
+
+  transform: |
+    # Pseudocodigo Python da transformacao
+    # 1. Merge dos datasets
+    data = {{raw_data}}.merge({{users}}, left_on='{{campo_join}}', right_on='ID')
+
+    # 2. Filtros de negocio
+    data = data[data['{{campo_filtro}}'] == '{{valor}}']
+
+    # 3. Agregacao e calculo
+    result = data.groupby(['{{dimensao}}', '{{periodo}}']).agg(
+        metrica_1=('{{campo}}', 'sum'),
+        metrica_2=('{{campo}}', 'count')
+    )
+
+    # 4. Calculo de percentuais (se aplicavel)
+    result['pct'] = result['metrica_1'] / result['metrica_1'].sum()
+
+  output_schema:
+    columns: [{{mes, nivel, assessor, metrica_1, metrica_2}}]
+    types: [{{date, string, string, float64, int}}]
+    sort: [{{mes, nivel, assessor}}]
+
+# ─────────────────────────────────────────────────────────
+# GUIA DE ANALISE E QUALIDADE
+# ─────────────────────────────────────────────────────────
+
+analysis_guide: >
+  {{O que mede e por que importa.
+  Benchmark M7 (2026): [valor de referencia].
+  Faixas: >=100% superacao, 80-99% normal, <80% atencao, <60% alarme.
+  Sazonalidade: [padroes conhecidos].
+  Caveats: [limitacoes da fonte MCP, latencia, cobertura].}}
+
+quality_checks:
+  - "output_fields presentes na resposta do MCP"
+  - "paginacao retornou todos os registros (comparar count com total)"
+  - "nenhum registro com campos obrigatorios NULL"
+  - "{{check de dominio: valor dentro de faixa esperada}}"
+  - "{{check de reconciliacao: total bate com fonte oficial}}"
+
+# ─────────────────────────────────────────────────────────
+# EXPLANATORY CONTEXT (obrigatorio para status "validated")
+# ─────────────────────────────────────────────────────────
+
+explanatory_context:
+
+  related_indicators:
+    - indicator_id: {{indicador_relacionado_1}}
+      relationship: {{leading|lagging|correlated|inverse|component}}
+      explanation: >
+        {{Mecanismo da relacao.}}
+    - indicator_id: {{indicador_relacionado_2}}
+      relationship: {{leading|lagging|correlated|inverse|component}}
+      explanation: >
+        {{Mecanismo da relacao.}}
+
+  segmentation_dimensions:
+    - dimension: {{Dimensao 1}}
+      source_column: {{campo_no_output}}
+      typical_segments: [{{seg1, seg2, seg3}}]
+      diagnostic_value: {{high|medium|low}}
+      rationale: >
+        {{Por que esse corte importa.}}
+    - dimension: {{Dimensao 2}}
+      source_column: {{campo_no_output}}
+      typical_segments: [{{seg1, seg2}}]
+      diagnostic_value: {{high|medium|low}}
+      rationale: >
+        {{Por que esse corte importa.}}
+    - dimension: {{Dimensao 3}}
+      source_column: {{campo_no_output}}
+      typical_segments: [{{seg1, seg2}}]
+      diagnostic_value: {{high|medium|low}}
+      rationale: >
+        {{Por que esse corte importa.}}
+
+  external_factors:
+    - factor: {{Fator Externo 1}}
+      impact_direction: >
+        {{Como tipicamente afeta o indicador.}}
+      data_source: "{{web_search: 'termo' ou URL}}"
+
+  investigation_playbook:
+    - step: 1
+      action: >
+        {{Primeira analise: visao geral do indicador no periodo.}}
+      expected_insight: >
+        {{O que este passo deve revelar.}}
+      tools:
+        - "extraction: steps 1-2, transform com filtro nivel='N1'"
+    - step: 2
+      action: >
+        {{Segmentar por dimensao principal.}}
+      expected_insight: >
+        {{O que a segmentacao deve revelar.}}
+      tools:
+        - "extraction: steps 1-2, transform com groupby={{dimensao}}"
+    - step: 3
+      action: >
+        {{Drill-down na dimensao com maior desvio.}}
+      expected_insight: >
+        {{O que o drill-down deve revelar.}}
+      tools:
+        - "extraction: steps 1-2, transform com filtro={{dimensao}}='{{valor}}'"
+    - step: 4
+      action: >
+        {{Analisar nivel mais granular.}}
+      expected_insight: >
+        {{O que a granularidade deve revelar.}}
+      tools:
+        - "extraction: full pipeline"
+    - step: 5
+      action: >
+        {{Cruzar com indicador relacionado.}}
+      expected_insight: >
+        {{O que o cruzamento deve revelar.}}
+      tools:
+        - "indicator: {{indicador_relacionado_1}}"

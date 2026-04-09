@@ -1,0 +1,11 @@
+{
+  "name": "m7-plano-acao",
+  "version": "2.0.1",
+  "description": "Registro e acompanhamento de Acoes de Melhoria M7. CRUD no plano-de-acao.csv com backup automatico, briefing diario e relatorio de KPIs. Use when managing improvement actions, registering new actions, or reviewing action plan status.",
+  "author": {
+    "name": "Bruno Chiaramonti",
+    "email": "bruno.chiaramonti@m7investimentos.com.br"
+  },
+  "license": "MIT",
+  "keywords": ["plano-de-acao", "melhorias", "csv"]
+}

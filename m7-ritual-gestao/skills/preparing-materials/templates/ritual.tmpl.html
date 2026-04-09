@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ritual de Gestao {{nivel}} {{vertical}} - {{data}}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      background: #333;
+      font-family: "twkEverett", Arial, sans-serif;
+    }
+    .presentation {
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .slide-wrapper {
+      max-width: 960px;
+      margin: 0 auto 20px auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .slide-label {
+      background: #424135;
+      color: #eef77c;
+      font-family: "twkEverett", Arial, sans-serif;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .slide-container {
+      position: relative;
+      width: 100%;
+      padding-bottom: 56.25%;
+      overflow: hidden;
+    }
+    .slide-frame {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 960px;
+      height: 540px;
+      border: none;
+      transform-origin: top left;
+      transform: scale(1);
+    }
+    @media print {
+      html, body { background: white; }
+      .presentation { padding: 0; max-width: none; }
+      .slide-wrapper {
+        box-shadow: none;
+        margin: 0;
+        max-width: none;
+        page-break-after: always;
+        border-radius: 0;
+      }
+      .slide-wrapper:last-child { page-break-after: auto; }
+      .slide-label { display: none; }
+      .slide-container { padding-bottom: 0; height: 405pt; width: 720pt; }
+      .slide-frame { position: static; width: 720pt; height: 405pt; transform: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="presentation">
+
+  <!-- ============================================================
+       SLIDE 1: CAPA
+       ============================================================ -->
+  <div class="slide-wrapper">
+    <div class="slide-label">Slide 1 - Capa</div>
+    <div class="slide-container">
+      <iframe class="slide-frame" srcdoc="<!DOCTYPE html>
+<html><head><style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 720pt; height: 405pt; background: #424135; font-family: "twkEverett", Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; line-height: 1.4; }
+.gold-line { width: 80px; height: 3px; background: #eef77c; margin-bottom: 16px; }
+h1 { color: #fffdef; font-size: 32px; font-weight: 400; margin: 0 0 8px 0; text-align: center; }
+.subtitle { color: #79755c; font-size: 16px; margin: 0 0 24px 0; text-align: center; }
+.meta { color: #eef77c; font-size: 14px; margin: 4px 0; text-align: center; }
+.footer-info { position: absolute; bottom: 24px; color: #79755c; font-size: 12px; }
+</style></head><body>
+<div class='gold-line'></div>
+<h1>Ritual de Gestao {{nivel}} {{vertical}}</h1>
+<p class='subtitle'>Resultados {{periodo_label}} | Ciclo {{data}}</p>
+<p class='meta'>Area: {{vertical}} | Nivel: {{nivel}}</p>
+<p class='meta'>Diretos: {{diretos_label}}</p>
+<p class='footer-info'>M7 Investimentos</p>
+</body></html>"></iframe>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       SLIDE 2: VISAO GERAL — MATRIZ DE STATUS
+       ============================================================ -->
+  <div class="slide-wrapper">
+    <div class="slide-label">Slide 2 - Visao Geral</div>
+    <div class="slide-container">
+      <iframe class="slide-frame" srcdoc="<!DOCTYPE html>
+<html><head><style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 720pt; height: 405pt; background: #fffdef; font-family: "twkEverett", Arial, sans-serif; display: flex; flex-direction: column; line-height: 1.4; }
+.header { background: #424135; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+h1 { color: #fffdef; font-size: 18px; font-weight: 400; }
+.section-tag { color: #eef77c; font-size: 11px; }
+.content { flex: 1; padding: 12px 16px; display: flex; flex-direction: column; overflow: hidden; }
+.matrix-container { flex: 1; background: white; border: 1px solid #d0d0cc; border-radius: 4px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; font-size: 10px; table-layout: fixed; }
+thead th { font-weight: 500; padding: 4px 4px; text-align: center; vertical-align: middle; }
+thead .period-header th { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: none; }
+thead .period-header th.ind { background: #fffdef; color: #424135; font-size: 10px; text-transform: none; }
+thead .period-header th.month { background: #424135; color: #fffdef; }
+thead .main-header th { font-size: 10px; font-weight: 500; padding: 4px 4px; color: #fffdef; }
+thead .main-header th.m-n { background: #424135; }
+thead .main-header th.m-e1 { background: #4f4e3c; }
+thead .main-header th.m-e2 { background: #5f5e4c; }
+tbody tr { border-bottom: 1px solid #f6f6f5; }
+tbody td { padding: 4px 4px; text-align: center; vertical-align: middle; font-size: 10px; height: 28px; }
+tbody td:first-child { text-align: left; padding-left: 8px; font-weight: 500; color: #424135; }
+.section-row-kpi td { background: #eef77c; color: #424135; font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; text-align: left; height: 20px; }
+.section-row-ppi td { background: #79755c; color: #FFFFFF; font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; text-align: left; height: 20px; }
+.status-cell { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 4px; }
+.cell-data { display: flex; flex-direction: column; align-items: flex-start; }
+.status-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.green { background: #4CAF50; } .status-dot.yellow { background: #FFC107; } .status-dot.red { background: #e40014; } .status-dot.gray { background: #d0d0cc; border: 1px solid #aeada8; }
+.cell-value { font-size: 10px; color: #424135; font-weight: 700; }
+.cell-meta { font-size: 8px; color: #79755c; }
+.cell-deviation { font-size: 8px; font-weight: 700; }
+.cell-deviation.positive { color: #4CAF50; } .cell-deviation.negative { color: #e40014; }
+.na-cell { color: #aeada8; font-size: 10px; }
+.legend { display: flex; gap: 8px; justify-content: flex-end; padding: 4px 0; }
+.legend-item { display: flex; align-items: center; gap: 4px; font-size: 9px; color: #79755c; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+.legend-dot.green { background: #4CAF50; } .legend-dot.yellow { background: #FFC107; } .legend-dot.red { background: #e40014; }
+.footer { padding: 4px 24px 4px; display: flex; justify-content: flex-end; }
+.page-number { color: #79755c; font-size: 9px; }
+</style></head><body>
+<div class='header'><h1>Matriz de Status por Indicador</h1><p class='section-tag'>VISAO GERAL</p></div>
+<div class='content'>
+  <div class='matrix-container'>
+    <table>
+      <colgroup><col style='width:20%'><col style='width:26.6%'><col style='width:26.6%'><col style='width:26.8%'></colgroup>
+      <thead>
+        <tr class='period-header'>
+          <th rowspan='2' class='ind'>Indicador</th>
+          <th colspan='3' class='month'>Mes Corrente ({{periodo_mes_label}})</th>
+        </tr>
+        <tr class='main-header'>
+          <th class='m-n'>{{nivel}}</th>
+          <th class='m-e1'>{{especialista1_nome}}</th>
+          <th class='m-e2'>{{especialista2_nome}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{matriz_rows}}
+      </tbody>
+    </table>
+  </div>
+  <div class='legend'>
+    <div class='legend-item'><span class='legend-dot green'></span> No alvo</div>
+    <div class='legend-item'><span class='legend-dot yellow'></span> Atencao</div>
+    <div class='legend-item'><span class='legend-dot red'></span> Critico</div>
+    <div class='legend-item'><span class='legend-dot' style='background:#d0d0cc;border:1px solid #aeada8;'></span> Sem meta</div>
+  </div>
+</div>
+<div class='footer'><p class='page-number'>2</p></div>
+</body></html>"></iframe>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       SLIDE 3: AGENDA
+       ============================================================ -->
+  <div class="slide-wrapper">
+    <div class="slide-label">Slide 3 - Agenda</div>
+    <div class="slide-container">
+      <iframe class="slide-frame" srcdoc="<!DOCTYPE html>
+<html><head><style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 720pt; height: 405pt; background: #fffdef; font-family: "twkEverett", Arial, sans-serif; display: flex; flex-direction: column; line-height: 1.4; }
+.header { background: #424135; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+h1 { color: #fffdef; font-size: 18px; font-weight: 400; }
+.section-tag { color: #eef77c; font-size: 12px; }
+.content { flex: 1; padding: 24px 40px; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
+.agenda-item { display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: white; border-radius: 8px; border-left: 4px solid #eef77c; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.agenda-number { width: 36px; height: 36px; background: #424135; color: #fffdef; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; flex-shrink: 0; }
+.agenda-content { flex: 1; }
+.agenda-title { font-size: 14px; font-weight: 400; color: #424135; margin-bottom: 2px; }
+.agenda-subtitle { font-size: 11px; color: #79755c; }
+.agenda-time { font-size: 10px; color: #424135; font-weight: 700; background: #eef77c; padding: 2px 8px; border-radius: 4px; }
+.footer { padding: 12px 24px; display: flex; justify-content: flex-end; }
+.page-number { color: #79755c; font-size: 9px; }
+</style></head><body>
+<div class='header'><h1>Agenda</h1><p class='section-tag'>RITUAL DE GESTAO {{nivel}}</p></div>
+<div class='content'>
+  {{agenda_items}}
+</div>
+<div class='footer'><p class='page-number'>3</p></div>
+</body></html>"></iframe>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       BLOCOS POR ESPECIALISTA
+       Repetir este bloco para cada especialista.
+       Cada bloco contem 5 slides: Dashboard, Analise, Projecao, Sugestoes PPI, Agenda Transicao.
+
+       Placeholders por bloco:
+       - {{esp_iniciais}}: iniciais do especialista (ex: "TB")
+       - {{esp_nome}}: nome completo (ex: "Tereza Bernardo")
+       - {{esp_periodo}}: periodo de referencia (ex: "Janeiro 2026")
+       - {{esp_indicadores_rows}}: rows da tabela de indicadores
+       - {{esp_acoes_executadas}}: bullets de acoes executadas
+       - {{esp_acoes_planejadas}}: bullets de acoes planejadas
+       - {{esp_riscos}}: risk items
+       - {{esp_desvio_principal}}: ex: "R$ 17.898 vs R$ 44.223 (-59,5%)"
+       - {{esp_chart_receita}}: bar rows do grafico de receita
+       - {{esp_chart_volume}}: bar rows do grafico de volume
+       - {{esp_diagnostico_problema}}: HTML do bloco PROBLEMA
+       - {{esp_diagnostico_onde}}: HTML do bloco ONDE OCORREU
+       - {{esp_diagnostico_porque}}: HTML do bloco POR QUE
+       - {{esp_diagnostico_destaque}}: HTML do bloco DESTAQUE POSITIVO
+       - {{esp_pipeline_stages}}: pipeline stages HTML
+       - {{esp_pipeline_totals}}: pipeline totals HTML
+       - {{esp_gauges}}: gauge SVGs
+       - {{esp_projecao_receita}}: projecao receita card
+       - {{esp_projecao_volume}}: projecao volume card
+       - {{esp_risk_tags}}: risk/success tag cards
+       - {{esp_kpi_strip}}: KPI strip boxes
+       - {{esp_sugestoes_table}}: tabela de sugestoes por assessor
+       - {{slide_num_dashboard}}: numero do slide
+       - {{slide_num_analise}}: numero do slide
+       - {{slide_num_projecao}}: numero do slide
+       - {{slide_num_sugestoes}}: numero do slide
+       - {{slide_num_agenda_trans}}: numero do slide
+       - {{agenda_transicao_items}}: agenda items com estado atualizado
+       ============================================================ -->
+
+  {{blocos_especialistas}}
+
+  <!-- ============================================================
+       STATUS PLANO DE ACAO
+       ============================================================ -->
+  <div class="slide-wrapper">
+    <div class="slide-label">Slide {{slide_num_status}} - Status Plano de Acao</div>
+    <div class="slide-container">
+      <iframe class="slide-frame" srcdoc="<!DOCTYPE html>
+<html><head><style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 720pt; height: 405pt; background: #fffdef; font-family: "twkEverett", Arial, sans-serif; display: flex; flex-direction: column; line-height: 1.4; }
+.header { background: #424135; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+h1 { color: #fffdef; font-size: 18px; font-weight: 400; }
+.section-tag { color: #eef77c; font-size: 12px; }
+.main-content { flex: 1; padding: 12px 20px 8px; display: grid; grid-template-columns: 280px 1fr; grid-template-rows: 1fr 1fr; gap: 12px; }
+.card { background: white; border: 1px solid #d0d0cc; border-radius: 6px; overflow: hidden; }
+.card-header { background: #4f4e3c; color: #fffdef; padding: 8px 12px; font-size: 11px; font-weight: 500; text-transform: uppercase; }
+.card-body { padding: 12px; display: flex; flex-direction: column; justify-content: center; height: calc(100% - 32px); }
+.pie-card { grid-row: span 2; }
+.pie-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
+.bar-chart { display: flex; flex-direction: column; gap: 8px; }
+.bar-row { display: flex; align-items: center; gap: 8px; }
+.bar-label { width: 50px; font-size: 9px; color: #424135; text-align: right; flex-shrink: 0; }
+.bar-stack { flex: 1; height: 20px; display: flex; border-radius: 3px; overflow: hidden; background: #f6f6f5; }
+.bar-segment { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: white; }
+.bar-total { width: 30px; font-size: 9px; font-weight: 700; color: #424135; text-align: center; }
+.status-nao-iniciada { background: #aeada8; } .status-andamento { background: #3B82F6; } .status-atrasada { background: #e40014; } .status-concluida { background: #4CAF50; }
+.global-legend { display: flex; justify-content: center; gap: 24px; padding: 8px 20px; background: #fffdef; border-top: 1px solid #d0d0cc; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 9px; }
+.legend-color { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+.legend-label { color: #424135; } .legend-value { font-weight: 700; color: #424135; margin-left: 4px; }
+.footer { padding: 12px 24px; display: flex; justify-content: flex-end; }
+.page-number { color: #79755c; font-size: 11px; }
+</style></head><body>
+<div class='header'><h1>Status do Plano de Acao</h1><p class='section-tag'>{{total_acoes}} ACOES | CICLO {{data}}</p></div>
+<div class='main-content'>
+  <div class='card pie-card'>
+    <div class='card-header'>Status Geral</div>
+    <div class='card-body'>
+      <div class='pie-container'>
+        {{pie_chart_svg}}
+      </div>
+    </div>
+  </div>
+  <div class='card'>
+    <div class='card-header'>Acoes por Semana (Prazo)</div>
+    <div class='card-body'><div class='bar-chart'>{{acoes_por_semana}}</div></div>
+  </div>
+  <div class='card'>
+    <div class='card-header'>Acoes por Responsavel</div>
+    <div class='card-body'><div class='bar-chart'>{{acoes_por_responsavel}}</div></div>
+  </div>
+</div>
+<div class='global-legend'>
+  <div class='legend-item'><div class='legend-color status-nao-iniciada'></div><span class='legend-label'>Nao iniciada</span><span class='legend-value'>{{count_nao_iniciada}}</span></div>
+  <div class='legend-item'><div class='legend-color status-andamento'></div><span class='legend-label'>Em andamento</span><span class='legend-value'>{{count_andamento}}</span></div>
+  <div class='legend-item'><div class='legend-color status-atrasada'></div><span class='legend-label'>Atrasada</span><span class='legend-value'>{{count_atrasada}}</span></div>
+  <div class='legend-item'><div class='legend-color status-concluida'></div><span class='legend-label'>Concluida</span><span class='legend-value'>{{count_concluida}}</span></div>
+</div>
+<div class='footer'><p class='page-number'>{{slide_num_status}}</p></div>
+</body></html>"></iframe>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       PLANO DE ACAO (TABELA)
+       ============================================================ -->
+  <div class="slide-wrapper">
+    <div class="slide-label">Slide {{slide_num_plano}} - Plano de Acao</div>
+    <div class="slide-container">
+      <iframe class="slide-frame" srcdoc="<!DOCTYPE html>
+<html><head><style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 720pt; height: 405pt; background: #fffdef; font-family: "twkEverett", Arial, sans-serif; display: flex; flex-direction: column; line-height: 1.4; }
+.header { background: #424135; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+h1 { color: #fffdef; font-size: 18px; font-weight: 400; }
+.section-tag { color: #eef77c; font-size: 12px; }
+.content { flex: 1; padding: 12px 20px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; font-size: 10px; }
+th { background: #4f4e3c; color: #fffdef; padding: 6px 8px; text-align: left; font-weight: 500; }
+td { padding: 5px 8px; border-bottom: 1px solid #d0d0cc; color: #424135; vertical-align: top; }
+tr:nth-child(even) { background: #f6f6f5; }
+.action-num { background: #eef77c; color: #424135; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10px; }
+.resp { font-weight: 700; color: #424135; }
+.date { color: #79755c; }
+.causa { color: #79755c; font-size: 9px; }
+.status-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.status-nao-iniciada { background: #aeada8; color: #424135; } .status-andamento { background: #3B82F6; color: white; } .status-atrasada { background: #e40014; color: white; } .status-concluida { background: #4CAF50; color: white; }
+.footer { padding: 12px 24px; display: flex; justify-content: flex-end; }
+.page-number { color: #79755c; font-size: 11px; }
+</style></head><body>
+<div class='header'><h1>Plano de Acao: {{total_acoes}} acoes</h1><p class='section-tag'>PLANO DE ACAO</p></div>
+<div class='content'>
+  <table>
+    <tr><th style='width:22px'>#</th><th>Acao</th><th style='width:90px'>Causa</th><th style='width:60px'>Resp.</th><th style='width:42px'>Prazo</th><th style='width:70px'>Status</th></tr>
+    {{plano_de_acao_rows}}
+  </table>
+</div>
+<div class='footer'><p class='page-number'>{{slide_num_plano}}</p></div>
+</body></html>"></iframe>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       ENCERRAMENTO
+       ============================================================ -->
+  <div class="slide-wrapper">
+    <div class="slide-label">Slide {{slide_num_encerramento}} - Encerramento</div>
+    <div class="slide-container">
+      <iframe class="slide-frame" srcdoc="<!DOCTYPE html>
+<html><head><style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 720pt; height: 405pt; background: #424135; font-family: "twkEverett", Arial, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; line-height: 1.4; }
+.content { text-align: center; padding: 20px; }
+.gold-line { width: 60px; height: 3px; background: #eef77c; margin: 0 auto 20px auto; }
+h1 { color: #fffdef; font-size: 28px; font-weight: 400; margin-bottom: 12px; }
+.subtitle { color: #79755c; font-size: 14px; margin-bottom: 24px; }
+.key-messages { display: flex; gap: 20px; margin-top: 20px; }
+.message-card { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 16px 20px; width: 200px; }
+.message-card .icon { font-size: 24px; margin-bottom: 10px; color: #eef77c; font-weight: 700; }
+.message-card p { color: #fffdef; font-size: 12px; line-height: 1.5; }
+.message-card .highlight { color: #eef77c; font-weight: 700; }
+.footer-info { position: absolute; bottom: 24px; color: #79755c; font-size: 11px; }
+</style></head><body>
+<div class='content'>
+  <div class='gold-line'></div>
+  <h1>Proximos Passos</h1>
+  <p class='subtitle'>{{encerramento_subtitulo}}</p>
+  <div class='key-messages'>
+    {{encerramento_cards}}
+  </div>
+</div>
+<p class='footer-info'>Ritual de Gestao {{nivel}} {{vertical}} | M7 Investimentos | {{data}}</p>
+</body></html>"></iframe>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     INSTRUCOES PARA O MATERIAL-GENERATOR
+     ============================================================
+
+     Este template contem a estrutura fixa do ritual (capa, visao geral,
+     agenda, status, plano de acao, encerramento) com placeholders {{...}}.
+
+     O bloco de especialista NAO esta inline neste template porque e
+     repetido N vezes. O material-generator deve:
+
+     1. Gerar o HTML de cada bloco de especialista (5 slides) seguindo
+        a estrutura documentada em slide-structure.md
+     2. Concatenar todos os blocos no placeholder {{blocos_especialistas}}
+     3. Calcular numeros de slide sequenciais
+     4. Preencher todos os placeholders com dados do WBR + Card
+
+     Placeholders globais:
+     - {{vertical}}, {{nivel}}, {{data}}, {{periodo_label}}
+     - {{periodo_mes_label}}
+     - {{diretos_label}}: "Esp1 | Esp2 | ..."
+     - {{especialista1_nome}}, {{especialista2_nome}}: nomes curtos
+     - {{matriz_rows}}: todas as rows da tabela de visao geral
+     - {{agenda_items}}: HTML dos items de agenda
+     - {{blocos_especialistas}}: HTML concatenado de todos os blocos
+     - {{total_acoes}}, {{pie_chart_svg}}
+     - {{acoes_por_semana}}, {{acoes_por_responsavel}}
+     - {{count_nao_iniciada}}, {{count_andamento}}, {{count_atrasada}}, {{count_concluida}}
+     - {{plano_de_acao_rows}}: rows da tabela de acoes
+     - {{encerramento_subtitulo}}, {{encerramento_cards}}
+     - {{slide_num_*}}: numeros de cada slide
+
+     Bloco de especialista: gerar como slide-wrappers HTML seguindo
+     o padrao dos slides fixos acima. Ver slide-structure.md secao
+     "Bloco por Especialista" para layout detalhado de cada slide.
+     ============================================================ -->
+</body>
+</html>

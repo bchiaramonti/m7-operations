@@ -1,0 +1,17 @@
+{
+  "name": "m7-comissionamento",
+  "version": "1.0.2",
+  "description": "Processamento mensal de comissionamento M7 Investimentos. Estrutura competencias, valida arquivos raw, processa receitas Split C com ETL multicamadas (Bronze/Silver/Gold), gera comissao oficial Louro Tech e resumo financeiro por assessor. Use quando for processar ciclos mensais de comissionamento da M7.",
+  "author": {
+    "name": "Bruno Chiaramonti"
+  },
+  "keywords": [
+    "comissionamento",
+    "comissoes",
+    "split-c",
+    "etl",
+    "medallion",
+    "louro-tech",
+    "m7"
+  ]
+}

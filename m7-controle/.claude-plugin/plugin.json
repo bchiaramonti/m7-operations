@@ -1,0 +1,22 @@
+{
+  "name": "m7-controle",
+  "version": "5.4.0",
+  "description": "Ciclo de controle de performance M7. Operacionaliza o processo G2.2 com 7 etapas: configuracao de Cards de Performance (E1), coleta de dados via scripts Python standalone com execucao paralela (E2), analise de desvios com regras de semaforo e segmentacao (E3), acompanhamento de acoes (E4), projecao YAML-driven com metodos configurados por indicador e dependencias cruzadas (E5), consolidacao do WBR com periodo/granularidade configuravel (E6) e licoes aprendidas mensais cross-vertical (E7).",
+  "author": {
+    "name": "Bruno Chiaramonti"
+  },
+  "homepage": "https://github.com/bchiaramonti/claude-plugins",
+  "repository": "https://github.com/bchiaramonti/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "performance",
+    "wbr",
+    "kpi",
+    "indicators",
+    "cards",
+    "weekly-review",
+    "clickhouse",
+    "bitrix24",
+    "m7"
+  ]
+}
