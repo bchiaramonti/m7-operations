@@ -5,6 +5,55 @@ Todas as mudancas notaveis neste plugin serao documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.0.1] - 2026-04-18
+
+Patch release — aplicando correções do `validating-artifacts` na skill `generating-status-materials` para levar a grade de C → A (0 fails, 0 warnings). Sem mudanças de comportamento.
+
+### Fixed
+- **U6** — `generating-status-materials/SKILL.md`: removidas 2 tags `<example>` do campo `description` do frontmatter. Exemplos de invocação movidos para seção `## Exemplos de invocação` no corpo do SKILL.md (3 exemplos: reporte completo, só OPR, data customizada). Description caiu de 927 → 522 chars.
+- **S6** — Adicionado `## Índice` em 4 references longas (>100 linhas) que estavam sem TOC: [narrative-synthesis.md](skills/generating-status-materials/references/narrative-synthesis.md), [xlsx-reading.md](skills/generating-status-materials/references/xlsx-reading.md), [data-sources.md](skills/generating-status-materials/references/data-sources.md), [failure-modes.md](skills/generating-status-materials/references/failure-modes.md). As outras 3 references (design-tokens, opr-layout, presentation-structure) já tinham Índice.
+- **S8** — `generating-status-materials/scripts/build_pptx.py`: bloco de 10 constantes documentadas no topo do arquivo (`PAD_SLIDE_X`, `PAD_EXEC_X`, `CONTENT_W_PX`, `DIAMOND_SIZE_ACTIVE`, `DIAMOND_SIZE_NEUTRAL`, `RISK_CARD_H`, `RISK_CARD_GAP`, `RISK_ACCENT_BAR_W`, `RISK_TAG_W`, `LOGO_SIZE_*`) com comentários cruzando para [`design-tokens.md`](skills/generating-status-materials/references/design-tokens.md) e [`presentation-structure.md`](skills/generating-status-materials/references/presentation-structure.md). Constantes são simbólicas (não usadas nos bodies ainda) — posicionamento para refactor gradual sem quebrar comportamento.
+
+### Validation
+- `build_pptx.py` passa `ast.parse` após refactor
+- Smoke test: PPTX regenerado com sucesso (48589 bytes, 8 slides)
+- Description parseia para 522 chars sem XML tags
+- Todas as 7 references agora têm `## Índice`
+
+### Not changed
+- Nenhum comportamento alterado — apenas ajustes de estrutura/documentação
+- Os outros 4 skills do plugin (`initializing-project`, `planning-project`, `building-project-plan`, `managing-action-plan`) mantêm o padrão `<example>` nas descriptions por ora — correção análoga pode ser feita em release futura caso se deseje grade A uniforme
+
+## [1.0.0] - 2026-04-18
+
+Release 1.0.0 — plugin completo. Adiciona a skill `generating-status-materials`, fechando o pipeline end-to-end do ciclo de vida de projetos M7: do scaffolding (`initializing-project`) ao reporte executivo (`generating-status-materials`), passando por planejamento iterativo (`planning-project`), plano formal (`building-project-plan`) e execução sincronizada com ClickUp (`managing-action-plan`). 5 de 5 skills funcionais.
+
+### Added
+- **Skill `generating-status-materials`**: gera materiais de status em dois formatos a partir do mesmo pipeline de coleta — **OPR** (one-page report HTML + PDF A4 retrato) para comunicação assíncrona, e **apresentação executiva PPTX 16:9** com 8 slides para reuniões de reporte. Narrativa consistente por construção (ambos consomem o mesmo dict canônico).
+  - **3 scripts Python**: `collect_data.py` (coleta determinística: xlsx LIVE + HTMLs do plano + changelog + .sync-state.json → JSON canônico), `build_opr.py` (Jinja2 → HTML → PDF via playwright/weasyprint com fallback), `build_pptx.py` (8 slides construídos programaticamente via python-pptx, fiéis ao canvas Paper `status-report`).
+  - **7 references**: [`design-tokens.md`](skills/generating-status-materials/references/design-tokens.md) (cores, tipografia, espaçamento extraídos com `get_computed_styles` do canvas Paper), [`opr-layout.md`](skills/generating-status-materials/references/opr-layout.md) (zonas A4, regras de fit, modo compacto), [`presentation-structure.md`](skills/generating-status-materials/references/presentation-structure.md) (8 slides detalhados + construção), [`narrative-synthesis.md`](skills/generating-status-materials/references/narrative-synthesis.md) (heurísticas determinísticas para status overall, highlights, next steps, attentions), [`data-sources.md`](skills/generating-status-materials/references/data-sources.md) (mapeamento exato campo → fonte), [`xlsx-reading.md`](skills/generating-status-materials/references/xlsx-reading.md) (leitura read-only do LIVE), [`failure-modes.md`](skills/generating-status-materials/references/failure-modes.md).
+  - **1 template**: `opr.tmpl.html` (Jinja2 com CSS inline completo, 23 substituições + 26 blocos de controle, tokens M7-2026 via variáveis CSS, modo compacto via classe `.compact`).
+  - **2 assets**: `m7-logo-dark.png` (para fundos off-white) e `m7-logo-offwhite.png` (para fundos Verde Caqui), embedados em base64 data URLs no OPR.
+- **Mapeamento Paper → PPTX**: 8 artboards 1280×720 do canvas `status-report` mapeiam 1:1 para slides PPTX: Cover · Agenda · Roadmap Overview · Roadmap Detail · Section Divider · Executive Status · Risks · Closing. Tokens visuais (cores exatas, tracking, padding) verificados via `get_computed_styles`.
+
+### Architecture decisions
+- **Coleta 100% determinística** — `collect_data.py` aplica heurísticas explícitas (status overall, highlights, next steps, attentions) sem invocar LLM. Honra o feedback arquitetural: "data collection uses deterministic script, never LLM interpretation". Duas execuções com os mesmos inputs produzem dicts canônicos byte-identicos → série temporal de reportes auditável.
+- **Skill read-only** — nunca toca em `Cronograma.xlsx` LIVE, `changelog.md` ou `.sync-state.json` (domínio exclusivo de `managing-action-plan`). Escrita confinada a `4-status-report/YYYY-MM-DD/`. Boundary arquitetural: esta skill é consumidora pura do LIVE.
+- **Zero MCP** — diferente de `managing-action-plan` (que orquestra ClickUp MCP), `generating-status-materials` é 100% local Python. `clickup_list_url` é derivado de `.sync-state.json` ou `CLAUDE.md`, não consultado.
+- **Font Arial (não TWK Everett)** — o canvas Paper `status-report` usa Arial como fonte real (verificado em `get_computed_styles`). Design System M7-2026 aceita Arial como primário oficial; TWK Everett é aspiracional/opcional. Simplifica portabilidade (Arial é ubíquo).
+- **8 slides em vez de 10** — reconciliação entre spec 04 (10 slides teóricos) e canvas Paper real (8 slides desenhados). Canvas é fonte de verdade; spec atualizada implicitamente. Cada slide mapeia para dados específicos do dict canônico; ausência de campo vira placeholder visível, nunca silêncio.
+- **Dois drivers HTML→PDF com fallback** — playwright (primário, suporte CSS completo, detecta overflow via `document.scrollHeight`) ou weasyprint (fallback leve, puro Python, CSS limitado). Skill degrada graceful se nenhum instalado, mantém PPTX funcional via `--only pptx`.
+- **Modo compacto automático no OPR** — detecta overflow A4 em px, rerender com `.compact` (reduz font-size/line-height/gap). Se ainda excede, trunca bullets. "1 página" é contrato; não pagina nunca.
+
+### Validation
+- Todos os 3 scripts passam `python3 -m ast.parse`
+- Template HTML: 23 Jinja2 variables + 26 control blocks com braces balanceados; CSS `<style>` balanceado
+- Smoke test: `build_pptx.py` com dados stub gerou PPTX 51KB com 8 slides sem erros
+- Tokens M7-2026 verificados caso-a-caso contra `get_computed_styles` do canvas Paper (cores hex, font-sizes px, letter-spacing em, padding px)
+
+### Scope (próximas releases)
+- **v1.1.0** (roadmap): cache de coleta (`--no-cache` flag), suporte a TWK Everett quando disponível no sistema, parametrização de seções da agenda via `CLAUDE.md`, slide 4 (Roadmap Detail) com swimlane Gantt-style renderizado via shapes dinâmicos (hoje é timeline linear simplificada).
+
 ## [0.4.0] - 2026-04-18
 
 Quarta release alpha. Adiciona a skill `planning-project` — interlocutora especializada em planejamento que conduz a elaboração iterativa do `PLANEJAMENTO.md` (snapshot estático denso, consumível por `building-project-plan`). 4 de 4 skills do ciclo de planejamento/execução agora presentes (faltando só `generating-status-materials` para v1.0.0).

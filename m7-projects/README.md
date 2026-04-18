@@ -2,21 +2,24 @@
 
 > Gestão completa do ciclo de vida de projetos M7: do scaffolding inicial à geração de materiais executivos de status, passando por plano de projeto com WBS/EAP e plano de ação continuamente sincronizado com ClickUp.
 
-## Status (v0.3.0 — alpha)
+## Status (v1.0.0)
 
 | Skill | Status |
 |---|---|
 | `initializing-project` | ✅ Implementada (scaffold base do projeto) |
+| `planning-project` | ✅ Implementada (planejamento iterativo em Markdown) |
 | `building-project-plan` | ✅ Implementada (10 HTMLs M7-2026 + Cronograma.xlsx baseline) |
 | `managing-action-plan` | ✅ Implementada (núcleo técnico: 9 scripts + sync three-way + ClickUp MCP) |
-| `generating-status-materials` | 🚧 Planejada (v1.0.0 — OPR + PPTX com Design System M7-2026) |
+| `generating-status-materials` | ✅ Implementada (OPR HTML/PDF + apresentação PPTX 8 slides mapeada do canvas Paper `status-report`) |
 
-3 de 4 skills funcionais. Pipeline completo do **planejamento até a execução** operacional end-to-end:
+Plugin completo. Pipeline end-to-end do planejamento à comunicação executiva:
 1. `initializing-project` → estrutura base do projeto
-2. `building-project-plan` → plano formal completo (10 HTMLs + Cronograma.xlsx baseline)
-3. `managing-action-plan` → execução com sync ClickUp (CRUD ações, follow-up, comentários)
+2. `planning-project` (opcional) → planejamento iterativo em `PLANEJAMENTO.md`
+3. `building-project-plan` → plano formal completo (10 HTMLs + Cronograma.xlsx baseline)
+4. `managing-action-plan` → execução com sync ClickUp (CRUD ações, follow-up, comentários)
+5. `generating-status-materials` → OPR + PPTX executivo em cadência de reporte
 
-Falta apenas a etapa de reporte (OPR + PPTX) prevista para v1.0.0. Ver [CHANGELOG.md](CHANGELOG.md) para detalhes.
+Ver [CHANGELOG.md](CHANGELOG.md) para detalhes de cada release.
 
 ## O que é
 

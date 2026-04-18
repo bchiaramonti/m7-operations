@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>OPR · {{ project.name }} · {{ report_date }}</title>
+<style>
+  :root {
+    --m7-primary:       #424135;
+    --m7-bg-light:      #FFFDEF;
+    --m7-text-muted:    #4F4E3C;
+    --m7-text-subtle:   #79755C;
+    --m7-text-caption:  #AEADA8;
+    --m7-accent:        #EEF77C;
+    --status-ok:        #00B050;
+    --status-progress:  #3B82F6;
+    --status-warning:   #F59E0B;
+    --status-critical:  #E46962;
+    --status-neutral:   #D0D0CC;
+    --tag-bg-critical:  #FDEDED;
+    --tag-bg-warning:   #FDF3E0;
+    --tag-bg-neutral:   #EFEFEC;
+    --size-body: 12px;
+    --size-small: 11px;
+    --size-dense: 10px;
+    --size-caption: 9px;
+    --size-h1: 18px;
+    --size-eyebrow: 9px;
+    --gap-2: 6px;
+    --gap-3: 8px;
+    --gap-4: 10px;
+    --gap-5: 12px;
+  }
+  body.compact {
+    --size-body: 11px;
+    --size-small: 10px;
+    --size-dense: 9px;
+    --size-h1: 16px;
+    --gap-3: 6px;
+    --gap-4: 8px;
+    --gap-5: 10px;
+  }
+  @page { size: A4 portrait; margin: 8mm 10mm; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--m7-bg-light);
+    color: var(--m7-primary);
+    font-family: Arial, "ArialMT", system-ui, sans-serif;
+    font-size: var(--size-body);
+    line-height: 1.45;
+  }
+  .opr {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-3);
+  }
+  .eyebrow {
+    font-size: var(--size-eyebrow);
+    letter-spacing: 0.18em;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--m7-primary);
+  }
+
+  /* HEADER */
+  .header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    background: var(--m7-primary);
+    color: var(--m7-bg-light);
+    padding: 8px 12px;
+    border-radius: 2px;
+  }
+  .header .logo img { height: 28px; display: block; }
+  .header .logo.no-image { font-style: italic; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
+  .header .title { line-height: 1.2; }
+  .header .title h1 { margin: 0; font-size: var(--size-h1); font-weight: 700; letter-spacing: -0.01em; }
+  .header .title .sub {
+    font-size: var(--size-small);
+    opacity: 0.85;
+    margin-top: 2px;
+  }
+  .header .status {
+    text-align: right;
+    font-size: var(--size-small);
+    line-height: 1.4;
+  }
+  .header .status .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  .dot-green  { background: var(--status-ok); }
+  .dot-yellow { background: var(--status-warning); }
+  .dot-red    { background: var(--status-critical); }
+
+  /* OBJETIVO */
+  .objective {
+    padding: 4px 0;
+    border-bottom: 1px solid #E5E2CE;
+  }
+  .objective .label {
+    font-size: var(--size-eyebrow);
+    letter-spacing: 0.18em;
+    font-weight: 700;
+    color: var(--m7-text-subtle);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .objective .goal {
+    font-size: var(--size-body);
+    color: var(--m7-text-muted);
+  }
+
+  /* TWO COLUMNS */
+  .two-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap-5);
+  }
+  .col .label {
+    font-size: var(--size-eyebrow);
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    color: var(--m7-text-subtle);
+    text-transform: uppercase;
+    margin-bottom: var(--gap-2);
+  }
+  ul.bullets {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  ul.bullets li {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    padding: 2px 0;
+    font-size: var(--size-small);
+    color: var(--m7-text-muted);
+  }
+  ul.bullets li::before {
+    content: "";
+    flex-shrink: 0;
+    width: 4px; height: 4px;
+    background: var(--m7-primary);
+    margin-top: 6px;
+    border-radius: 1px;
+  }
+
+  /* MILESTONES */
+  .milestones {
+    padding: 4px 0;
+    border-top: 1px solid #E5E2CE;
+    border-bottom: 1px solid #E5E2CE;
+  }
+  .milestones .label {
+    font-size: var(--size-eyebrow);
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    color: var(--m7-text-subtle);
+    text-transform: uppercase;
+    margin-bottom: var(--gap-3);
+  }
+  .timeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .milestone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    flex: 1;
+  }
+  .milestone .diamond {
+    width: 12px; height: 12px;
+    transform: rotate(45deg);
+    flex-shrink: 0;
+  }
+  .milestone .diamond.done         { background: var(--status-ok); }
+  .milestone .diamond.in_progress  { background: var(--status-progress); }
+  .milestone .diamond.overdue      { background: var(--status-critical); }
+  .milestone .diamond.not_started  { background: transparent; border: 1.5px solid var(--status-neutral); width: 10px; height: 10px; }
+  .milestone .name {
+    margin-top: 6px;
+    font-size: var(--size-dense);
+    text-align: center;
+    color: var(--m7-text-muted);
+    max-width: 80px;
+  }
+  .connector {
+    flex: 1;
+    height: 1.5px;
+    background: var(--status-neutral);
+    margin: 0 -4px 18px -4px;
+  }
+  .connector.active { background: var(--status-progress); }
+
+  /* ATTENTIONS */
+  .attentions .label {
+    font-size: var(--size-eyebrow);
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    color: var(--status-warning);
+    text-transform: uppercase;
+    margin-bottom: var(--gap-2);
+  }
+  ul.attention-list {
+    margin: 0; padding: 0; list-style: none;
+  }
+  ul.attention-list li {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 2px 0;
+    font-size: var(--size-small);
+    color: var(--m7-text-muted);
+  }
+  ul.attention-list li .sev {
+    flex-shrink: 0;
+    width: 8px; height: 8px;
+    margin-top: 5px;
+    border-radius: 50%;
+  }
+  .sev.critical { background: var(--status-critical); }
+  .sev.warning  { background: var(--status-warning); }
+  .sev.neutral  { background: var(--status-neutral); }
+
+  /* FOOTER */
+  .footer {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    padding-top: 4px;
+    border-top: 1px solid #E5E2CE;
+    font-size: var(--size-caption);
+    color: var(--m7-text-caption);
+  }
+  .footer a { color: var(--m7-text-subtle); text-decoration: none; }
+  .footer .extra { text-align: right; }
+</style>
+</head>
+<body class="{{ 'compact' if compact else '' }}">
+<div class="opr">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      {% if logo_url %}
+        <img src="{{ logo_url }}" alt="M7" />
+      {% else %}
+        <span class="no-image">M7</span>
+      {% endif %}
+    </div>
+    <div class="title">
+      <h1>{{ project.name }}</h1>
+      <div class="sub">{{ project.period_label }}</div>
+    </div>
+    <div class="status">
+      <div><span class="dot dot-{{ status.overall }}"></span>Status: {{ status_label }}</div>
+      <div>{{ status.done_actions }}/{{ status.total_actions }} · {{ status.percent_done }}% concluído</div>
+    </div>
+  </div>
+
+  <!-- OBJETIVO -->
+  {% if project.goal %}
+  <div class="objective">
+    <div class="label">Objetivo</div>
+    <div class="goal">{{ project.goal }}</div>
+  </div>
+  {% endif %}
+
+  <!-- TWO COLUMNS -->
+  <div class="two-cols">
+    <div class="col">
+      <div class="label">Highlights (o que avançou)</div>
+      <ul class="bullets">
+        {% for h in highlights[:3] %}<li>{{ h }}</li>{% endfor %}
+        {% if highlights|length == 0 %}<li style="color: var(--m7-text-caption)">— nenhum highlight no período —</li>{% endif %}
+      </ul>
+    </div>
+    <div class="col">
+      <div class="label">Próximos passos</div>
+      <ul class="bullets">
+        {% for n in next_steps[:3] %}<li>{{ n.action }} — até {{ n.deadline }}</li>{% endfor %}
+        {% if next_steps|length == 0 %}<li style="color: var(--m7-text-caption)">— sem próximos passos cadastrados —</li>{% endif %}
+      </ul>
+    </div>
+  </div>
+
+  <!-- MILESTONES -->
+  <div class="milestones">
+    <div class="label">Marcos</div>
+    <div class="timeline">
+      {% for m in macro_milestones[:7] %}
+        <div class="milestone">
+          <div class="diamond {{ m.status }}"></div>
+          <div class="name">{{ m.label }}</div>
+        </div>
+        {% if not loop.last %}
+          <div class="connector {{ 'active' if m.status in ['done','in_progress'] else '' }}"></div>
+        {% endif %}
+      {% endfor %}
+      {% if macro_milestones|length == 0 %}
+        <span style="color: var(--m7-text-caption); font-size: var(--size-dense)">— marcos não identificados no plano —</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ATTENTIONS -->
+  <div class="attentions">
+    <div class="label">Pontos de atenção</div>
+    <ul class="attention-list">
+      {% for a in attentions[:3] %}
+        <li><span class="sev {{ a.severity }}"></span>{{ a.text }}</li>
+      {% endfor %}
+      {% if attentions|length == 0 %}
+        <li style="color: var(--m7-text-caption)">— sem pontos de atenção —</li>
+      {% endif %}
+    </ul>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>
+      {% if project.clickup_list_url %}
+        ClickUp: <a href="{{ project.clickup_list_url }}">{{ project.clickup_list_url }}</a>
+      {% else %}
+        {{ project.footer_label }}
+      {% endif %}
+    </div>
+    <div class="extra">gerado por m7-projects/generating-status-materials</div>
+  </div>
+
+</div>
+</body>
+</html>
