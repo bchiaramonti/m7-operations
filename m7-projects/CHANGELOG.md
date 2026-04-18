@@ -5,6 +5,37 @@ Todas as mudancas notaveis neste plugin serao documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.4.0] - 2026-04-18
+
+Quarta release alpha. Adiciona a skill `planning-project` — interlocutora especializada em planejamento que conduz a elaboração iterativa do `PLANEJAMENTO.md` (snapshot estático denso, consumível por `building-project-plan`). 4 de 4 skills do ciclo de planejamento/execução agora presentes (faltando só `generating-status-materials` para v1.0.0).
+
+### Added
+- **Skill `planning-project`**: conduz elaboração iterativa do Plano de Projeto em Markdown (`1-planning/PLANEJAMENTO.md`) aplicando boas práticas PMBOK + mindset ágil. Fluxo em 3 fases (Setup → Loop de Incrementos → Revisão Consolidada) com um artefato por vez e aceite explícito.
+  - Cobre 9 artefatos: Contexto/Escopo, OKRs, WBS/EAP, Cronograma, Roadmap & Marcos, Recursos & Dependências, Plano de Comunicação, Riscos, Calendário
+  - **≥36 critérios de aceite** codificados (média 4+ por artefato) em `acceptance-criteria.md`
+  - **≥25 push-backs calibrados** em `pushback-playbook.md` — skill confronta conteúdo raso antes de aceitar
+  - **7 verificações cross-artefato** na Fase 3 (`consistency-checks.md`): marcos×cronograma, RACI×recursos, owners×equipe, KRs×trabalho, datas, pacotes×cronograma, rituais×comunicação
+  - **Racional PMBOK/ágil** em `pmbok-artifact-best-practices.md` — 6 fontes canônicas citadas (PMBOK 7e, Doerr, Google re:Work, ISO 31000, PMI Stakeholder Matrix, Scrum Guide)
+- **Schema formal do `PLANEJAMENTO.md`** em `planning-md-schema.md`: frontmatter YAML (com campo opcional `consistency_overrides`), 9 headers `## NN · ...` como âncoras fixas, markers `<!-- STATUS: ... -->` parseáveis, mapeamento seção → artefato HTML para consumo por `building-project-plan`
+- **Template `PLANEJAMENTO.tmpl.md`**: 9 seções pre-stubbed com sub-headers guia + bloco de comentário HTML ilustrando convenção completa de markers (PENDING/DRAFT/ACCEPTED/SKIPPED + REASON + OVERRIDE)
+
+### Architecture decisions
+- **Skill conversacional, sem scripts Python** — toda lógica vive no prompt + references. Valor está no raciocínio guiado e nos push-backs codificados, não em transformação de dados.
+- **Output estático** — `PLANEJAMENTO.md` é snapshot de planejamento inicial; **não é mantido em sync** com os HTMLs depois gerados por `building-project-plan` nem com o ClickUp. Carimbo visível no topo após `FINAL`.
+- **Retrabalho permitido** — qualquer artefato `ACCEPTED` pode ser reaberto sem derrubar os demais (contraste com waterfall).
+- **Estado persistente** — markers permitem pausar e retomar em dias diferentes.
+- **Autonomia do usuário preservada** — skill push-backa, sugere, mas nunca aceita incremento sem ok explícito. Sobrescrita requer `<!-- OVERRIDE: <justificativa> -->` no MD; inconsistências aceitas na Fase 3 vão para `consistency_overrides` no frontmatter (trilha de auditoria para retrospectivas).
+- **Fronteira firme com `building-project-plan`**: quality gate é responsabilidade de `planning-project`; transformação é de `building-project-plan`. A skill 03 **não re-aplica** push-backs em modo `read-md` — references de best practices vivem **apenas** aqui, sem duplicação.
+- **Mindset ágil, não Scrum ritual** — entregáveis pequenos com aceite por incremento e retrabalho permitido; sem sprint backlog, sem retro, sem timeboxes fixos.
+
+### Integration
+- `planning-project` é **opcional** no fluxo. Projetos simples podem ir direto de `initializing-project` → `building-project-plan` em modo interativo. Projetos complexos passam por `planning-project` para densificar o pensamento antes de gerar visuais.
+- Contrato com `building-project-plan`: frontmatter → hero da landing; cada seção `## NN · ...` → artefato HTML correspondente; seções `SKIPPED` resolvidas por skill 03 (placeholder vs omissão do nav-grid).
+
+### Scope (próximas releases)
+- `generating-status-materials` — OPR (PDF) + apresentação executiva (PPTX) com Design System M7-2026 (consome `4-status-report/Cronograma.xlsx` LIVE + `changelog.md`) — última skill antes de v1.0.0
+- Ajustes em `building-project-plan` para consumir `PLANEJAMENTO.md` FINAL em modo `read-md` (parser + 9 handlers + fallback para SKIPPED) — documentados na spec 06
+
 ## [0.3.0] - 2026-04-18
 
 Terceira release alpha. Adiciona a skill `building-project-plan` — geração do Plano de Projeto completo (10 HTMLs com Design System M7-2026 + Cronograma.xlsx baseline). Pipeline cross-skill com `managing-action-plan` validado end-to-end. 3 de 4 skills do plugin agora funcionais.
