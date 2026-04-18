@@ -1,0 +1,21 @@
+{
+  "name": "m7-projects",
+  "version": "0.1.0",
+  "description": "Gestão completa do ciclo de vida de projetos: scaffolding de diretório, construção do plano com WBS/EAP, gestão contínua do plano de ação em 3 camadas sincronizadas com ClickUp como SSOT, e geração de materiais de status (OPR + apresentação executiva). Design System M7-2026.",
+  "author": {
+    "name": "Bruno Chiaramonti"
+  },
+  "homepage": "https://github.com/bchiaramonti/claude-plugins",
+  "repository": "https://github.com/bchiaramonti/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "project-management",
+    "wbs",
+    "eap",
+    "action-plan",
+    "clickup",
+    "status-report",
+    "opr",
+    "m7"
+  ]
+}

@@ -107,6 +107,27 @@
         "louro-tech",
         "m7"
       ]
+    },
+    {
+      "name": "m7-projects",
+      "description": "Gestão completa do ciclo de vida de projetos: scaffolding WBS/EAP, plano de projeto, plano de ação sincronizado com ClickUp como SSOT (CRUD + follow-up), OPR e apresentações executivas com Design System M7-2026.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Bruno Chiaramonti"
+      },
+      "source": "./m7-projects",
+      "category": "project-management",
+      "homepage": "https://github.com/bchiaramonti/claude-plugins",
+      "keywords": [
+        "project-management",
+        "wbs",
+        "eap",
+        "action-plan",
+        "clickup",
+        "status-report",
+        "opr",
+        "m7"
+      ]
     }
   ]
 }
