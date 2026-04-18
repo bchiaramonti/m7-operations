@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TAP — {{project_name}}{{project_code_suffix}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --verde-caqui: #424135;
+    --lime: #eef77c;
+    --off-white: #fffdef;
+    --cinza-700: #3d3d3d;
+    --cinza-400: #9a9a8e;
+    --cinza-200: #d9d9c8;
+    --cinza-100: #f0f0e4;
+    --accent-green: #7ab648;
+    --radius: 12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--off-white);
+    color: var(--verde-caqui);
+    min-height: 100vh;
+  }
+  /* HERO */
+  .hero {
+    background: var(--verde-caqui);
+    color: var(--off-white);
+    padding: 60px 48px 50px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::after {
+    content: '';
+    position: absolute; top:0; right:0;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(238,247,124,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 32px;
+    margin-bottom: 20px;
+  }
+  .hero-logo {
+    flex-shrink: 0;
+    height: 72px;
+    opacity: 0.92;
+    margin-top: 8px;
+  }
+  .hero-titles { flex: 1; }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(238,247,124,0.15);
+    color: var(--off-white);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+  }
+  .hero-titles h1 {
+    font-size: 42px;
+    font-weight: 400;
+    line-height: 1.15;
+    margin-bottom: 16px;
+    max-width: 700px;
+  }
+  .hero p.subtitle {
+    font-size: 18px;
+    font-weight: 300;
+    color: var(--cinza-200);
+    max-width: 600px;
+    line-height: 1.6;
+  }
+  .hero-meta {
+    display: flex;
+    gap: 40px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+  }
+  .hero-meta-item { display: flex; flex-direction: column; gap: 4px; }
+  .hero-meta-item .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--cinza-400); }
+  .hero-meta-item .value { font-size: 16px; font-weight: 500; color: var(--off-white); }
+  .hero-meta-item .value.lime { color: var(--lime); }
+
+  /* CONTAINER */
+  .container { max-width: 1080px; margin: 0 auto; padding: 48px 32px 80px; }
+
+  /* ESTRELA GUIA */
+  .estrela {
+    background: var(--verde-caqui);
+    color: var(--off-white);
+    border-radius: var(--radius);
+    padding: 32px 36px;
+    margin-bottom: 48px;
+    position: relative;
+  }
+  .estrela::before {
+    content: '★';
+    position: absolute; top: 28px; right: 32px;
+    font-size: 28px;
+    color: var(--lime);
+    opacity: 0.6;
+  }
+  .estrela h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--cinza-200);
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+  .estrela p {
+    font-size: 17px;
+    font-weight: 300;
+    line-height: 1.7;
+    max-width: 880px;
+  }
+
+  /* NAV CARDS */
+  .section-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--cinza-400);
+    font-weight: 600;
+    margin-bottom: 24px;
+  }
+  .nav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 20px;
+  }
+  .nav-card {
+    background: #fff;
+    border: 1px solid var(--cinza-200);
+    border-radius: var(--radius);
+    padding: 28px;
+    text-decoration: none;
+    color: var(--verde-caqui);
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .nav-card:hover {
+    border-color: var(--verde-caqui);
+    box-shadow: 0 4px 20px rgba(66,65,53,0.08);
+    transform: translateY(-2px);
+  }
+  .nav-card .card-num {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--cinza-200);
+    line-height: 1;
+  }
+  .nav-card h3 {
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 1.35;
+  }
+  .nav-card p {
+    font-size: 13px;
+    color: var(--cinza-400);
+    line-height: 1.55;
+  }
+  .nav-card .arrow {
+    position: absolute;
+    bottom: 20px; right: 24px;
+    font-size: 18px;
+    color: var(--cinza-400);
+    transition: all 0.2s ease;
+  }
+  .nav-card:hover .arrow { color: var(--verde-caqui); transform: translateX(3px); }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    padding: 32px;
+    font-size: 12px;
+    color: var(--cinza-400);
+    border-top: 1px solid var(--cinza-200);
+    margin-top: 48px;
+  }
+
+  @media (max-width: 768px) {
+    .hero { padding: 48px 24px 40px; }
+    .hero-titles h1 { font-size: 28px; }
+    .nav-grid { grid-template-columns: 1fr; }
+    .container { padding: 32px 20px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-header">
+    <img src="data:image/png;base64,{{logo_b64}}" alt="M7" class="hero-logo">
+    <div class="hero-titles">
+      <div class="hero-badge">Termo de Abertura de Projeto</div>
+      <h1>{{project_name}}</h1>
+    </div>
+  </div>
+  <p class="subtitle">{{project_subtitle}}</p>
+  <div class="hero-meta">
+    <div class="hero-meta-item">
+      <span class="label">Projeto</span>
+      <span class="value">{{project_code}}</span>
+    </div>
+    <div class="hero-meta-item">
+      <span class="label">Líder</span>
+      <span class="value">{{lider}}</span>
+    </div>
+    <div class="hero-meta-item">
+      <span class="label">Sponsor</span>
+      <span class="value">{{sponsor}}</span>
+    </div>
+    <div class="hero-meta-item">
+      <span class="label">Duração</span>
+      <span class="value lime">{{dias}} dias</span>
+    </div>
+    <div class="hero-meta-item">
+      <span class="label">Período</span>
+      <span class="value">{{periodo}}</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="estrela">
+    <h3>Estrela Guia</h3>
+    <p>{{estrela_guia}}</p>
+  </div>
+
+  <div class="section-title">Documentos do Projeto</div>
+  <div class="nav-grid">
+{{nav_cards_html}}
+  </div>
+
+</div>
+
+<div class="footer">
+  {{footer_text}}
+</div>
+
+</body>
+</html>

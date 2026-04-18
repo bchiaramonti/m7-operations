@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>06 — Plano de Comunicação | {{project_label}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --verde-caqui:#424135;--lime:#eef77c;--off-white:#fffdef;
+    --cinza-700:#3d3d3d;--cinza-400:#9a9a8e;--cinza-200:#d9d9c8;--cinza-100:#f0f0e4;
+    --radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--off-white);color:var(--verde-caqui);}
+  .topbar{background:var(--verde-caqui);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;}
+  .topbar a{color:var(--cinza-200);text-decoration:none;font-size:13px;font-weight:500;}.topbar a:hover{color:var(--lime);}
+  .topbar .title{color:var(--off-white);font-size:14px;font-weight:500;}
+  .page-header { background:var(--verde-caqui); padding:24px 48px 48px; color:var(--off-white); display:flex; justify-content:space-between; align-items:flex-end; }
+  .page-header .num { font-size:60px; font-weight:700; color:rgba(238,247,124,0.2); line-height:1; }
+  .page-header h1 { font-size:32px; font-weight:400; margin-top:-10px; }
+  .page-header-left { flex:1; }
+  .page-header .logo { height:56px; opacity:0.85; flex-shrink:0; }
+  .container{max-width:1060px;margin:0 auto;padding:48px 32px 80px;}
+
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--cinza-400);font-weight:600;margin-bottom:16px;margin-top:40px;}
+  .section-title:first-child{margin-top:0;}
+
+  .ritual-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+  .ritual-card{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:24px;border-top:4px solid var(--verde-caqui);}
+  .ritual-card.highlight{border-top-color:var(--lime);}
+  .ritual-card .freq{font-size:11px;font-weight:600;color:var(--cinza-400);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+  .ritual-card h3{font-size:16px;font-weight:400;margin-bottom:8px;}
+  .ritual-card p{font-size:13px;color:var(--cinza-700);line-height:1.6;}
+  .ritual-card .meta{margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;}
+  .ritual-card .meta span{font-size:12px;color:var(--cinza-400);}
+  .ritual-card .meta strong{color:var(--cinza-700);}
+
+  .raci-table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--radius);overflow:hidden;border:1px solid var(--cinza-200);}
+  .raci-table th{text-align:center;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--cinza-400);padding:12px 8px;border-bottom:2px solid var(--cinza-200);font-weight:600;background:#fafaf0;}
+  .raci-table th:first-child{text-align:left;padding-left:16px;}
+  .raci-table td{padding:12px 8px;text-align:center;border-bottom:1px solid var(--cinza-100);font-size:13px;color:var(--cinza-700);}
+  .raci-table td:first-child{text-align:left;padding-left:16px;font-weight:500;}
+  .raci-table tr:last-child td{border-bottom:none;}
+  .raci-r{background:var(--verde-caqui);color:var(--off-white);border-radius:4px;padding:2px 8px;font-weight:700;font-size:11px;}
+  .raci-a{background:var(--lime);color:var(--verde-caqui);border-radius:4px;padding:2px 8px;font-weight:700;font-size:11px;}
+  .raci-c{background:var(--cinza-100);color:var(--cinza-700);border-radius:4px;padding:2px 8px;font-weight:600;font-size:11px;}
+  .raci-i{background:transparent;color:var(--cinza-400);font-size:11px;font-weight:500;}
+
+  .channel-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .channel{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:20px;text-align:center;}
+  .channel .icon{font-size:28px;margin-bottom:8px;}
+  .channel h4{font-size:13px;font-weight:500;margin-bottom:4px;}
+  .channel p{font-size:11px;color:var(--cinza-400);line-height:1.4;}
+
+  .raci-legend{font-size:12px;color:var(--cinza-400);margin-top:8px;}
+  .raci-legend > span{margin-right:12px;}
+
+  .footer{text-align:center;padding:24px;font-size:12px;color:var(--cinza-400);border-top:1px solid var(--cinza-200);margin-top:48px;}
+  @media(max-width:768px){.page-header{padding:16px 24px 32px;}.page-header h1{font-size:24px;}.container{padding:32px 16px 60px;}.ritual-grid{grid-template-columns:1fr;}.channel-grid{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+{{topbar_html}}
+
+{{page_header_html}}
+
+<div class="container">
+
+  <div class="section-title">Rituais de Acompanhamento</div>
+  <div class="ritual-grid">
+{{ritual_cards_html}}
+  </div>
+
+  <div class="section-title">Matriz RACI</div>
+  <div style="overflow-x:auto;">
+    <table class="raci-table">
+      <thead>
+        <tr>
+          <th>Atividade</th>
+{{raci_papel_headers_html}}
+        </tr>
+      </thead>
+      <tbody>
+{{raci_rows_html}}
+      </tbody>
+    </table>
+  </div>
+  <p class="raci-legend">
+    <span class="raci-r">R</span> Responsável &nbsp;
+    <span class="raci-a">A</span> Aprovador &nbsp;
+    <span class="raci-c">C</span> Consultado &nbsp;
+    <span class="raci-i">I</span> Informado
+  </p>
+
+  <div class="section-title">Canais de Comunicação</div>
+  <div class="channel-grid">
+{{channels_html}}
+  </div>
+
+</div>
+
+{{footer_html}}
+
+</body>
+</html>

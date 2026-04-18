@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>09 — Calendário de Reuniões & Rituais | {{project_label}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --verde-caqui:#424135;--lime:#eef77c;--off-white:#fffdef;
+    --cinza-700:#3d3d3d;--cinza-400:#9a9a8e;--cinza-200:#d9d9c8;--cinza-100:#f0f0e4;
+    --radius:12px;
+    --discovery:#5a8f5a;--validacao:#8b6914;--checkin:#7a8a9a;--status:#b8860b;
+    --handoff:#c45d3e;--marco:#424135;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--off-white);color:var(--verde-caqui);}
+  .topbar{background:var(--verde-caqui);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;}
+  .topbar a{color:#f0f0e4;text-decoration:none;font-size:13px;font-weight:500;}.topbar a:hover{color:var(--lime);}
+  .topbar .title{color:var(--off-white);font-size:14px;font-weight:500;}
+  .page-header{background:var(--verde-caqui);padding:24px 48px 48px;color:var(--off-white);display:flex;justify-content:space-between;align-items:flex-end;}
+  .page-header .num{font-size:60px;font-weight:700;color:rgba(238,247,124,0.2);line-height:1;}
+  .page-header h1{font-size:32px;font-weight:400;margin-top:-10px;}
+  .page-header-left{flex:1;}
+  .page-header .logo{height:56px;opacity:0.85;flex-shrink:0;}
+  .container{max-width:1200px;margin:0 auto;padding:48px 32px 80px;}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:32px;padding:20px 24px;background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--cinza-700);}
+  .legend-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+  .legend-dot.discovery{background:var(--discovery);}
+  .legend-dot.validacao{background:var(--validacao);}
+  .legend-dot.checkin{background:var(--checkin);}
+  .legend-dot.status-report{background:var(--status);}
+  .legend-dot.handoff{background:var(--handoff);}
+  .legend-dot.marco{background:var(--lime);border:2px solid var(--verde-caqui);}
+  .legend-dot.fase{background:var(--verde-caqui);}
+
+  .filter-bar{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap;}
+  .filter-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--cinza-200);background:#fff;font-size:12px;cursor:pointer;font-family:inherit;color:var(--cinza-700);transition:all .2s;}
+  .filter-btn:hover,.filter-btn.active{background:var(--verde-caqui);color:var(--off-white);border-color:var(--verde-caqui);}
+
+  .month-section{margin-bottom:40px;}
+  .month-header{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;}
+  .month-header h2{font-size:22px;font-weight:400;color:var(--verde-caqui);}
+  .month-header .year{font-size:14px;color:var(--cinza-400);font-weight:400;}
+
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--cinza-200);border:1px solid var(--cinza-200);border-radius:var(--radius);overflow:hidden;}
+  .cal-head{background:#fafaf0;padding:10px 4px;text-align:center;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--cinza-400);}
+  .cal-day{background:#fff;min-height:100px;padding:6px 8px;position:relative;transition:background .15s;}
+  .cal-day:hover{background:rgba(238,247,124,0.08);}
+  .cal-day.empty{background:#fafaf0;}
+  .cal-day.weekend{background:#f7f7ec;}
+  .cal-day.today{box-shadow:inset 0 0 0 2px var(--lime);}
+  .cal-day .day-num{font-size:13px;font-weight:600;color:var(--cinza-700);margin-bottom:4px;line-height:1.4;}
+  .cal-day.weekend .day-num{color:var(--cinza-400);}
+
+  .evt{padding:2px 5px;border-radius:3px;font-size:9px;font-weight:600;margin-bottom:2px;line-height:1.3;cursor:default;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;}
+  .evt:hover{z-index:100;overflow:visible;white-space:normal;background:var(--off-white);border:1px solid var(--cinza-200);border-radius:4px;padding:4px 6px;}
+  .evt.discovery{background:rgba(90,143,90,0.15);color:var(--discovery);border-left:3px solid var(--discovery);}
+  .evt.validacao{background:rgba(139,105,20,0.12);color:var(--validacao);border-left:3px solid var(--validacao);}
+  .evt.checkin{background:rgba(122,138,154,0.12);color:var(--checkin);border-left:3px solid var(--checkin);}
+  .evt.status-report{background:rgba(184,134,11,0.12);color:var(--status);border-left:3px solid var(--status);}
+  .evt.handoff{background:rgba(196,93,62,0.12);color:var(--handoff);border-left:3px solid var(--handoff);}
+  .evt.marco{background:rgba(238,247,124,0.35);color:var(--verde-caqui);border-left:3px solid var(--lime);font-weight:700;}
+  .evt.fase{background:var(--verde-caqui);color:var(--off-white);border-left:3px solid var(--lime);}
+
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--cinza-400);font-weight:600;margin-bottom:16px;margin-top:48px;}
+  .summary-table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--radius);overflow:hidden;border:1px solid var(--cinza-200);}
+  .summary-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--cinza-400);padding:12px 14px;border-bottom:2px solid var(--cinza-200);font-weight:600;background:#fafaf0;}
+  .summary-table td{padding:10px 14px;border-bottom:1px solid var(--cinza-100);font-size:13px;color:var(--cinza-700);vertical-align:top;}
+  .summary-table tr:last-child td{border-bottom:none;}
+  .summary-table tr:hover td{background:rgba(238,247,124,0.08);}
+  .type-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;}
+  .type-badge.discovery{background:rgba(90,143,90,0.15);color:var(--discovery);}
+  .type-badge.validacao{background:rgba(139,105,20,0.12);color:var(--validacao);}
+  .type-badge.checkin{background:rgba(122,138,154,0.12);color:var(--checkin);}
+  .type-badge.status-report{background:rgba(184,134,11,0.12);color:var(--status);}
+  .type-badge.handoff{background:rgba(196,93,62,0.12);color:var(--handoff);}
+  .type-badge.marco{background:rgba(238,247,124,0.35);color:var(--verde-caqui);}
+  .type-badge.fase{background:var(--verde-caqui);color:var(--off-white);}
+
+  .stats{display:flex;gap:20px;margin-bottom:32px;flex-wrap:wrap;}
+  .stat-card{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:16px 24px;flex:1;min-width:150px;text-align:center;}
+  .stat-card .val{font-size:28px;font-weight:700;color:var(--verde-caqui);}
+  .stat-card .label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--cinza-400);margin-top:4px;}
+
+  .footer{text-align:center;padding:24px;font-size:12px;color:var(--cinza-400);border-top:1px solid var(--cinza-200);margin-top:48px;}
+  @media(max-width:768px){.page-header{padding:16px 24px 32px;}.page-header h1{font-size:24px;}.container{padding:32px 16px 60px;}.stats{flex-direction:column;}.cal-day{min-height:60px;}.evt{font-size:8px;}.legend{flex-direction:column;}}
+</style>
+</head>
+<body>
+
+{{topbar_html}}
+
+{{page_header_html}}
+
+<div class="container">
+
+  <div class="stats">
+{{stats_cards_html}}
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot discovery"></div>Sessão de Discovery</div>
+    <div class="legend-item"><div class="legend-dot validacao"></div>Validação</div>
+    <div class="legend-item"><div class="legend-dot checkin"></div>Check-in Semanal</div>
+    <div class="legend-item"><div class="legend-dot status-report"></div>Status Report</div>
+    <div class="legend-item"><div class="legend-dot handoff"></div>Handoff</div>
+    <div class="legend-item"><div class="legend-dot marco"></div>Marco do Projeto</div>
+    <div class="legend-item"><div class="legend-dot fase"></div>Início / Fim de Fase</div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterEvts('all')">Todos</button>
+    <button class="filter-btn" onclick="filterEvts('discovery')">Discovery</button>
+    <button class="filter-btn" onclick="filterEvts('validacao')">Validação</button>
+    <button class="filter-btn" onclick="filterEvts('checkin')">Check-in</button>
+    <button class="filter-btn" onclick="filterEvts('status-report')">Status Report</button>
+    <button class="filter-btn" onclick="filterEvts('handoff')">Handoff</button>
+    <button class="filter-btn" onclick="filterEvts('marco')">Marcos</button>
+  </div>
+
+  <div id="calendar-root"></div>
+
+  <div class="section-title">Lista Completa de Reuniões & Rituais</div>
+  <div style="overflow-x:auto;">
+    <table class="summary-table" id="summary-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Tipo</th>
+          <th>Reunião</th>
+          <th>Participantes</th>
+          <th>Duração</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody id="summary-body"></tbody>
+    </table>
+  </div>
+
+</div>
+
+{{footer_html}}
+
+<script>
+const events = {{events_json}};
+const MONTHS = {{months_json}};
+const DOW = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+function pad(n){return n.toString().padStart(2,'0');}
+function dateKey(y,m,d){return `${y}-${pad(m+1)}-${pad(d)}`;}
+
+function renderCalendars(filter){
+  const root = document.getElementById('calendar-root');
+  root.innerHTML = '';
+  MONTHS.forEach(mo => {
+    const sec = document.createElement('div');
+    sec.className = 'month-section';
+    sec.innerHTML = `<div class="month-header"><h2>${mo.name}</h2><span class="year">${mo.year}</span></div>`;
+    const grid = document.createElement('div');
+    grid.className = 'cal-grid';
+    DOW.forEach(d => {
+      const h = document.createElement('div');
+      h.className = 'cal-head';
+      h.textContent = d;
+      grid.appendChild(h);
+    });
+    const firstDay = new Date(mo.year, mo.month, 1).getDay();
+    const daysInMonth = new Date(mo.year, mo.month+1, 0).getDate();
+    for(let i=0;i<firstDay;i++){
+      const empty = document.createElement('div');
+      empty.className = 'cal-day empty';
+      grid.appendChild(empty);
+    }
+    for(let d=1;d<=daysInMonth;d++){
+      const cell = document.createElement('div');
+      const dow = new Date(mo.year, mo.month, d).getDay();
+      cell.className = 'cal-day' + (dow===0||dow===6?' weekend':'');
+      const key = dateKey(mo.year, mo.month, d);
+      const today = new Date();
+      const todayKey = dateKey(today.getFullYear(), today.getMonth(), today.getDate());
+      if(key === todayKey) cell.classList.add('today');
+      cell.innerHTML = `<div class="day-num">${d}</div>`;
+      const dayEvts = events.filter(e => e.d === key);
+      dayEvts.forEach(ev => {
+        if(filter !== 'all' && ev.type !== filter) return;
+        const tag = document.createElement('div');
+        tag.className = 'evt ' + ev.type;
+        tag.textContent = ev.label;
+        tag.title = `${ev.label}\n${ev.who?'Participantes: '+ev.who:''}\n${ev.dur?'Duração: '+ev.dur:''}\n${ev.out?'Output: '+ev.out:''}`;
+        cell.appendChild(tag);
+      });
+      grid.appendChild(cell);
+    }
+    const totalCells = firstDay + daysInMonth;
+    const remainder = totalCells % 7;
+    if(remainder > 0){
+      for(let i=0;i<7-remainder;i++){
+        const empty = document.createElement('div');
+        empty.className = 'cal-day empty';
+        grid.appendChild(empty);
+      }
+    }
+    sec.appendChild(grid);
+    root.appendChild(sec);
+  });
+}
+
+function renderSummary(filter){
+  const tbody = document.getElementById('summary-body');
+  tbody.innerHTML = '';
+  const sorted = [...events].sort((a,b) => a.d.localeCompare(b.d));
+  sorted.forEach(ev => {
+    if(filter !== 'all' && ev.type !== filter) return;
+    const typeLabels = {
+      discovery:'Discovery', validacao:'Validação', checkin:'Check-in',
+      'status-report':'Status Report', handoff:'Handoff', marco:'Marco', fase:'Fase'
+    };
+    const tr = document.createElement('tr');
+    const [y,m,dd] = ev.d.split('-');
+    const dateStr = `${dd}/${m}/${y}`;
+    const dowIdx = new Date(parseInt(y),parseInt(m)-1,parseInt(dd)).getDay();
+    const dowStr = DOW[dowIdx];
+    tr.innerHTML = `
+      <td style="white-space:nowrap;">${dateStr}<br><span style="font-size:11px;color:var(--cinza-400);">${dowStr}</span></td>
+      <td><span class="type-badge ${ev.type}">${typeLabels[ev.type]||ev.type}</span></td>
+      <td style="font-weight:500;">${ev.label}</td>
+      <td style="font-size:12px;">${ev.who||'—'}</td>
+      <td style="font-size:12px;white-space:nowrap;">${ev.dur||'—'}</td>
+      <td style="font-size:12px;">${ev.out||'—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+let activeFilter = 'all';
+function filterEvts(type){
+  activeFilter = type;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderCalendars(type);
+  renderSummary(type);
+}
+
+renderCalendars('all');
+renderSummary('all');
+</script>
+
+</body>
+</html>

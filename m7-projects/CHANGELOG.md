@@ -5,6 +5,44 @@ Todas as mudancas notaveis neste plugin serao documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.3.0] - 2026-04-18
+
+Terceira release alpha. Adiciona a skill `building-project-plan` — geração do Plano de Projeto completo (10 HTMLs com Design System M7-2026 + Cronograma.xlsx baseline). Pipeline cross-skill com `managing-action-plan` validado end-to-end. 3 de 4 skills do plugin agora funcionais.
+
+### Added
+- **Skill `building-project-plan`**: produz o Plano de Projeto completo dentro de `1-planning/` reproduzindo fielmente a estrutura do projeto-modelo H1-02 Playbook de Processos:
+  - 1 landing (`plano-projeto.html`) com hero/estrela/nav-grid de 9 cards
+  - 9 artefatos HTML em `artefatos/`: contexto-escopo, eap (WBS org-chart CSS), roadmap-marcos (phase-bar + timeline + swim-lane com lanes/governance + milestone-grid), okrs (objetivos × KRs com cadência), recursos-dependencias (team-grid + alloc-table + dep-table), plano-comunicacao (rituais + RACI + canais), riscos (heatmap 3×3 + risk-legend + risk-detail), cronograma (wh-table com filtros derivada do xlsx), calendario (grid mensal + summary-table com events JS)
+  - `Cronograma.xlsx` BASELINE com schema espelhando H1-02 (10 colunas B-K, header bold caqui, formatação por Tipo, freeze B5, auto-filter, data validation em Tipo/Status, todos `Status=not_started`)
+- **4 scripts Python** (3 + lib compartilhada):
+  - `_lib.py` — tokens M7-2026, helpers HTML compartilhados (topbar/page-header/footer), datas BR (jan/fev/mar/abr/...), asset loading
+  - `generate_xlsx.py` — gera `Cronograma.xlsx` BASELINE com formatação completa (cores por Tipo, data validation, freeze, auto-filter)
+  - `derive_calendar_events.py` — deriva `events[]` do calendário a partir de Fases do xlsx + milestones do roadmap + rituais (manual + recurring com freq/start/end/weekday)
+  - `render_html.py` — engine de renderização: 10 builders (um por artefato), substituição de placeholders, montagem de chunks dinâmicos (nav cards, WBS tree, swim-lane lanes/bars/ticks/qrs com posicionamento `left%`/`width%`, heatmap cells, etc.)
+- **10 templates HTML** em `templates/` (1 landing + 9 em `artefatos/`): cada um self-contained com CSS inline próprio + placeholders apenas onde varia o conteúdo. Total: ~1.560 linhas de templates fiéis ao H1-02.
+- **5 references**: `design-system-m7-2026.md`, `artifact-catalog.md` (schema completo do `data` JSON por artefato), `cronograma-xlsx-schema.md` (contrato com managing-action-plan), `wbs-conventions.md` (3 níveis na árvore + nível 4 em tabela), `example-project-h1-02.md` (benchmark canônico)
+- **Logo M7** (`templates/assets/m7-logo-offwhite.b64` + `m7-logo-dark.b64`) carregado e embedado base64 em hero/page-headers
+
+### Architecture decisions
+- **Modelo Z reforçado**: a skill é **proibida** de escrever fora de `1-planning/`. Toda saída do plano formal vive ali. `4-status-report/` é responsabilidade de outras skills.
+- **Cronograma BASELINE imutável**: após criação, somente `managing-action-plan` toca em xlsx (e só na cópia LIVE em `4-status-report/`). A coluna L `ClickUp ID` NÃO é adicionada por esta skill — é responsabilidade da `managing-action-plan` no 1º run.
+- **Templates self-contained**: cada HTML tem seu próprio `<style>` inline (espelha pattern do H1-02) — funciona offline, copia/cola por email, imprime corretamente. Logo embedado base64 em todos.
+- **Renderer simples (Python str.replace)**: sem Jinja2 ou templating engine — placeholders `{{var}}` substituídos sequencialmente. Templates têm chunks dinâmicos (`{{nav_cards_html}}`, `{{wbs_tree_html}}`, etc.) que Python monta a partir do data JSON.
+- **Cronograma.html derivado do xlsx**: lê 1:1 do `Cronograma.xlsx` (consistência item-a-item garantida; qualquer divergência seria bug do xlsx ou do parser).
+- **Calendar events derivados do xlsx + rituais**: `derive_calendar_events.py` extrai linhas Fase do xlsx (início+fim) + milestones do roadmap + rituais com data fixa + recurring com freq/weekday.
+
+### Cross-skill validation
+- Smoke test cross-skill end-to-end passou: `building-project-plan/generate_xlsx.py` produz xlsx que `managing-action-plan/init.py` consome sem ajustes. Pipeline completo: planejamento → execução validado.
+- Render end-to-end: 10/10 HTMLs renderizados, ZERO warnings de placeholders remanescentes, 13 events do calendário derivados automaticamente do xlsx + rituais.
+
+### Validation
+- Todos os 4 scripts passam `python3 -m py_compile`
+- `validating-artifacts` grade C (1 fail em U6 por uso de `<example>` tags na description — decisão consciente e consistente com `initializing-project` e `managing-action-plan`)
+- Templates testados com sample data sintético: 10 HTMLs gerados sem erros, ~135KB total
+
+### Scope (próximas releases)
+- `generating-status-materials` — OPR (PDF) + apresentação executiva (PPTX) com Design System M7-2026 (consome `4-status-report/Cronograma.xlsx` LIVE + `changelog.md`) — última skill antes de v1.0.0
+
 ## [0.2.0] - 2026-04-18
 
 Segunda release alpha. Adiciona a skill `managing-action-plan` (núcleo técnico do plugin) e revisa a `initializing-project` para refletir a nova arquitetura de path (Modelo Z) e o uso de `Cronograma.xlsx` como artefato local.

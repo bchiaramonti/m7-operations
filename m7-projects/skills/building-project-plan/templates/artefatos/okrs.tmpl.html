@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>04 — OKRs do Projeto | {{project_label}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --verde-caqui:#424135;--lime:#eef77c;--off-white:#fffdef;
+    --cinza-700:#3d3d3d;--cinza-400:#9a9a8e;--cinza-200:#d9d9c8;--cinza-100:#f0f0e4;
+    --accent-green:#7ab648;--radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--off-white);color:var(--verde-caqui);}
+  .topbar{background:var(--verde-caqui);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;}
+  .topbar a{color:var(--cinza-200);text-decoration:none;font-size:13px;font-weight:500;}.topbar a:hover{color:var(--lime);}
+  .topbar .title{color:var(--off-white);font-size:14px;font-weight:500;}
+  .page-header { background:var(--verde-caqui); padding:24px 48px 48px; color:var(--off-white); display:flex; justify-content:space-between; align-items:flex-end; }
+  .page-header .num { font-size:60px; font-weight:700; color:rgba(238,247,124,0.2); line-height:1; }
+  .page-header h1 { font-size:32px; font-weight:400; margin-top:-10px; }
+  .page-header-left { flex:1; }
+  .page-header .logo { height:56px; opacity:0.85; flex-shrink:0; }
+  .container{max-width:960px;margin:0 auto;padding:48px 32px 80px;}
+
+  .okr-block{margin-bottom:40px;}
+  .obj-card{background:var(--verde-caqui);color:var(--off-white);border-radius:var(--radius);padding:24px 28px;margin-bottom:16px;position:relative;}
+  .obj-card .obj-num{font-size:11px;font-weight:600;color:var(--cinza-200);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;}
+  .obj-card h2{font-size:19px;font-weight:400;line-height:1.45;}
+
+  .kr-list{display:flex;flex-direction:column;gap:12px;}
+  .kr{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:20px 24px;display:flex;align-items:flex-start;gap:16px;}
+  .kr-num{flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--cinza-100);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--verde-caqui);}
+  .kr-content{flex:1;}
+  .kr-content h4{font-size:14px;font-weight:400;line-height:1.4;margin-bottom:4px;}
+  .kr-content .metric{font-size:13px;color:var(--cinza-400);line-height:1.5;}
+  .kr-content .metric strong{color:var(--verde-caqui);}
+  .kr-target{flex-shrink:0;background:rgba(238,247,124,0.2);padding:8px 14px;border-radius:8px;font-size:20px;font-weight:700;color:var(--verde-caqui);text-align:center;min-width:60px;}
+  .kr-target .unit{font-size:10px;font-weight:500;color:var(--cinza-400);display:block;}
+
+  .cadence-box{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:24px 28px;margin-top:40px;}
+  .cadence-box h3{font-size:15px;font-weight:500;margin-bottom:14px;}
+  .cadence-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .cadence-item{background:var(--cinza-100);border-radius:8px;padding:16px;text-align:center;}
+  .cadence-item .freq{font-size:12px;font-weight:600;color:var(--cinza-400);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;}
+  .cadence-item .desc{font-size:13px;color:var(--cinza-700);line-height:1.4;}
+
+  .footer{text-align:center;padding:24px;font-size:12px;color:var(--cinza-400);border-top:1px solid var(--cinza-200);margin-top:48px;}
+  @media(max-width:768px){.page-header{padding:16px 24px 32px;}.page-header h1{font-size:24px;}.container{padding:32px 16px 60px;}.cadence-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+{{topbar_html}}
+
+{{page_header_html}}
+
+<div class="container">
+
+{{okr_blocks_html}}
+
+  <div class="cadence-box">
+    <h3>Cadência de Acompanhamento dos OKRs</h3>
+    <div class="cadence-grid">
+{{cadence_items_html}}
+    </div>
+  </div>
+
+</div>
+
+{{footer_html}}
+
+</body>
+</html>

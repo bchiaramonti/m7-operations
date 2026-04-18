@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>07 — Mapeamento & Matriz de Riscos | {{project_label}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --verde-caqui:#424135;--lime:#eef77c;--off-white:#fffdef;
+    --cinza-700:#3d3d3d;--cinza-400:#9a9a8e;--cinza-200:#d9d9c8;--cinza-100:#f0f0e4;
+    --red:#c0392b;--orange:#e67e22;--yellow:#f1c40f;--green:#7ab648;
+    --radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--off-white);color:var(--verde-caqui);}
+  .topbar{background:var(--verde-caqui);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;}
+  .topbar a{color:var(--cinza-200);text-decoration:none;font-size:13px;font-weight:500;}.topbar a:hover{color:var(--lime);}
+  .topbar .title{color:var(--off-white);font-size:14px;font-weight:500;}
+  .page-header { background:var(--verde-caqui); padding:24px 48px 48px; color:var(--off-white); display:flex; justify-content:space-between; align-items:flex-end; }
+  .page-header .num { font-size:60px; font-weight:700; color:rgba(238,247,124,0.2); line-height:1; }
+  .page-header h1 { font-size:32px; font-weight:400; margin-top:-10px; }
+  .page-header-left { flex:1; }
+  .page-header .logo { height:56px; opacity:0.85; flex-shrink:0; }
+  .container{max-width:1100px;margin:0 auto;padding:48px 32px 80px;}
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--cinza-400);font-weight:600;margin-bottom:16px;margin-top:40px;}
+  .section-title:first-child{margin-top:0;}
+
+  .matrix-container{display:flex;gap:32px;align-items:flex-start;flex-wrap:wrap;}
+  .heat-map{position:relative;width:340px;flex-shrink:0;}
+  .heat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;}
+  .heat-cell{width:100%;aspect-ratio:1;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;font-size:11px;font-weight:600;color:#fff;position:relative;}
+  .heat-cell .risk-dots{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;}
+  .risk-dot{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.9);color:var(--verde-caqui);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,0.2);}
+  .heat-high-high{background:var(--red);}
+  .heat-high-med{background:#e74c3c;}
+  .heat-high-low{background:var(--orange);}
+  .heat-med-high{background:#e74c3c;}
+  .heat-med-med{background:var(--orange);}
+  .heat-med-low{background:var(--yellow);}
+  .heat-low-high{background:var(--orange);}
+  .heat-low-med{background:var(--yellow);}
+  .heat-low-low{background:var(--green);}
+  .axis-label{font-size:11px;color:var(--cinza-400);font-weight:500;text-transform:uppercase;letter-spacing:0.5px;}
+  .axis-y{position:absolute;left:-28px;top:50%;transform:rotate(-90deg) translateX(-50%);transform-origin:0 0;white-space:nowrap;}
+  .axis-x{text-align:center;margin-top:8px;}
+  .axis-ticks{display:flex;justify-content:space-around;font-size:10px;color:var(--cinza-400);margin-bottom:4px;}
+
+  .risk-legend{flex:1;min-width:280px;}
+  .risk-item{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start;}
+  .risk-id{flex-shrink:0;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;}
+  .risk-id.crit{background:var(--red);}
+  .risk-id.high{background:var(--orange);}
+  .risk-id.medium{background:var(--yellow);color:var(--verde-caqui);}
+  .risk-content h4{font-size:14px;font-weight:400;line-height:1.35;margin-bottom:4px;}
+  .risk-content .tags{display:flex;gap:8px;margin-bottom:6px;}
+  .risk-tag{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+  .tag-prob{background:var(--cinza-100);color:var(--cinza-700);}
+  .tag-imp{background:var(--cinza-100);color:var(--cinza-700);}
+  .risk-content p{font-size:12px;color:var(--cinza-400);line-height:1.5;}
+  .mitigation{margin-top:8px;padding:8px 12px;background:rgba(122,182,72,0.08);border-left:3px solid var(--green);border-radius:0 6px 6px 0;}
+  .mitigation strong{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--green);display:block;margin-bottom:2px;}
+  .mitigation span{font-size:12px;color:var(--cinza-700);line-height:1.5;}
+
+  .risk-detail{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--radius);overflow:hidden;border:1px solid var(--cinza-200);}
+  .risk-detail th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.8px;color:var(--cinza-400);padding:14px 16px;border-bottom:2px solid var(--cinza-200);font-weight:600;background:#fafaf0;}
+  .risk-detail td{padding:14px 16px;font-size:13px;border-bottom:1px solid var(--cinza-100);color:var(--cinza-700);vertical-align:top;line-height:1.5;}
+  .risk-detail tr:last-child td{border-bottom:none;}
+  .sev{display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600;}
+  .sev-crit{background:#fde8e6;color:var(--red);}
+  .sev-high{background:#fef0e0;color:var(--orange);}
+  .sev-med{background:#fef9e0;color:#9a8c00;}
+
+  .footer{text-align:center;padding:24px;font-size:12px;color:var(--cinza-400);border-top:1px solid var(--cinza-200);margin-top:48px;}
+  @media(max-width:768px){.page-header{padding:16px 24px 32px;}.page-header h1{font-size:24px;}.container{padding:32px 16px 60px;}.matrix-container{flex-direction:column;}.heat-map{width:100%;max-width:340px;}}
+</style>
+</head>
+<body>
+
+{{topbar_html}}
+
+{{page_header_html}}
+
+<div class="container">
+
+  <div class="section-title">Matriz Probabilidade × Impacto</div>
+  <div class="matrix-container">
+    <div class="heat-map">
+      <div class="axis-label axis-y">← Probabilidade</div>
+      <div style="margin-left:28px;">
+        <div class="axis-ticks"><span>Baixo</span><span>Médio</span><span>Alto</span></div>
+        <div class="heat-grid">
+{{heatmap_cells_html}}
+        </div>
+        <div style="display:flex;justify-content:space-around;font-size:10px;color:var(--cinza-400);margin-top:4px;">
+          <span>Alta</span><span>Média</span><span>Baixa</span>
+        </div>
+        <div class="axis-label axis-x">Impacto →</div>
+      </div>
+    </div>
+
+    <div class="risk-legend">
+{{risk_items_html}}
+    </div>
+  </div>
+
+  <div class="section-title">Contramedidas</div>
+  <table class="risk-detail">
+    <thead><tr><th>#</th><th>Risco</th><th>Severidade</th><th>Contramedida</th><th>Ação de Mitigação</th><th>Trigger</th></tr></thead>
+    <tbody>
+{{contramedidas_rows_html}}
+    </tbody>
+  </table>
+
+</div>
+
+{{footer_html}}
+
+</body>
+</html>

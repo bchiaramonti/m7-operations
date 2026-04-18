@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>03 — Roadmap & Marcos | {{project_label}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --verde-caqui:#424135;--lime:#eef77c;--off-white:#fffdef;
+    --cinza-700:#3d3d3d;--cinza-400:#9a9a8e;--cinza-200:#d9d9c8;--cinza-100:#f0f0e4;
+    --verde-medio:#4f4e3c;--verde-claro:#79755c;--verde-escuro:#2d2d24;
+    --verde-caqui-50:#f6f6f5;--verde-caqui-100:#d0d0cc;--verde-caqui-200:#aeada8;
+    --blue:#0066ff;--amber:#F59E0B;--purple:#8B5CF6;--teal:#14B8A6;
+    --radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--off-white);color:var(--verde-caqui);}
+  .topbar{background:var(--verde-caqui);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;}
+  .topbar a{color:var(--cinza-200);text-decoration:none;font-size:13px;font-weight:500;}.topbar a:hover{color:var(--lime);}
+  .topbar .title{color:var(--off-white);font-size:14px;font-weight:500;}
+  .page-header { background:var(--verde-caqui); padding:24px 48px 48px; color:var(--off-white); display:flex; justify-content:space-between; align-items:flex-end; }
+  .page-header .num { font-size:60px; font-weight:700; color:rgba(238,247,124,0.2); line-height:1; }
+  .page-header h1 { font-size:32px; font-weight:400; margin-top:-10px; }
+  .page-header-left { flex:1; }
+  .page-header .logo { height:56px; opacity:0.85; flex-shrink:0; }
+  .container{max-width:1200px;margin:0 auto;padding:48px 32px 80px;}
+
+  /* PHASE BAR */
+  .phase-bar{display:flex;border-radius:var(--radius);overflow:hidden;margin-bottom:32px;border:1px solid var(--cinza-200);}
+  .phase-bar .phase{padding:14px 20px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;position:relative;}
+  .phase-bar .phase .phase-dates{font-size:10px;font-weight:400;opacity:0.7;margin-top:2px;letter-spacing:0;text-transform:none;}
+  .phase-bar .phase-plan{background:var(--cinza-100);color:var(--cinza-700);flex:1;}
+  .phase-bar .phase-exec{background:var(--verde-caqui);color:var(--off-white);flex:5;}
+  .phase-bar .phase-close{background:var(--lime);color:var(--verde-caqui);flex:0.5;}
+
+  /* TIMELINE */
+  .timeline-wrapper{overflow-x:auto;padding-bottom:20px;-webkit-overflow-scrolling:touch;margin:0 -32px;padding-left:32px;padding-right:32px;}
+  .timeline{position:relative;display:flex;gap:0;width:max-content;min-width:100%;padding:40px 40px 60px;}
+  .timeline::before{content:'';position:absolute;top:60px;left:20px;right:20px;height:4px;background:var(--cinza-200);border-radius:2px;}
+
+  .block{flex:0 0 110px;position:relative;display:flex;flex-direction:column;align-items:center;}
+  .block .dot{width:18px;height:18px;border-radius:50%;background:var(--verde-caqui);border:3px solid var(--off-white);box-shadow:0 0 0 2px var(--verde-caqui);position:relative;z-index:2;margin-top:52px;}
+  .block.phase-start .dot{width:22px;height:22px;background:var(--lime);box-shadow:0 0 0 2px var(--verde-caqui);}
+  .block.transversal .dot{background:var(--lime);box-shadow:0 0 0 2px var(--verde-caqui);}
+  .block.cadeia .dot{background:#fff;border:3px solid var(--verde-caqui);box-shadow:0 0 0 2px var(--cinza-400);}
+  .block.encerramento .dot{background:var(--lime);box-shadow:0 0 0 2px var(--verde-caqui);}
+  .block .label-top{font-size:11px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:0.5px;position:absolute;top:0;text-align:center;width:100%;}
+  .block .label-top.phase-label{color:var(--verde-caqui);font-size:10px;letter-spacing:1px;}
+  .block .label-bottom{position:absolute;top:82px;text-align:center;width:120px;left:50%;transform:translateX(-50%);}
+  .block .label-bottom .process{font-size:13px;font-weight:600;line-height:1.3;}
+  .block .label-bottom .dates{font-size:11px;color:var(--cinza-400);margin-top:4px;}
+  .block .label-bottom .owner{font-size:11px;color:var(--cinza-400);margin-top:2px;font-style:italic;}
+  .block .label-bottom .parallel-note{font-size:9px;color:var(--verde-caqui);background:var(--lime);padding:1px 6px;border-radius:3px;margin-top:4px;display:inline-block;}
+
+  /* SECTION DIVIDERS */
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--cinza-400);font-weight:600;margin-bottom:16px;margin-top:48px;}
+
+  /* SWIM-LANE ROADMAP (frentes do projeto) */
+  .roadmap{width:100%;background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;}
+  .months-row{display:grid;grid-template-columns:200px repeat({{n_months}}, 1fr);background:var(--verde-caqui);color:var(--off-white);}
+  .months-row .corner{padding:8px 14px;font-size:10px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--lime);border-right:1px solid rgba(255,253,239,0.15);}
+  .month-cell{text-align:center;font-size:11px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--off-white);padding:8px 4px;border-right:1px solid rgba(255,253,239,0.1);}
+  .month-cell:last-child{border-right:none;}
+  .month-cell .year{display:block;font-size:8px;color:rgba(255,253,239,0.55);letter-spacing:0.5px;margin-top:1px;font-weight:400;}
+
+  .lane{display:grid;grid-template-columns:200px 1fr;border-top:1px solid var(--verde-caqui-100);min-height:100px;}
+  .lane.gov{border-top:3px solid var(--lime);background:var(--verde-caqui-50);}
+  .lane-label{padding:12px 14px;display:flex;flex-direction:column;justify-content:center;background:var(--verde-caqui-50);border-right:1px solid var(--verde-caqui-100);}
+  .lane.gov .lane-label{background:var(--verde-caqui);}
+  .lane-label .code{font-size:10px;font-weight:500;letter-spacing:1.5px;color:var(--verde-claro);text-transform:uppercase;}
+  .lane.gov .lane-label .code{color:var(--lime);}
+  .lane-label .name{font-size:12px;font-weight:500;color:var(--verde-caqui);margin-top:2px;line-height:1.25;}
+  .lane.gov .lane-label .name{color:var(--off-white);}
+  .lane-label .owner{font-size:9.5px;color:var(--verde-claro);margin-top:4px;line-height:1.35;}
+  .lane.gov .lane-label .owner{color:var(--verde-caqui-200);}
+
+  .track{position:relative;padding:8px 0 6px;background-image:repeating-linear-gradient(to right,transparent 0,transparent calc((100% / {{n_months}}) - 1px),var(--verde-caqui-100) calc((100% / {{n_months}}) - 1px),var(--verde-caqui-100) calc(100% / {{n_months}}));}
+
+  .bar{position:absolute;top:8px;height:38px;display:flex;flex-direction:column;justify-content:center;padding:0 32px 0 14px;font-size:11px;font-weight:500;line-height:1.1;color:var(--off-white);background:var(--verde-caqui);clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%);box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+  .bar.v-purple{background:var(--purple);color:#fff;}
+  .bar.v-blue{background:var(--blue);color:#fff;}
+  .bar.v-amber{background:var(--amber);color:var(--verde-escuro);}
+  .bar.v-dark{background:var(--verde-caqui);color:var(--off-white);}
+  .bar.v-teal{background:var(--teal);color:#fff;}
+  .bar.v-gov{background:linear-gradient(90deg,var(--verde-caqui) 0%, var(--verde-medio) 100%);color:var(--off-white);}
+  .bar .title{display:block;font-weight:600;letter-spacing:0.1px;font-size:11.5px;}
+  .bar .range{display:block;font-size:9.5px;opacity:0.8;font-weight:400;margin-top:1px;letter-spacing:0.3px;}
+
+  .milestones{position:relative;margin-top:48px;height:60px;}
+  .tick{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;width:100px;z-index:4;}
+  .tick .connector{width:1.5px;height:8px;background:var(--verde-caqui-200);}
+  .tick .dot{width:10px;height:10px;border-radius:50%;background:var(--lime);border:2px solid #fff;box-shadow:0 0 0 1.5px var(--verde-caqui);margin-top:-5px;}
+  .tick.gate .dot{background:#fff;border:2px solid var(--lime);box-shadow:0 0 0 1.5px var(--verde-caqui);}
+  .tick .lbl{font-size:9px;font-weight:700;color:var(--verde-caqui);background:var(--off-white);padding:1px 5px;border-radius:3px;margin-top:3px;letter-spacing:0.3px;}
+  .tick.gate .lbl{background:var(--lime);}
+  .tick .date{font-size:9px;color:var(--cinza-400);margin-top:2px;font-weight:500;}
+  .tick .desc{font-size:9px;color:var(--cinza-700);margin-top:1px;text-align:center;line-height:1.2;max-width:90px;}
+
+  .lane.gov .qr{position:absolute;top:8px;background:var(--lime);color:var(--verde-caqui);font-size:9.5px;font-weight:600;padding:6px 12px;border-radius:18px;box-shadow:0 1px 3px rgba(0,0,0,0.15);transform:translateX(-50%);}
+  .lane.gov .qr-label{display:block;text-align:center;}
+
+  .roadmap-legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;font-size:11px;color:var(--cinza-400);}
+  .roadmap-legend .legend-item{display:flex;align-items:center;gap:6px;}
+  .roadmap-legend .legend-dot{width:12px;height:12px;border-radius:3px;}
+
+  /* MILESTONES */
+  .milestone-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .milestone{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:20px;border-left:4px solid var(--verde-caqui);}
+  .milestone.major{border-left-color:var(--lime);background:rgba(238,247,124,0.08);}
+  .milestone .date{font-size:11px;font-weight:600;color:var(--cinza-400);text-transform:uppercase;letter-spacing:0.5px;}
+  .milestone .wbs{font-size:10px;color:var(--verde-caqui);background:var(--cinza-100);padding:1px 6px;border-radius:3px;display:inline-block;margin-left:6px;}
+  .milestone h4{font-size:14px;font-weight:400;margin-top:4px;line-height:1.4;}
+  .milestone p{font-size:12px;color:var(--cinza-400);margin-top:6px;line-height:1.5;}
+
+  .footer{text-align:center;padding:24px;font-size:12px;color:var(--cinza-400);border-top:1px solid var(--cinza-200);margin-top:48px;}
+  @media(max-width:768px){.page-header{padding:16px 24px 32px;}.page-header h1{font-size:24px;}.container{padding:32px 16px 60px;}.milestone-grid{grid-template-columns:1fr;}.phase-bar{flex-direction:column;}}
+</style>
+</head>
+<body>
+
+{{topbar_html}}
+
+{{page_header_html}}
+
+<div class="container">
+
+  <div class="phase-bar">
+{{phase_bar_html}}
+  </div>
+
+  <div class="timeline-wrapper">
+    <div class="timeline">
+{{timeline_blocks_html}}
+    </div>
+  </div>
+
+  <div class="section-title">Roadmap por Frente</div>
+  <div class="roadmap">
+    <div class="months-row">
+      <div class="corner">Frente / Fase</div>
+{{months_row_html}}
+    </div>
+{{lanes_html}}
+  </div>
+
+  <div class="roadmap-legend">
+{{roadmap_legend_html}}
+  </div>
+
+  <div class="section-title">Marcos do Projeto</div>
+  <div class="milestone-grid">
+{{milestones_html}}
+  </div>
+
+</div>
+
+{{footer_html}}
+
+</body>
+</html>

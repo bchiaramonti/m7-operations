@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>08 — Cronograma Detalhado | {{project_label}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --verde-caqui:#424135;--lime:#eef77c;--off-white:#fffdef;
+    --cinza-700:#3d3d3d;--cinza-400:#9a9a8e;--cinza-200:#d9d9c8;--cinza-100:#f0f0e4;
+    --radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--off-white);color:var(--verde-caqui);}
+  .topbar{background:var(--verde-caqui);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;}
+  .topbar a{color:var(--cinza-200);text-decoration:none;font-size:13px;font-weight:500;}.topbar a:hover{color:var(--lime);}
+  .topbar .title{color:var(--off-white);font-size:14px;font-weight:500;}
+  .page-header{background:var(--verde-caqui);padding:24px 48px 48px;color:var(--off-white);display:flex;justify-content:space-between;align-items:flex-end;}
+  .page-header .num{font-size:60px;font-weight:700;color:rgba(238,247,124,0.2);line-height:1;}
+  .page-header h1{font-size:32px;font-weight:400;margin-top:-10px;}
+  .page-header-left{flex:1;}
+  .page-header .logo{height:56px;opacity:0.85;flex-shrink:0;}
+  .container{max-width:1400px;margin:0 auto;padding:48px 24px 80px;}
+
+  .stats{display:flex;gap:24px;margin-bottom:32px;}
+  .stat-card{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:16px 24px;flex:1;text-align:center;}
+  .stat-card .val{font-size:28px;font-weight:700;color:var(--verde-caqui);}
+  .stat-card .label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--cinza-400);margin-top:4px;}
+
+  .filter-bar{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;}
+  .filter-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--cinza-200);background:#fff;font-size:12px;cursor:pointer;font-family:inherit;color:var(--cinza-700);transition:all .2s;}
+  .filter-btn:hover,.filter-btn.active{background:var(--verde-caqui);color:var(--off-white);border-color:var(--verde-caqui);}
+
+  .wh-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .wh-table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--radius);overflow:hidden;border:1px solid var(--cinza-200);font-size:12px;min-width:1100px;}
+  .wh-table thead th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--cinza-400);padding:10px 12px;border-bottom:2px solid var(--cinza-200);font-weight:600;background:#fafaf0;white-space:nowrap;position:sticky;top:0;z-index:2;}
+  .wh-table tbody td{padding:8px 12px;border-bottom:1px solid var(--cinza-100);color:var(--cinza-700);vertical-align:top;line-height:1.4;}
+  .wh-table tbody tr:last-child td{border-bottom:none;}
+  .wh-table .wbs-code{font-weight:600;color:var(--verde-caqui);font-size:11px;white-space:nowrap;}
+  .wh-table .wbs-code.sub{font-weight:400;color:var(--cinza-400);font-size:10px;}
+
+  .wh-table .phase-row td{background:var(--verde-caqui);color:var(--off-white);font-weight:600;font-size:12px;letter-spacing:0.3px;padding:10px 12px;}
+  .wh-table .phase-row.close td{background:var(--lime);color:var(--verde-caqui);}
+  .wh-table .acao-row td{background:rgba(217,217,200,0.25);font-weight:500;}
+  .wh-table .acao-row:hover td{background:rgba(238,247,124,0.2);}
+  .etapa-row td{font-size:11px;color:var(--cinza-400);padding:6px 12px;border-bottom:1px solid rgba(217,217,200,0.4);}
+  .entreg,.entreg-etapa{font-size:11px;max-width:320px;}
+  .entreg-etapa{color:var(--cinza-400);font-size:10px;}
+
+  .footer{text-align:center;padding:24px;font-size:12px;color:var(--cinza-400);border-top:1px solid var(--cinza-200);margin-top:48px;}
+  @media(max-width:768px){.container{padding:24px 12px;}.stats{flex-direction:column;}}
+</style>
+</head>
+<body>
+
+{{topbar_html}}
+
+{{page_header_html}}
+
+<div class="container">
+
+  <div class="stats">
+    <div class="stat-card"><div class="val">{{stat_fases}}</div><div class="label">Fases / Sub-fases</div></div>
+    <div class="stat-card"><div class="val">{{stat_acoes}}</div><div class="label">Ações</div></div>
+    <div class="stat-card"><div class="val">{{stat_etapas}}</div><div class="label">Etapas</div></div>
+    <div class="stat-card"><div class="val">{{stat_dias}}</div><div class="label">Dias</div></div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="filterRows('all')">Todas</button>
+    <button class="filter-btn" onclick="filterRows('Fase')">Fases</button>
+    <button class="filter-btn" onclick="filterRows('Ação')">Ações</button>
+    <button class="filter-btn" onclick="filterRows('Etapas')">Etapas</button>
+  </div>
+
+  <div class="wh-wrapper">
+    <table class="wh-table" id="cronoTable">
+      <thead>
+        <tr><th>No.</th><th>Tipo</th><th>Etapa</th><th>Responsável</th><th>Início Planejado</th><th>Fim Planejado</th><th>Entregável</th></tr>
+      </thead>
+      <tbody>
+{{cronograma_rows_html}}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+{{footer_html}}
+
+<script>
+function filterRows(tipo) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const rows = document.querySelectorAll('#cronoTable tbody tr');
+  rows.forEach(row => {
+    if (tipo === 'all') { row.style.display = ''; return; }
+    const isPhase = row.classList.contains('phase-row');
+    const isAcao = row.classList.contains('acao-row');
+    const isEtapa = row.classList.contains('etapa-row');
+    if (tipo === 'Fase') row.style.display = isPhase ? '' : 'none';
+    else if (tipo === 'Ação') row.style.display = (isAcao || isPhase) ? '' : 'none';
+    else if (tipo === 'Etapas') row.style.display = '';
+  });
+}
+</script>
+
+</body>
+</html>

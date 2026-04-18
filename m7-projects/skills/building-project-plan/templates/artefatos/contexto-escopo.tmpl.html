@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>01 — Contexto, Escopo & Exclusões | {{project_label}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --verde-caqui: #424135;
+    --lime: #eef77c;
+    --off-white: #fffdef;
+    --cinza-700: #3d3d3d;
+    --cinza-400: #9a9a8e;
+    --cinza-200: #d9d9c8;
+    --cinza-100: #f0f0e4;
+    --accent-red: #c0392b;
+    --accent-green: #7ab648;
+    --radius: 12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:var(--off-white); color:var(--verde-caqui); }
+  .topbar { background:var(--verde-caqui); padding:16px 32px; display:flex; justify-content:space-between; align-items:center; }
+  .topbar a { color:var(--cinza-200); text-decoration:none; font-size:13px; font-weight:500; }
+  .topbar a:hover { color:var(--lime); }
+  .topbar .title { color:var(--off-white); font-size:14px; font-weight:500; }
+  .page-header { background:var(--verde-caqui); padding:24px 48px 48px; color:var(--off-white); display:flex; justify-content:space-between; align-items:flex-end; }
+  .page-header .num { font-size:60px; font-weight:700; color:rgba(238,247,124,0.2); line-height:1; }
+  .page-header h1 { font-size:32px; font-weight:400; margin-top:-10px; }
+  .page-header-left { flex:1; }
+  .page-header .logo { height:56px; opacity:0.85; flex-shrink:0; }
+  .container { max-width:960px; margin:0 auto; padding:48px 32px 80px; }
+
+  .card { background:#fff; border:1px solid var(--cinza-200); border-radius:var(--radius); padding:32px; margin-bottom:24px; }
+  .card h2 { font-size:18px; font-weight:400; margin-bottom:16px; }
+  .card h3 { font-size:14px; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--cinza-400); margin-bottom:12px; margin-top:20px; }
+  .card h3:first-child { margin-top:0; }
+  .card p, .card li { font-size:15px; line-height:1.7; color:var(--cinza-700); }
+  .card ul { padding-left:20px; margin-top:8px; }
+  .card li { margin-bottom:6px; }
+  .card p + p { margin-top:14px; }
+
+  .estrela-box {
+    background:var(--verde-caqui); color:var(--off-white);
+    border-radius:var(--radius); padding:28px 32px;
+    margin-bottom:24px; position:relative;
+  }
+  .estrela-box::before { content:'★'; position:absolute; top:24px; right:28px; font-size:24px; color:var(--lime); opacity:0.5; }
+  .estrela-box .label { font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--cinza-200); font-weight:600; margin-bottom:8px; }
+  .estrela-box p { font-size:16px; font-weight:300; line-height:1.7; }
+
+  .scope-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .scope-card { border-radius:var(--radius); padding:28px; }
+  .scope-yes { background:#f0f8e8; border:1px solid #c5e1a5; }
+  .scope-no { background:#fef0ef; border:1px solid #f5c6c2; }
+  .scope-card h3 { font-size:13px; text-transform:uppercase; letter-spacing:1.2px; margin-bottom:14px; margin-top:0; }
+  .scope-yes h3 { color:var(--accent-green); }
+  .scope-no h3 { color:var(--accent-red); }
+  .scope-card li { font-size:14px; line-height:1.6; color:var(--cinza-700); }
+
+  .quote-box {
+    border-left:4px solid var(--verde-caqui);
+    background:rgba(238,247,124,0.1);
+    padding:20px 24px;
+    border-radius:0 var(--radius) var(--radius) 0;
+    margin:20px 0;
+  }
+  .quote-box p { font-style:italic; font-size:14px; line-height:1.65; color:var(--cinza-700); }
+  .quote-box .source { font-style:normal; font-weight:600; font-size:12px; color:var(--cinza-400); margin-top:8px; }
+
+  .dep-table { width:100%; border-collapse:collapse; margin-top:16px; }
+  .dep-table th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:1px; color:var(--cinza-400); padding:10px 12px; border-bottom:2px solid var(--cinza-200); font-weight:600; }
+  .dep-table td { padding:12px; font-size:14px; border-bottom:1px solid var(--cinza-100); color:var(--cinza-700); }
+  .dep-table tr:last-child td { border-bottom:none; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:11px; font-weight:600; }
+  .badge-in { background:#e8f5e9; color:#2e7d32; }
+  .badge-out { background:#fef0ef; color:#c0392b; }
+
+  .footer { text-align:center; padding:24px; font-size:12px; color:var(--cinza-400); border-top:1px solid var(--cinza-200); }
+
+  @media(max-width:768px) {
+    .scope-grid { grid-template-columns:1fr; }
+    .page-header { padding:16px 24px 32px; }
+    .page-header h1 { font-size:24px; }
+    .container { padding:32px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+
+{{topbar_html}}
+
+{{page_header_html}}
+
+<div class="container">
+
+  <div class="estrela-box">
+    <div class="label">Estrela Guia</div>
+    <p>{{estrela_guia}}</p>
+  </div>
+
+  <div class="card">
+    <h2>Contexto Estratégico</h2>
+{{contexto_paragrafos_html}}
+{{quote_box_html}}
+{{contexto_pos_quote_html}}
+  </div>
+
+  <div class="scope-grid">
+    <div class="scope-card scope-yes">
+      <h3>✓ Faremos</h3>
+      <ul>
+{{scope_yes_html}}
+      </ul>
+    </div>
+    <div class="scope-card scope-no">
+      <h3>✗ Não Faremos</h3>
+      <ul>
+{{scope_no_html}}
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:24px;">
+    <h2>Decisões de Escopo</h2>
+    <table class="dep-table">
+      <thead>
+        <tr><th>Decisão</th><th>Justificativa</th></tr>
+      </thead>
+      <tbody>
+{{decisoes_html}}
+      </tbody>
+    </table>
+  </div>
+
+{{conexoes_card_html}}
+
+</div>
+
+{{footer_html}}
+
+</body>
+</html>

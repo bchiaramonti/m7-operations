@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>05 — Recursos, Time & Dependências | {{project_label}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --verde-caqui:#424135;--lime:#eef77c;--off-white:#fffdef;
+    --cinza-700:#3d3d3d;--cinza-400:#9a9a8e;--cinza-200:#d9d9c8;--cinza-100:#f0f0e4;
+    --radius:12px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Inter',sans-serif;background:var(--off-white);color:var(--verde-caqui);}
+  .topbar{background:var(--verde-caqui);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;}
+  .topbar a{color:var(--cinza-200);text-decoration:none;font-size:13px;font-weight:500;}.topbar a:hover{color:var(--lime);}
+  .topbar .title{color:var(--off-white);font-size:14px;font-weight:500;}
+  .page-header { background:var(--verde-caqui); padding:24px 48px 48px; color:var(--off-white); display:flex; justify-content:space-between; align-items:flex-end; }
+  .page-header .num { font-size:60px; font-weight:700; color:rgba(238,247,124,0.2); line-height:1; }
+  .page-header h1 { font-size:32px; font-weight:400; margin-top:-10px; }
+  .page-header-left { flex:1; }
+  .page-header .logo { height:56px; opacity:0.85; flex-shrink:0; }
+  .container{max-width:1060px;margin:0 auto;padding:48px 32px 80px;}
+
+  .section-title{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--cinza-400);font-weight:600;margin-bottom:16px;margin-top:40px;}
+  .section-title:first-child{margin-top:0;}
+
+  .team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+  .team-card{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:24px;position:relative;}
+  .team-card.lead{border-left:4px solid var(--lime);}
+  .team-card .role-badge{display:inline-block;padding:3px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;}
+  .badge-lider{background:rgba(238,247,124,0.3);color:var(--verde-caqui);}
+  .badge-dono{background:var(--cinza-100);color:var(--cinza-700);}
+  .team-card h3{font-size:16px;font-weight:400;margin-bottom:4px;}
+  .team-card .area{font-size:13px;color:var(--cinza-400);margin-bottom:12px;}
+  .team-card .blocks{display:flex;gap:6px;flex-wrap:wrap;}
+  .block-chip{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;background:var(--verde-caqui);color:var(--off-white);}
+  .block-chip.trans{background:var(--lime);color:var(--verde-caqui);}
+  .team-card .alloc{font-size:12px;color:var(--cinza-400);margin-top:10px;font-style:italic;}
+
+  .dep-table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--radius);overflow:hidden;border:1px solid var(--cinza-200);}
+  .dep-table th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--cinza-400);padding:14px 16px;border-bottom:2px solid var(--cinza-200);font-weight:600;background:#fafaf0;}
+  .dep-table td{padding:14px 16px;font-size:14px;border-bottom:1px solid var(--cinza-100);color:var(--cinza-700);vertical-align:top;}
+  .dep-table tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600;}
+  .badge-in{background:#e8f5e9;color:#2e7d32;}
+  .badge-out{background:#fff3e0;color:#e65100;}
+  .badge-bi{background:#e3f2fd;color:#1565c0;}
+
+  .alloc-table{width:100%;border-collapse:collapse;background:#fff;border-radius:var(--radius);overflow:hidden;border:1px solid var(--cinza-200);}
+  .alloc-table th{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--cinza-400);padding:10px 6px;border-bottom:2px solid var(--cinza-200);font-weight:600;background:#fafaf0;text-align:center;}
+  .alloc-table th:first-child{text-align:left;padding-left:16px;}
+  .alloc-table td{padding:8px 6px;text-align:center;border-bottom:1px solid var(--cinza-100);font-size:12px;}
+  .alloc-table td:first-child{text-align:left;padding-left:16px;font-weight:500;font-size:13px;}
+  .cell-active{background:var(--verde-caqui);color:var(--off-white);font-weight:600;border-radius:4px;}
+  .cell-trans{background:var(--lime);color:var(--verde-caqui);font-weight:600;border-radius:4px;}
+  .cell-plan{background:var(--cinza-200);color:var(--cinza-700);font-weight:600;border-radius:4px;}
+  .cell-close{background:var(--lime);color:var(--verde-caqui);font-weight:600;border-radius:4px;}
+
+  .invest-card{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:24px 28px;line-height:1.7;font-size:13px;color:var(--cinza-700);}
+  .invest-card p{margin-bottom:12px;}
+  .invest-card p:last-child{margin-bottom:0;}
+  .invest-card strong{color:var(--verde-caqui);}
+
+  .footer{text-align:center;padding:24px;font-size:12px;color:var(--cinza-400);border-top:1px solid var(--cinza-200);margin-top:48px;}
+  @media(max-width:768px){.page-header{padding:16px 24px 32px;}.page-header h1{font-size:24px;}.container{padding:32px 16px 60px;}.team-grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+{{topbar_html}}
+
+{{page_header_html}}
+
+<div class="container">
+
+  <div class="section-title">Equipe do Projeto</div>
+  <div class="team-grid">
+{{team_cards_html}}
+  </div>
+
+  <div class="section-title">Alocação por Período</div>
+  <div style="overflow-x:auto;">
+    <table class="alloc-table">
+      <thead>
+        <tr>
+          <th>Pessoa</th>
+{{alloc_period_headers_html}}
+        </tr>
+      </thead>
+      <tbody>
+{{alloc_rows_html}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-title">Dependências com Portfólio</div>
+  <table class="dep-table">
+    <thead><tr><th>Projeto</th><th>Tipo</th><th>Interface</th><th>Risco se Falhar</th></tr></thead>
+    <tbody>
+{{dependencias_rows_html}}
+    </tbody>
+  </table>
+
+  <div class="section-title">Investimentos & Recursos Necessários</div>
+  <div class="invest-card">
+{{investimentos_html}}
+  </div>
+
+</div>
+
+{{footer_html}}
+
+</body>
+</html>
