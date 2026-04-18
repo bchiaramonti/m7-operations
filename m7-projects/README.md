@@ -2,16 +2,16 @@
 
 > Gestão completa do ciclo de vida de projetos M7: do scaffolding inicial à geração de materiais executivos de status, passando por plano de projeto com WBS/EAP e plano de ação continuamente sincronizado com ClickUp.
 
-## Status (v0.1.0 — alpha)
+## Status (v0.2.0 — alpha)
 
 | Skill | Status |
 |---|---|
 | `initializing-project` | ✅ Implementada |
-| `building-project-plan` | 🚧 Planejada (próxima release) |
-| `managing-action-plan` | 🚧 Planejada |
-| `generating-status-materials` | 🚧 Planejada |
+| `managing-action-plan` | ✅ Implementada (núcleo técnico do plugin: 9 scripts + sync three-way + ClickUp MCP) |
+| `building-project-plan` | 🚧 Planejada (v0.3.0 — gera o `Cronograma.xlsx` baseline) |
+| `generating-status-materials` | 🚧 Planejada (v1.0.0 — OPR + PPTX com Design System M7-2026) |
 
-Apenas `initializing-project` está funcional nesta versão. As três skills restantes serão liberadas em releases subsequentes antes do v1.0.0 — ver [CHANGELOG.md](CHANGELOG.md).
+2 de 4 skills funcionais. Ciclo completo de plano de ação já operacional (após cronograma baseline ser construído manualmente em `1-planning/Cronograma.xlsx` enquanto `building-project-plan` não chega). Ver [CHANGELOG.md](CHANGELOG.md) para detalhes.
 
 ## O que é
 

@@ -53,29 +53,43 @@ Subestrutura:
 
 ---
 
-## Convenção de status report por data
+## Convenção de `4-status-report/` — arquivos live + snapshots por data
 
-Dentro de `4-status-report/`, cada reporte vira uma subpasta datada:
+A pasta `4-status-report/` hospeda **dois tipos de conteúdo**:
 
 ```
 4-status-report/
-├── 2026-04-17/
+├── Cronograma.xlsx              # LIVE — gerenciado por managing-action-plan
+├── changelog.md                 # LIVE append-only — espelha mutações + comentários
+├── .sync-state.json             # Sidecar com baselines + last_sync_hash
+├── 2026-04-25/                  # Snapshot do reporte daquela data
 │   ├── OPR.pdf
 │   └── apresentacao.pptx
-├── 2026-05-15/
+├── 2026-05-02/                  # Próximo reporte
 │   ├── OPR.pdf
 │   └── apresentacao.pptx
-└── 2026-06-12/
+└── 2026-06-13/
     └── ...
 ```
 
-**Por que `YYYY-MM-DD/`:**
+**Arquivos LIVE na raiz da pasta:**
+- `Cronograma.xlsx` — cópia da baseline (`1-planning/Cronograma.xlsx`) feita pela skill `managing-action-plan` na primeira rodada. Cresce/muda continuamente: novas ações, status atualizado, datas reais, etc. Sincronizada com ClickUp via three-way diff.
+- `changelog.md` — append-only. Toda mutação (create/update/delete/comment/sync) gera entry. Comentários do ClickUp são espelhados aqui também.
+- `.sync-state.json` — sidecar com baselines per-row + last_sync_hash. **Não editar manualmente.**
 
-- **Ordenação natural** — o formato ISO 8601 ordena cronologicamente em qualquer listagem
-- **Rastreabilidade** — fica claro qual versão do status foi apresentada em cada data; se alguém perguntar "o que mostramos em abril?", o caminho é óbvio
-- **Imutabilidade do passado** — reportes antigos **não são editados**; cada reunião gera uma pasta nova, preservando o histórico
+**Subpastas dated `YYYY-MM-DD/` — snapshots por reporte:**
+- Cada reunião de status report gera uma subpasta nova com `OPR.pdf` + `apresentacao.pptx` daquele dia
+- Snapshots são **imutáveis** — preservam o histórico ("o que mostramos em abril?" tem caminho óbvio)
+- O `Cronograma.xlsx` live continua na raiz; não é copiado para cada snapshot (a apresentação já tem a foto da estrutura naquele momento)
+- Ordenação natural ISO 8601 nos finders
 
-Esta pasta é preenchida pela skill `generating-status-materials` — não precisa ser criada manualmente.
+**Quem mexe em quê:**
+| Arquivo / pasta | Quem mantém |
+|---|---|
+| `Cronograma.xlsx` (raiz) | `managing-action-plan` |
+| `changelog.md` | `managing-action-plan` |
+| `.sync-state.json` | `managing-action-plan` |
+| `YYYY-MM-DD/` (snapshots) | `generating-status-materials` |
 
 ---
 
