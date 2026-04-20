@@ -175,8 +175,11 @@ def render_contexto_escopo(data: dict, logo_b64: str, output_dir: Path,
     quote = ctx.get("quote") or {}
     pos_quote_h3 = ctx.get("pos_quote_h3") or ""
 
+    # paragrafos_pre_quote / paragrafos_pos_quote: prosa livre, aceita HTML inline
+    # (consistente com recursos.investimentos_paragrafos). Usar <strong>, <em>, <code>
+    # diretamente no texto. Se precisar de `<` literal, escapar a mao na data.
     paragrafos_html = "\n".join(
-        f'    <p>{html_escape(p)}</p>' for p in contexto_paragrafos
+        f'    <p>{p}</p>' for p in contexto_paragrafos
     )
 
     quote_html = ""
@@ -193,7 +196,7 @@ def render_contexto_escopo(data: dict, logo_b64: str, output_dir: Path,
     if pos_quote_h3:
         pos_quote_html += f'\n    <h3>{html_escape(pos_quote_h3)}</h3>'
     pos_quote_html += "\n" + "\n".join(
-        f'    <p>{html_escape(p)}</p>' for p in contexto_pos_quote
+        f'    <p>{p}</p>' for p in contexto_pos_quote
     )
 
     scope_yes = ctx.get("scope_yes") or []

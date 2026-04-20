@@ -16,6 +16,27 @@ campos do `data` JSON alimentam cada secao.
 8. [07 — `riscos.html`](#07--riscos-html)
 9. [08 — `cronograma.html`](#08--cronograma-html)
 10. [09 — `calendario.html`](#09--calendario-html)
+11. [Convencao HTML inline vs escape](#convencao-html-inline-vs-escape)
+
+---
+
+## Convencao HTML inline vs escape
+
+`render_html.py` aplica `html_escape()` a **quase todos** os campos — e isso e o comportamento default seguro. Sao **excecoes** (passam cru, aceitam `<strong>`/`<em>`/`<code>` inline) apenas os campos explicitamente documentados como "prosa livre" ou que tem sufixo `_html`:
+
+| Campo | Escapa? | Obs |
+|---|---|---|
+| `contexto.paragrafos_pre_quote[]` | **nao** | Prosa livre |
+| `contexto.paragrafos_pos_quote[]` | **nao** | Prosa livre |
+| `recursos.investimentos_paragrafos[]` | **nao** | Prosa livre |
+| `okrs[].krs[].metric` | **nao** | Formula/KR inline |
+| `eap.convencao_html` | **nao** | Sufixo `_html` explicito |
+| `eap.nivel_4.intro_html` | **nao** | Sufixo `_html` explicito |
+| Todos os demais campos | **sim** | Default seguro |
+
+**Regra para quem gera `data.json`:**
+- Em campos que escapam, **nao** use tags HTML — use convencao editorial (CAIXA ALTA, citacoes com `""`, marcacao em prosa).
+- Em campos que nao escapam, `<strong>` e `<em>` sao liberados. Evitar tags que exijam CSS especifico nao presente no template.
 
 ---
 
@@ -50,13 +71,15 @@ campos do `data` JSON alimentam cada secao.
 | Placeholder | Origem |
 |---|---|
 | `{{estrela_guia}}` | `data.estrela_guia` |
-| `{{contexto_paragrafos_html}}` | `data.contexto.paragrafos_pre_quote: list[str]` |
-| `{{quote_box_html}}` | `data.contexto.quote: {text, source}` (opcional) |
-| `{{contexto_pos_quote_html}}` | `data.contexto.pos_quote_h3: str` + `paragrafos_pos_quote: list[str]` |
+| `{{contexto_paragrafos_html}}` | `data.contexto.paragrafos_pre_quote: list[str]` (aceita HTML inline) |
+| `{{quote_box_html}}` | `data.contexto.quote: {text, source}` (opcional; `text` e `source` sao escapados) |
+| `{{contexto_pos_quote_html}}` | `data.contexto.pos_quote_h3: str` + `paragrafos_pos_quote: list[str]` (paragrafos aceitam HTML inline) |
 | `{{scope_yes_html}}` | `data.contexto.scope_yes: list[str]` |
 | `{{scope_no_html}}` | `data.contexto.scope_no: list[str]` |
 | `{{decisoes_html}}` | `data.contexto.decisoes: list[{decisao, justificativa}]` |
 | `{{conexoes_card_html}}` | `data.contexto.conexoes: list[{projeto, direcao_class, direcao_label, interface}]` (opcional; bloco inteiro condicional) |
+
+> **HTML inline em prosa:** `paragrafos_pre_quote` e `paragrafos_pos_quote` sao passados cru para o template (`<p>{texto}</p>`, sem `html_escape`), consistente com `recursos.investimentos_paragrafos`. Use `<strong>`, `<em>`, `<code>` diretamente no texto. Se precisar de `<` ou `>` literais, escapar a mao (`&lt;` / `&gt;`) na propria string do JSON.
 
 ---
 

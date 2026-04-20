@@ -187,6 +187,7 @@ Apos rodar a skill, verificar:
 - **Usar template de outro artefato:** cada template tem CSS especifico; copiar e modificar quebra fidelidade visual ao H1-02
 - **Adicionar logo base64 manualmente:** carregar via `_lib.load_logo_b64()` para garantir consistencia
 - **Escrever fora de `1-planning/`:** invariante critico do Modelo Z. Quebrar isso polui pastas de outras skills
+- **Usar `<strong>`/`<em>`/`<code>` em campos que escapam HTML:** a maioria dos campos passa por `html_escape` — as tags aparecem literalmente no render. Ver [artifact-catalog.md — Convencao HTML inline vs escape](references/artifact-catalog.md#convencao-html-inline-vs-escape) para a lista curta de excecoes (prosa livre: `paragrafos_pre_quote`, `paragrafos_pos_quote`, `investimentos_paragrafos`, `metric` de KRs, campos com sufixo `_html`). Em campos que escapam, usar convencao editorial (CAIXA ALTA para labels, aspas para destaque).
 
 ## Scripts (referencia rapida)
 

@@ -13,6 +13,24 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.0.3] - 2026-04-20
+
+Fix de inconsistencia em `building-project-plan/render_html.py`: os campos de prosa livre `contexto.paragrafos_pre_quote` e `contexto.paragrafos_pos_quote` agora aceitam HTML inline (`<strong>`, `<em>`, `<code>`), consistentes com `recursos.investimentos_paragrafos`, `okrs[].krs[].metric` e campos com sufixo `_html`. Antes, tags passadas nesses campos eram escapadas e apareciam literalmente no render.
+
+### Fixed
+- [render_html.py](skills/building-project-plan/scripts/render_html.py) — removido `html_escape()` nas linhas que geram `<p>` para `paragrafos_pre_quote` e `paragrafos_pos_quote`. Passa cru (`f'    <p>{p}</p>'`), igual a `investimentos_paragrafos`. `quote.text`, `quote.source` e `pos_quote_h3` continuam escapados (sao dados estruturados, nao prosa livre).
+
+### Added
+- Secao `## Convencao HTML inline vs escape` em [artifact-catalog.md](skills/building-project-plan/references/artifact-catalog.md) — tabela unica listando os 6 campos que passam cru (prosa livre + sufixo `_html`) vs o default seguro (escape). Orienta quem gera `data.json` a usar convencao editorial (CAIXA ALTA, aspas) em campos que escapam.
+- Anti-pattern em [building-project-plan/SKILL.md](skills/building-project-plan/SKILL.md): "Usar `<strong>`/`<em>`/`<code>` em campos que escapam HTML" com ponteiro para a secao do catalog.
+
+### Changed
+- Tabela de placeholders do artefato 01 em `artifact-catalog.md` agora marca explicitamente `paragrafos_pre_quote` e `paragrafos_pos_quote` como "aceita HTML inline".
+
+### Validation
+- `render_html.py` passa `py_compile`
+- Smoke test: `<strong>Origem</strong>` em `paragrafos_pre_quote` renderiza como tag (antes: escapado); `quote.text` com `<tag>` continua escapado corretamente (`&lt;tag&gt;`)
+
 ## [1.0.2] - 2026-04-20
 
 Alinhamento do comportamento de changelog (plugin + per-projeto) com Keep a Changelog 1.1.0. Remove secoes de "Scope (proximas releases)" das entries historicas, adiciona regras explicitas no header, codifica no template/skill/CLAUDE.md de projeto. Sem mudancas funcionais nos scripts.
