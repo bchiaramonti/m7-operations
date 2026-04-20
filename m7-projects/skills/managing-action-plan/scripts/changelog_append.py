@@ -5,6 +5,20 @@ changelog_append.py — Anexa entradas ao changelog.md do projeto.
 O changelog vive em `4-status-report/changelog.md` e e append-only.
 Entradas mais novas no TOPO (apos o header e antes da entrada anterior).
 
+Formato alinhado a Keep a Changelog 1.1.0
+(https://keepachangelog.com/en/1.1.0/). Regras operacionais:
+
+    1. Ordem decrescente — entry nova sempre entra logo apos o header.
+    2. Datas reais — timestamp default vem de `dt.datetime.now()` do
+       relogio do sistema. O flag `--timestamp` so deve ser usado
+       em cenarios de replay/teste (ex: reprocessar um sync que foi
+       executado mas nao teve changelog gravado por falha de IO).
+       Nunca improvisar ou estimar datas passadas.
+    3. Sem proximos passos — o changelog registra o que foi feito;
+       planos futuros nao entram aqui.
+    4. Append-only — para corrigir um valor gravado errado, emitir
+       nova entry `update`; jamais editar entries historicas.
+
 Tipos de entrada suportados (--op):
     create        Nova acao criada (local + push ClickUp)
     update        Campo(s) alterado(s) em uma acao
@@ -39,9 +53,16 @@ VALID_OPS = {"create", "update", "delete", "comment", "sync", "init", "error"}
 
 CHANGELOG_HEADER_DEFAULT = """# Changelog — Plano de Acao
 
-> Registro cronologico (reverse, mais novo no topo) de todas as operacoes
-> sobre o plano de acao. Mantido automaticamente por `managing-action-plan`.
-> Append-only: nunca editar entries existentes manualmente.
+> Registro cronologico de todas as operacoes sobre o plano de acao.
+> Mantido automaticamente por `managing-action-plan`.
+>
+> Formato inspirado em [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
+>
+> **Regras (invariantes):**
+> 1. **Ordem decrescente** — entry mais recente sempre no topo, logo apos este header.
+> 2. **Datas reais** — todo timestamp vem do relogio do sistema no momento da operacao; nunca estimar, retropolar ou reusar timestamp anterior.
+> 3. **Sem proximos passos** — o changelog registra somente o que foi feito. Planos futuros vivem no `BRIEFING.md`, `PLANEJAMENTO.md` ou no ClickUp.
+> 4. **Append-only** — entries existentes sao imutaveis; correcoes viram nova entry `update`.
 
 ---
 """

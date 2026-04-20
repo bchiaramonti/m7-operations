@@ -2,8 +2,34 @@
 
 Todas as mudancas notaveis neste plugin serao documentadas neste arquivo.
 
-O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
-e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
+O formato segue [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/),
+e este projeto adere ao [Semantic Versioning](https://semver.org/).
+
+Regras de manutencao (Keep a Changelog 1.1.0):
+
+- Ordem decrescente — release mais recente no topo
+- Datas reais — verificar data/hora do sistema no momento do registro; nunca estimar ou retropolar
+- Sem proximos passos / roadmap — changelog registra somente o que ja foi liberado; planos futuros vivem em issues/milestones
+- Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
+- Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
+
+## [1.0.2] - 2026-04-20
+
+Alinhamento do comportamento de changelog (plugin + per-projeto) com Keep a Changelog 1.1.0. Remove secoes de "Scope (proximas releases)" das entries historicas, adiciona regras explicitas no header, codifica no template/skill/CLAUDE.md de projeto. Sem mudancas funcionais nos scripts.
+
+### Added
+- Bloco de regras de manutencao do changelog no header deste `CHANGELOG.md`, citando Keep a Changelog 1.1.0 (ordem decrescente, datas reais via relogio do sistema, sem proximos passos, agrupamento por tipo, imutabilidade).
+- Secao `## Regras de atualizacao do changelog` em [CLAUDE.tmpl.md](skills/initializing-project/templates/CLAUDE.tmpl.md) (template instanciado em todo projeto novo) — garante que cada projeto M7 carregue as regras comportamentais para o `4-status-report/changelog.md`.
+- Secao `## Regras de manutencao (Keep a Changelog 1.1.0)` em [changelog-format.md](skills/managing-action-plan/references/changelog-format.md) — formaliza o contrato operacional do per-project changelog.
+- Header do template [CHANGELOG.tmpl.md](skills/managing-action-plan/templates/CHANGELOG.tmpl.md) agora referencia Keep a Changelog 1.1.0 e lista as 3 regras operacionais.
+
+### Changed
+- [managing-action-plan/SKILL.md](skills/managing-action-plan/SKILL.md) — secao `## Anti-patterns a evitar` expandida com as 3 regras: ordem decrescente, sem proximos passos, timestamp sempre via relogio (nunca improvisar data).
+- [changelog_append.py](skills/managing-action-plan/scripts/changelog_append.py) — docstring reforca o contrato: `--timestamp` so existe para casos de replay; fluxo normal usa `dt.datetime.now()` do sistema.
+
+### Removed
+- Secoes `### Scope (proximas releases)` das entries historicas `[1.0.0]`, `[0.4.0]`, `[0.3.0]`, `[0.2.0]`, `[0.1.0]` — viola "no future plans in changelog" do Keep a Changelog 1.1.0. Roadmap futuro, quando existir, vive em issues/milestones, nao no historico de releases.
+- Secao `### Not changed` da entry `[1.0.1]` — nao e tipo suportado pelo Keep a Changelog 1.1.0; o conteudo era um disclaimer meta que pertence ao corpo introdutorio da entry, nao a uma secao tipada.
 
 ## [1.0.1] - 2026-04-18
 
@@ -19,10 +45,6 @@ Patch release — aplicando correções do `validating-artifacts` na skill `gene
 - Smoke test: PPTX regenerado com sucesso (48589 bytes, 8 slides)
 - Description parseia para 522 chars sem XML tags
 - Todas as 7 references agora têm `## Índice`
-
-### Not changed
-- Nenhum comportamento alterado — apenas ajustes de estrutura/documentação
-- Os outros 4 skills do plugin (`initializing-project`, `planning-project`, `building-project-plan`, `managing-action-plan`) mantêm o padrão `<example>` nas descriptions por ora — correção análoga pode ser feita em release futura caso se deseje grade A uniforme
 
 ## [1.0.0] - 2026-04-18
 
@@ -51,9 +73,6 @@ Release 1.0.0 — plugin completo. Adiciona a skill `generating-status-materials
 - Smoke test: `build_pptx.py` com dados stub gerou PPTX 51KB com 8 slides sem erros
 - Tokens M7-2026 verificados caso-a-caso contra `get_computed_styles` do canvas Paper (cores hex, font-sizes px, letter-spacing em, padding px)
 
-### Scope (próximas releases)
-- **v1.1.0** (roadmap): cache de coleta (`--no-cache` flag), suporte a TWK Everett quando disponível no sistema, parametrização de seções da agenda via `CLAUDE.md`, slide 4 (Roadmap Detail) com swimlane Gantt-style renderizado via shapes dinâmicos (hoje é timeline linear simplificada).
-
 ## [0.4.0] - 2026-04-18
 
 Quarta release alpha. Adiciona a skill `planning-project` — interlocutora especializada em planejamento que conduz a elaboração iterativa do `PLANEJAMENTO.md` (snapshot estático denso, consumível por `building-project-plan`). 4 de 4 skills do ciclo de planejamento/execução agora presentes (faltando só `generating-status-materials` para v1.0.0).
@@ -80,10 +99,6 @@ Quarta release alpha. Adiciona a skill `planning-project` — interlocutora espe
 ### Integration
 - `planning-project` é **opcional** no fluxo. Projetos simples podem ir direto de `initializing-project` → `building-project-plan` em modo interativo. Projetos complexos passam por `planning-project` para densificar o pensamento antes de gerar visuais.
 - Contrato com `building-project-plan`: frontmatter → hero da landing; cada seção `## NN · ...` → artefato HTML correspondente; seções `SKIPPED` resolvidas por skill 03 (placeholder vs omissão do nav-grid).
-
-### Scope (próximas releases)
-- `generating-status-materials` — OPR (PDF) + apresentação executiva (PPTX) com Design System M7-2026 (consome `4-status-report/Cronograma.xlsx` LIVE + `changelog.md`) — última skill antes de v1.0.0
-- Ajustes em `building-project-plan` para consumir `PLANEJAMENTO.md` FINAL em modo `read-md` (parser + 9 handlers + fallback para SKIPPED) — documentados na spec 06
 
 ## [0.3.0] - 2026-04-18
 
@@ -120,9 +135,6 @@ Terceira release alpha. Adiciona a skill `building-project-plan` — geração d
 - `validating-artifacts` grade C (1 fail em U6 por uso de `<example>` tags na description — decisão consciente e consistente com `initializing-project` e `managing-action-plan`)
 - Templates testados com sample data sintético: 10 HTMLs gerados sem erros, ~135KB total
 
-### Scope (próximas releases)
-- `generating-status-materials` — OPR (PDF) + apresentação executiva (PPTX) com Design System M7-2026 (consome `4-status-report/Cronograma.xlsx` LIVE + `changelog.md`) — última skill antes de v1.0.0
-
 ## [0.2.0] - 2026-04-18
 
 Segunda release alpha. Adiciona a skill `managing-action-plan` (núcleo técnico do plugin) e revisa a `initializing-project` para refletir a nova arquitetura de path (Modelo Z) e o uso de `Cronograma.xlsx` como artefato local.
@@ -153,10 +165,6 @@ Segunda release alpha. Adiciona a skill `managing-action-plan` (núcleo técnico
 - **3 camadas com SSOT global no ClickUp**: status/comentários/dados operacionais vencem do ClickUp; estrutura/datas planejadas vencem do xlsx local. Field resolution rules em [field-resolution-rules.md](skills/managing-action-plan/references/field-resolution-rules.md).
 - **Mapping responsáveis em CLAUDE.md do projeto** (não em sidecar JSON): humano-legível e versionável junto do orquestrador.
 
-### Scope (próximas releases)
-- `building-project-plan` — construção do plano formal incluindo geração do `Cronograma.xlsx` baseline (v0.3.0)
-- `generating-status-materials` — OPR (PDF) + apresentação (PPTX) com Design System M7-2026 (v1.0.0)
-
 ## [0.1.0] - 2026-04-18
 
 Release alpha. Apenas a skill `initializing-project` esta implementada. As demais skills (`building-project-plan`, `managing-action-plan`, `generating-status-materials`) existem como scaffolds vazios e serao implementadas em releases subsequentes antes do v1.0.0.
@@ -165,8 +173,3 @@ Release alpha. Apenas a skill `initializing-project` esta implementada. As demai
 - **Skill `initializing-project`**: cria a estrutura base de um diretorio de projeto com as 4 pastas de fase (`1-planning/`, `2-development/`, `3-conclusion/`, `4-status-report/`), subpasta `_docs/` com `assets/` e `bibliography/`, mais `CLAUDE.md` orquestrador e `BRIEFING.md` inicial. Cobre inputs interativos (nome, destino, objetivo, stakeholders, prazo), validacao de destino, criacao de `.gitkeep` em cada pasta, substituicao de placeholders nos templates e validacao pos-execucao (tree + grep de placeholders remanescentes).
 - Templates `CLAUDE.tmpl.md` e `BRIEFING.tmpl.md` com placeholders `{{project_name}}`, `{{project_goal}}`, `{{deadline_or_tbd}}`, `{{stakeholders_list}}`, `{{creation_date}}`, `{{clickup_list_id_or_tbd}}`.
 - Reference `directory-layout.md` documentando o racional das 4 pastas numeradas, convencao `_docs/` com underscore, formato `YYYY-MM-DD/` para status reports, regras de nomenclatura (kebab-case, sem acentos, max 40 chars) e guidance para renomeacao de projeto.
-
-### Scope (proximas releases)
-- `building-project-plan` — construcao do plano formal (WBS/EAP, cronograma, stakeholders, riscos)
-- `managing-action-plan` — inicializacao de `CRONOGRAMA.md` + `CHANGELOG.md` do plano de acao e sync bidirecional com ClickUp (SSOT)
-- `generating-status-materials` — geracao de OPR (PDF) e apresentacao executiva (PPTX) com Design System M7-2026

@@ -241,7 +241,10 @@ Esses dados tambem ficam em `.sync-state.json` (campo `clickup_list_id` e `statu
 
 - **Mexer no xlsx baseline (`1-planning/`):** essa copia e imutavel. Toda mutacao vai no live (`4-status-report/`).
 - **Deletar `.sync-state.json` manualmente:** quebra baselines, proximo sync vai gerar muitos falsos conflicts.
-- **Editar entries antigas no `changelog.md`:** append-only por contrato. Para corrigir um valor errado, gere um update novo.
+- **Editar entries antigas no `changelog.md`:** append-only por contrato (ver [changelog-format.md](references/changelog-format.md)). Para corrigir um valor errado, gere um update novo.
+- **Passar `--timestamp` no fluxo normal do `changelog_append.py`:** o default (`dt.datetime.now()`) e obrigatorio para operacoes em tempo real; nunca improvisar ou reusar timestamps. `--timestamp` existe apenas para replay de sync que falhou meio-caminho.
+- **Colocar proximos passos, planos ou TODOs em entries do changelog:** o changelog registra somente o que foi feito. Planos futuros vao para `BRIEFING.md`, `PLANEJAMENTO.md` ou ClickUp. Nunca aceitar summary ou details contendo "vai fazer X", "pendente Y", "proximo passo Z".
+- **Reordenar entries manualmente:** `changelog_append.py` insere sempre no topo (ordem decrescente). Se o arquivo aparecer fora de ordem, investigar o script antes de editar a mao.
 - **Skip do `sync.py finalize` apos push:** baselines nao atualizam, proximo sync faz tudo de novo.
 - **Push de campos nao-mapeados (`no`, `tipo`):** sao schema local. Sync ja filtra automaticamente.
 - **Aplicar update sem confirmar quando usuario fala data ambigua:** sempre confirmar valor exato antes de gravar.
