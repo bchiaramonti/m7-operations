@@ -13,6 +13,31 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.1.0] - 2026-04-20
+
+Redesenho do artefato `roadmap-marcos.html` em `building-project-plan` para refletir a v2 prototipada no Paper: `.phase-bar`, `.timeline-wrapper` (blocos de pontos horizontais) e `.roadmap-legend` removidos; lane dedicada de Marcos do Projeto adicionada no topo do swim-lane com ticks alternados acima/abaixo de um trilho central; grid 3×3 de cards substituido por Tabela de Marcos com colunas `Tipo · Marco · Data · WBS · Descricao`; barras das lanes passaram a exibir apenas o nome da entrega (sem `range` de datas).
+
+### Added
+- [templates/artefatos/roadmap-marcos.tmpl.html](skills/building-project-plan/templates/artefatos/roadmap-marcos.tmpl.html) — CSS novo: `.lane.milestones` (lane topo com `.rail` central), `.tick.top`/`.tick.bottom` alternados com `.tick.gate` para majors, `.marcos-table` (header-row + data-row com `.col-tipo`/`.col-marco`/`.col-data`/`.col-wbs`/`.col-desc`), `.tipo-dot.gate` para indicar majors na tabela.
+- [scripts/render_html.py](skills/building-project-plan/scripts/render_html.py) — helpers `_render_milestones_lane(milestones, months)`, `_render_marco_row(m, idx)`, `_percent_calendar(point, months)` e `_short_lbl(h4)`. `_percent_calendar` posiciona ticks proporcional a colunas-mes iguais (cada mes = `100/n_months%`), alinhando visualmente com os headers MAR/ABR/MAI/... mesmo quando o periodo do projeto nao comeca no dia 1.
+- Campos opcionais em `data.roadmap.milestones[]`: `lbl` (chip curto do tick, fallback extrai trecho antes de ` · ` em uppercase) e `desc` (linha auxiliar curta abaixo da data).
+
+### Changed
+- `render_roadmap_marcos` reescrito: 4 placeholders substituidos (`{{n_months}}`, `{{months_row_html}}`, `{{milestones_lane_html}}`, `{{lanes_html}}`, `{{marcos_table_rows_html}}`). Mesma lista `data.roadmap.milestones` alimenta tanto a lane do topo quanto a tabela abaixo — fonte unica de verdade.
+- `_render_lane` deixa de renderizar `<span class="range">` nas barras; deixa de renderizar `.milestones`/`.tick` dentro das lanes de frente (ticks agora vivem na lane dedicada do topo).
+- Alternancia `idx % 2`: marcos em indices pares viram ticks `top` (chip acima, conector desce ate o trilho); impares viram `bottom` (dot no trilho, conector desce ate o chip). Evita colisao de rotulos mesmo com marcos proximos no calendario.
+- [references/artifact-catalog.md](skills/building-project-plan/references/artifact-catalog.md), [SKILL.md](skills/building-project-plan/SKILL.md) e [references/design-system-m7-2026.md](skills/building-project-plan/references/design-system-m7-2026.md) atualizados com o novo esquema de dados, placeholders ativos e taxonomia CSS.
+
+### Removed
+- Placeholders descontinuados no template: `{{phase_bar_html}}`, `{{timeline_blocks_html}}`, `{{roadmap_legend_html}}`, `{{milestones_html}}` (grid 3x3 de cards).
+- Funcao `_render_timeline_block` removida do renderer.
+- CSS descontinuado: `.phase-bar`, `.timeline-wrapper`, `.timeline`, `.block`, `.roadmap-legend`, `.milestone-grid`, `.milestone`, `.milestone.major`, `.milestones` (antigo container interno das lanes).
+- Campos do `data.roadmap` agora ignorados (sem erro): `phase_bar`, `timeline_blocks`, `legend`, `lanes[].ticks[]`, `lanes[].bars[].range`. JSONs antigos continuam renderizando sem warnings de placeholder.
+
+### Validation
+- `python3 -c "import ast; ast.parse(...)"` passa em `render_html.py`.
+- Render end-to-end com JSON minimo (4 marcos, 2 lanes de frente + GOV) produz `roadmap-marcos.html` valido, `warnings = []`.
+
 ## [1.0.3] - 2026-04-20
 
 Fix de inconsistencia em `building-project-plan/render_html.py`: os campos de prosa livre `contexto.paragrafos_pre_quote` e `contexto.paragrafos_pos_quote` agora aceitam HTML inline (`<strong>`, `<em>`, `<code>`), consistentes com `recursos.investimentos_paragrafos`, `okrs[].krs[].metric` e campos com sufixo `_html`. Antes, tags passadas nesses campos eram escapadas e apareciam literalmente no render.

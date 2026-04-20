@@ -117,21 +117,30 @@ campos do `data` JSON alimentam cada secao.
 
 ## 03 — `roadmap-marcos.html`
 
-**Secoes:** `.phase-bar` → `.timeline-wrapper` com `.timeline` e `.block`s → `.section-title "Roadmap por Frente"` → `.roadmap` swim-lane (`.months-row` + `.lane`s + `.lane.gov`) → `.roadmap-legend` → `.section-title "Marcos do Projeto"` → `.milestone-grid`.
+**Secoes:** `.roadmap` swim-lane (`.months-row` + `.lane.milestones` no topo + `.lane`s de frente + `.lane.gov`) → `.section-title "Tabela de Marcos"` → `.marcos-table`.
+
+Sem `phase-bar`, sem `timeline-wrapper` (bloco de pontos horizontais), sem `roadmap-legend` e sem `milestone-grid` (cards) — versao enxuta alinhada ao design no Paper.
 
 **Placeholders + origem (`data.roadmap`):**
 
 | Placeholder | Origem |
 |---|---|
-| `{{phase_bar_html}}` | `data.roadmap.phase_bar: [{class, label, dates}]` |
-| `{{timeline_blocks_html}}` | `data.roadmap.timeline_blocks: [{class, phase_label, label_top, process, dates, owner, parallel}]` |
 | `{{n_months}}` | Calculado de `data.period_start`/`period_end` (numero de meses no intervalo) |
 | `{{months_row_html}}` | Mesma fonte (gera 1 cell por mes) |
-| `{{lanes_html}}` | `data.roadmap.lanes: [{is_gov?, code, name, owner, bars: [{start, end, class, title, range}], ticks: [{date, lbl, gate?, desc}], qrs: [{date, label}]}]` |
-| `{{roadmap_legend_html}}` | `data.roadmap.legend: [{color, label}]` |
-| `{{milestones_html}}` | `data.roadmap.milestones: [{date, date_iso, wbs, h4, p, major}]` |
+| `{{milestones_lane_html}}` | `data.roadmap.milestones` — renderiza lane do topo com ticks alternados (top/bottom) ao redor de trilho central |
+| `{{lanes_html}}` | `data.roadmap.lanes: [{is_gov?, code, name, owner, bars: [{start, end, class, title}], qrs: [{date, label}]}]` — `range` e `ticks` ignorados (ticks agora na lane unica do topo) |
+| `{{marcos_table_rows_html}}` | `data.roadmap.milestones: [{date, date_iso, wbs, h4, p, major, lbl?, desc?}]` — cada marco vira uma linha da tabela |
 
-**Posicionamento no swim-lane:** `_percent_position(start, end)` calcula `left%` e `width%` proporcionais ao `period_start..period_end` total. Marcos (`.tick`) usam `_percent_anchor(date)` para `left%` apenas.
+**Posicionamento:**
+- **Bars** (frentes L1, L2, ...): `_percent_position(start, end)` proporcional ao `period_start..period_end` (escala cronograma).
+- **Milestones lane (ticks) + GOV .qr**: `_percent_calendar(date, months)` — cada coluna-mes ocupa `100/n_months%`, alinhando ticks visualmente com os headers MAR/ABR/MAI/... (escala calendario).
+
+**Milestones — campos opcionais para a lane de topo:**
+- `lbl`: label curto do chip (ex: `"M0 KICKOFF"`). Se ausente, extrai de `h4` antes do primeiro ` · ` em uppercase.
+- `desc`: descricao curta abaixo da data (ex: `"TAP aprovado"`). Se ausente, omitida.
+- `major: true` aplica visual gate (anel lime) nos ticks e na coluna `Tipo` da tabela.
+
+**Alternancia dos ticks:** indice par → top (chip acima do trilho, conector desce). Indice impar → bottom (chip abaixo, conector sobe). Evita sobreposicao quando marcos estao proximos no calendario.
 
 ---
 

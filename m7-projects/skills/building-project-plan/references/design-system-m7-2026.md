@@ -146,7 +146,7 @@ Width maximo varia por artefato (960px - 1400px), padding 48px 32px 80px.
 | **Landing** | `.hero` (gradiente caqui), `.estrela`, `.nav-grid` com `.nav-card` |
 | **01 Contexto** | `.estrela-box`, `.card`, `.scope-grid` (`.scope-yes` / `.scope-no`), `.quote-box`, `.dep-table`, `.badge-in` / `.badge-out` |
 | **02 EAP** | `.legend` com `.legend-swatch`, `.wbs` (org-chart CSS com pseudo-elements `::before`/`::after`), `.node.l0/l1/l2/l3`, `.wp-table`, `.note-box` |
-| **03 Roadmap** | `.phase-bar` com `.phase-plan/exec/close`, `.timeline` com `.block` (variantes `.cadeia`, `.transversal`, `.encerramento`), `.roadmap` swim-lane com `.lane`/`.lane.gov`, `.bar` (chevron via clip-path), `.tick` (marcos com connector+dot+lbl+date+desc), `.qr` (badges governance), `.milestone-grid` com `.milestone.major` |
+| **03 Roadmap** | `.roadmap` swim-lane com `.months-row`, `.lane.milestones` no topo (ticks alternados `.tick.top`/`.tick.bottom` sobre `.rail` central, `.tick.gate` para majors), `.lane`s de frente com `.bar` (chevron via clip-path, apenas `.title`), `.lane.gov` com `.qr` badges, `.marcos-table` (colunas `.col-tipo`/`.col-marco`/`.col-data`/`.col-wbs`/`.col-desc`) com `.tipo-dot.gate` para majors |
 | **04 OKRs** | `.okr-block` com `.obj-card` (caqui) + `.kr-list` com `.kr` (`.kr-num` / `.kr-content` / `.kr-target`), `.cadence-box` |
 | **05 Recursos** | `.team-grid` com `.team-card.lead`, `.role-badge .badge-lider/.badge-dono`, `.block-chip.trans`, `.alloc-table` com `.cell-active/.cell-trans/.cell-plan/.cell-close`, `.dep-table`, `.invest-card` |
 | **06 Comunicacao** | `.ritual-grid` com `.ritual-card.highlight`, `.raci-table` com `.raci-r/.raci-a/.raci-c/.raci-i`, `.channel-grid` |

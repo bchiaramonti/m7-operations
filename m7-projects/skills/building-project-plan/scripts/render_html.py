@@ -371,26 +371,10 @@ def render_roadmap_marcos(data: dict, logo_b64: str, output_dir: Path,
     template = load_template("artefatos/roadmap-marcos.tmpl.html")
     roadmap = data.get("roadmap") or {}
 
-    # Phase bar
-    phase_bar_items = roadmap.get("phase_bar") or []
-    phase_bar_html = "\n".join(
-        f'    <div class="phase phase-{html_escape(p.get("class","exec"))}">'
-        f'{html_escape(p.get("label",""))}'
-        + (f'<div class="phase-dates">{html_escape(p.get("dates",""))}</div>' if p.get("dates") else "")
-        + '</div>'
-        for p in phase_bar_items
-    )
-
-    # Timeline blocks
-    timeline_blocks = roadmap.get("timeline_blocks") or []
-    timeline_blocks_html = "\n".join(
-        _render_timeline_block(b) for b in timeline_blocks
-    )
-
-    # Swim-lane months
+    # Month columns (cada mês = 100/n % da largura do track)
     period_start = parse_date(data.get("period_start"))
     period_end = parse_date(data.get("period_end"))
-    months = []
+    months: list[tuple[int, int]] = []
     if period_start and period_end:
         cur = dt.datetime(period_start.year, period_start.month, 1)
         end_anchor = dt.datetime(period_end.year, period_end.month, 1)
@@ -407,30 +391,15 @@ def render_roadmap_marcos(data: dict, logo_b64: str, output_dir: Path,
         for (y, m) in months
     )
 
-    # Lanes
+    # Data lanes (bars com apenas .title — range removido)
     lanes = roadmap.get("lanes") or []
     lanes_html = "\n".join(_render_lane(lane, period_start, period_end) for lane in lanes)
 
-    # Roadmap legend
-    legend_items = roadmap.get("legend") or []
-    legend_html = "\n".join(
-        f'    <div class="legend-item">'
-        f'<div class="legend-dot" style="background:{html_escape(it.get("color","#424135"))};"></div>'
-        f'{html_escape(it.get("label",""))}</div>'
-        for it in legend_items
-    )
-
-    # Milestones
+    # Milestones — usadas tanto na lane do topo quanto na tabela abaixo
     milestones = roadmap.get("milestones") or []
-    milestones_html = "\n".join(
-        f'    <div class="milestone{" major" if m.get("major") else ""}">\n'
-        f'      <div class="date">{html_escape(m.get("date",""))} '
-        + (f'<span class="wbs">{html_escape(m.get("wbs",""))}</span>' if m.get("wbs") else "")
-        + '</div>\n'
-        f'      <h4>{html_escape(m.get("h4",""))}</h4>\n'
-        f'      <p>{html_escape(m.get("p",""))}</p>\n'
-        '    </div>'
-        for m in milestones
+    milestones_lane_html = _render_milestones_lane(milestones, months)
+    marcos_table_rows_html = "\n".join(
+        _render_marco_row(m, idx) for idx, m in enumerate(milestones)
     )
 
     subs = shared_subs(
@@ -439,13 +408,11 @@ def render_roadmap_marcos(data: dict, logo_b64: str, output_dir: Path,
         next_=("okrs.html", "Próximo: OKRs"),
     )
     subs.update({
-        "{{phase_bar_html}}": phase_bar_html,
-        "{{timeline_blocks_html}}": timeline_blocks_html,
         "{{n_months}}": str(n_months),
         "{{months_row_html}}": months_row_html,
+        "{{milestones_lane_html}}": milestones_lane_html,
         "{{lanes_html}}": lanes_html,
-        "{{roadmap_legend_html}}": legend_html,
-        "{{milestones_html}}": milestones_html,
+        "{{marcos_table_rows_html}}": marcos_table_rows_html,
     })
     html = substitute(template, subs)
     output_path = output_dir / "artefatos" / "roadmap-marcos.html"
@@ -453,38 +420,95 @@ def render_roadmap_marcos(data: dict, logo_b64: str, output_dir: Path,
     return output_path
 
 
-def _render_timeline_block(b: dict) -> str:
-    classes = ["block"]
-    if b.get("class"):
-        classes.append(b["class"])
-    label_top = html_escape(b.get("label_top", ""))
-    label_top_class = "label-top phase-label" if b.get("phase_label") else "label-top"
-    process = html_escape(b.get("process", ""))
-    dates = html_escape(b.get("dates", ""))
-    owner = html_escape(b.get("owner", ""))
-    parallel = html_escape(b.get("parallel", ""))
+def _render_milestones_lane(milestones: list[dict], months: list[tuple[int, int]]) -> str:
+    """Lane no topo do roadmap com ticks alternados (top/bottom) ao redor de um trilho central.
+    Posicionamento calendário: cada coluna-mês ocupa 100/n_months%."""
+    if not milestones:
+        return ""
+
+    ticks_html_parts = []
+    for idx, m in enumerate(milestones):
+        m_date = parse_date(m.get("date_iso") or m.get("date"))
+        if not m_date:
+            continue
+        left = _percent_calendar(m_date, months)
+        is_major = m.get("major", False)
+        gate_class = " gate" if is_major else " regular"
+        position = "top" if idx % 2 == 0 else "bottom"
+        lbl = html_escape(m.get("lbl") or _short_lbl(m.get("h4", "")))
+        date_str = html_escape(m.get("date") or fmt_br(m_date))
+        desc = html_escape(m.get("desc") or "")
+
+        if position == "top":
+            ticks_html_parts.append(
+                f'        <div class="tick top{gate_class}" style="left:{left:.2f}%;">\n'
+                f'          <div class="lbl">{lbl}</div>\n'
+                f'          <div class="date">{date_str}</div>\n'
+                + (f'          <div class="desc">{desc}</div>\n' if desc else "")
+                + '          <div class="connector"></div>\n'
+                '          <div class="dot"></div>\n'
+                '        </div>'
+            )
+        else:
+            ticks_html_parts.append(
+                f'        <div class="tick bottom{gate_class}" style="left:{left:.2f}%;">\n'
+                '          <div class="dot"></div>\n'
+                '          <div class="connector"></div>\n'
+                f'          <div class="lbl">{lbl}</div>\n'
+                f'          <div class="date">{date_str}</div>\n'
+                + (f'          <div class="desc">{desc}</div>\n' if desc else "")
+                + '        </div>'
+            )
+
     return (
-        f'      <div class="{" ".join(classes)}">\n'
-        f'        <div class="{label_top_class}">{label_top}</div>\n'
-        f'        <div class="dot"></div>\n'
-        f'        <div class="label-bottom">\n'
-        f'          <div class="process">{process}</div>\n'
-        + (f'          <div class="dates">{dates}</div>\n' if dates else "")
-        + (f'          <div class="owner">{owner}</div>\n' if owner else "")
-        + (f'          <div class="parallel-note">∥ {parallel}</div>\n' if parallel else "")
-        + '        </div>\n'
+        '    <div class="lane milestones">\n'
+        '      <div class="lane-label">\n'
+        '        <div class="code">M</div>\n'
+        '        <div class="name">Marcos do Projeto</div>\n'
+        f'        <div class="owner">{len(milestones)} gates</div>\n'
+        '      </div>\n'
+        '      <div class="track">\n'
+        '        <div class="rail"></div>\n'
+        + "\n".join(ticks_html_parts) + "\n"
+        + '      </div>\n'
+        + '    </div>'
+    )
+
+
+def _render_marco_row(m: dict, idx: int) -> str:
+    """Linha da Tabela de Marcos (Tipo · Marco · Data · WBS · Descrição)."""
+    alt_class = " alt" if idx % 2 == 1 else ""
+    tipo_class = " gate" if m.get("major") else ""
+    wbs = html_escape(m.get("wbs", ""))
+    wbs_html = f'<span class="chip">{wbs}</span>' if wbs else ""
+    return (
+        f'      <div class="data-row{alt_class}">\n'
+        f'        <div class="col-tipo"><span class="tipo-dot{tipo_class}"></span></div>\n'
+        f'        <div class="col-marco">{html_escape(m.get("h4",""))}</div>\n'
+        f'        <div class="col-data">{html_escape(m.get("date",""))}</div>\n'
+        f'        <div class="col-wbs">{wbs_html}</div>\n'
+        f'        <div class="col-desc">{html_escape(m.get("p",""))}</div>\n'
         '      </div>'
     )
 
 
+def _short_lbl(h4: str) -> str:
+    """Fallback para tick label: pega o trecho antes do primeiro ' · ' ou trunca em 18 chars."""
+    if not h4:
+        return ""
+    if " · " in h4:
+        return h4.split(" · ", 1)[0].upper()
+    return h4[:18].upper()
+
+
 def _render_lane(lane: dict, period_start, period_end) -> str:
-    """Renderiza uma .lane do swim-lane com chevron .bar + .milestones .tick."""
+    """Renderiza uma .lane do swim-lane com chevron .bar (apenas título) + .qr (governança)."""
     is_gov = lane.get("is_gov", False)
     code = html_escape(lane.get("code", ""))
     name = html_escape(lane.get("name", ""))
     owner = html_escape(lane.get("owner", ""))
 
-    # Position bars (chevron) within the track
+    # Position bars (chevron) within the track — apenas title (sem range)
     bars = lane.get("bars") or []
     bars_html_parts = []
     for bar in bars:
@@ -493,32 +517,10 @@ def _render_lane(lane: dict, period_start, period_end) -> str:
         left, width = _percent_position(bar_start, bar_end, period_start, period_end)
         bar_class = bar.get("class", "v-dark")
         title = html_escape(bar.get("title", ""))
-        range_ = html_escape(bar.get("range", ""))
         bars_html_parts.append(
             f'        <div class="bar {html_escape(bar_class)}" '
             f'style="left:{left:.1f}%; width:{width:.1f}%;">\n'
             f'          <span class="title">{title}</span>\n'
-            f'          <span class="range">{range_}</span>\n'
-            '        </div>'
-        )
-
-    # Milestones (ticks) within track
-    ticks = lane.get("ticks") or []
-    ticks_html_parts = []
-    for tick in ticks:
-        tick_date = parse_date(tick.get("date"))
-        left = _percent_anchor(tick_date, period_start, period_end)
-        gate = " gate" if tick.get("gate") else ""
-        lbl = html_escape(tick.get("lbl", ""))
-        date_str = html_escape(tick.get("date_label") or fmt_br(tick_date))
-        desc = html_escape(tick.get("desc", ""))
-        ticks_html_parts.append(
-            f'        <div class="tick{gate}" style="left:{left:.1f}%;">\n'
-            '          <div class="connector"></div>\n'
-            '          <div class="dot"></div>\n'
-            f'          <div class="lbl">{lbl}</div>\n'
-            f'          <div class="date">{date_str}</div>\n'
-            f'          <div class="desc">{desc}</div>\n'
             '        </div>'
         )
 
@@ -545,7 +547,6 @@ def _render_lane(lane: dict, period_start, period_end) -> str:
     track_html = (
         '      <div class="track">\n'
         + "\n".join(bars_html_parts) + "\n"
-        + ('        <div class="milestones">\n' + "\n".join(ticks_html_parts) + "\n        </div>\n" if ticks_html_parts else "")
         + ("\n".join(qrs_html_parts) + "\n" if qrs_html_parts else "")
         + '      </div>'
     )
@@ -576,6 +577,29 @@ def _percent_anchor(point, period_start, period_end) -> float:
     total = (period_end - period_start).days or 1
     d = (point - period_start).days
     return max(0.0, min(100.0, 100.0 * d / total))
+
+
+def _percent_calendar(point, months: list[tuple[int, int]]) -> float:
+    """Posição baseada em colunas-mês iguais (cada mês = 100/n_months %).
+    Usa o dia dentro do mês como fração linear. Alinha ticks visualmente com
+    os headers de mês, mesmo quando o período do projeto não começa no dia 1."""
+    if not point or not months:
+        return 0.0
+    n = len(months)
+    cell_width = 100.0 / n
+    for idx, (y, m) in enumerate(months):
+        if point.year == y and point.month == m:
+            if m == 12:
+                next_first = dt.date(y + 1, 1, 1)
+            else:
+                next_first = dt.date(y, m + 1, 1)
+            first = dt.date(y, m, 1)
+            days_in_month = (next_first - first).days
+            day_fraction = (point.day - 1) / max(days_in_month, 1)
+            return (idx + day_fraction) * cell_width
+    first_y, first_m = months[0]
+    first_dt = dt.date(first_y, first_m, 1)
+    return 0.0 if point < first_dt else 100.0
 
 
 # ---------------------------------------------------------------------------

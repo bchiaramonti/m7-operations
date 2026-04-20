@@ -83,11 +83,9 @@ Coletar conteudo para cada um dos 9 artefatos. Ordem natural:
    - Padrao repetitivo no nivel 4 (se houver) — vira tabela `wp-table`
    - Convencao WBS (HTML inline com totais)
 6. **Roadmap & Marcos:**
-   - `phase_bar` (3 segmentos com flex 1/5/0.5 tipico)
-   - `timeline_blocks` (1 por agrupamento temporal)
-   - `lanes` (frentes para o swim-lane, com bars + ticks + qrs em lane.gov)
-   - `legend` (cores das frentes)
-   - `milestones` (date_iso + h4 + p; marcar `major:true` para criticos)
+   - `lanes` (frentes para o swim-lane, com bars `{start, end, class, title}` + qrs em `lane.gov`)
+   - `milestones` (date_iso + date + h4 + p + wbs; `major:true` para criticos; opcionais `lbl` curto e `desc` curto usados na lane de marcos do topo)
+   - A lane de Marcos do Projeto aparece no topo do roadmap com ticks alternados (top/bottom) sobre trilho central; os mesmos marcos viram linhas da Tabela de Marcos abaixo do roadmap
 7. **OKRs:** N objetivos (default 3) × K KRs (default 3) com `target` quantitativo
 8. **Equipe:** lider + donos (lead, role, name, area, blocks, alloc)
 9. **Alocacao por Periodo:** matriz Pessoa × Periodo

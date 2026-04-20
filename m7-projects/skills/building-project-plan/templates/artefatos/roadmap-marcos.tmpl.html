@@ -26,46 +26,20 @@
   .page-header .logo { height:56px; opacity:0.85; flex-shrink:0; }
   .container{max-width:1200px;margin:0 auto;padding:48px 32px 80px;}
 
-  /* PHASE BAR */
-  .phase-bar{display:flex;border-radius:var(--radius);overflow:hidden;margin-bottom:32px;border:1px solid var(--cinza-200);}
-  .phase-bar .phase{padding:14px 20px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;text-align:center;position:relative;}
-  .phase-bar .phase .phase-dates{font-size:10px;font-weight:400;opacity:0.7;margin-top:2px;letter-spacing:0;text-transform:none;}
-  .phase-bar .phase-plan{background:var(--cinza-100);color:var(--cinza-700);flex:1;}
-  .phase-bar .phase-exec{background:var(--verde-caqui);color:var(--off-white);flex:5;}
-  .phase-bar .phase-close{background:var(--lime);color:var(--verde-caqui);flex:0.5;}
-
-  /* TIMELINE */
-  .timeline-wrapper{overflow-x:auto;padding-bottom:20px;-webkit-overflow-scrolling:touch;margin:0 -32px;padding-left:32px;padding-right:32px;}
-  .timeline{position:relative;display:flex;gap:0;width:max-content;min-width:100%;padding:40px 40px 60px;}
-  .timeline::before{content:'';position:absolute;top:60px;left:20px;right:20px;height:4px;background:var(--cinza-200);border-radius:2px;}
-
-  .block{flex:0 0 110px;position:relative;display:flex;flex-direction:column;align-items:center;}
-  .block .dot{width:18px;height:18px;border-radius:50%;background:var(--verde-caqui);border:3px solid var(--off-white);box-shadow:0 0 0 2px var(--verde-caqui);position:relative;z-index:2;margin-top:52px;}
-  .block.phase-start .dot{width:22px;height:22px;background:var(--lime);box-shadow:0 0 0 2px var(--verde-caqui);}
-  .block.transversal .dot{background:var(--lime);box-shadow:0 0 0 2px var(--verde-caqui);}
-  .block.cadeia .dot{background:#fff;border:3px solid var(--verde-caqui);box-shadow:0 0 0 2px var(--cinza-400);}
-  .block.encerramento .dot{background:var(--lime);box-shadow:0 0 0 2px var(--verde-caqui);}
-  .block .label-top{font-size:11px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:0.5px;position:absolute;top:0;text-align:center;width:100%;}
-  .block .label-top.phase-label{color:var(--verde-caqui);font-size:10px;letter-spacing:1px;}
-  .block .label-bottom{position:absolute;top:82px;text-align:center;width:120px;left:50%;transform:translateX(-50%);}
-  .block .label-bottom .process{font-size:13px;font-weight:600;line-height:1.3;}
-  .block .label-bottom .dates{font-size:11px;color:var(--cinza-400);margin-top:4px;}
-  .block .label-bottom .owner{font-size:11px;color:var(--cinza-400);margin-top:2px;font-style:italic;}
-  .block .label-bottom .parallel-note{font-size:9px;color:var(--verde-caqui);background:var(--lime);padding:1px 6px;border-radius:3px;margin-top:4px;display:inline-block;}
-
-  /* SECTION DIVIDERS */
+  /* SECTION TITLES */
   .section-title{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--cinza-400);font-weight:600;margin-bottom:16px;margin-top:48px;}
 
-  /* SWIM-LANE ROADMAP (frentes do projeto) */
+  /* SWIM-LANE ROADMAP */
   .roadmap{width:100%;background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;}
   .months-row{display:grid;grid-template-columns:200px repeat({{n_months}}, 1fr);background:var(--verde-caqui);color:var(--off-white);}
-  .months-row .corner{padding:8px 14px;font-size:10px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--lime);border-right:1px solid rgba(255,253,239,0.15);}
+  .months-row .corner{padding:8px 14px;font-size:10px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--lime);border-right:1px solid rgba(255,253,239,0.15);display:flex;align-items:center;}
   .month-cell{text-align:center;font-size:11px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--off-white);padding:8px 4px;border-right:1px solid rgba(255,253,239,0.1);}
   .month-cell:last-child{border-right:none;}
   .month-cell .year{display:block;font-size:8px;color:rgba(255,253,239,0.55);letter-spacing:0.5px;margin-top:1px;font-weight:400;}
 
   .lane{display:grid;grid-template-columns:200px 1fr;border-top:1px solid var(--verde-caqui-100);min-height:100px;}
   .lane.gov{border-top:3px solid var(--lime);background:var(--verde-caqui-50);}
+  .lane.milestones{background:var(--off-white);}
   .lane-label{padding:12px 14px;display:flex;flex-direction:column;justify-content:center;background:var(--verde-caqui-50);border-right:1px solid var(--verde-caqui-100);}
   .lane.gov .lane-label{background:var(--verde-caqui);}
   .lane-label .code{font-size:10px;font-weight:500;letter-spacing:1.5px;color:var(--verde-claro);text-transform:uppercase;}
@@ -76,7 +50,10 @@
   .lane.gov .lane-label .owner{color:var(--verde-caqui-200);}
 
   .track{position:relative;padding:8px 0 6px;background-image:repeating-linear-gradient(to right,transparent 0,transparent calc((100% / {{n_months}}) - 1px),var(--verde-caqui-100) calc((100% / {{n_months}}) - 1px),var(--verde-caqui-100) calc(100% / {{n_months}}));}
+  .lane.milestones .track{min-height:160px;padding:0;background-image:none;}
+  .lane.milestones .rail{position:absolute;top:80px;left:0;right:0;height:1.5px;background:var(--verde-caqui-200);z-index:1;}
 
+  /* BARS — apenas nome da entrega (sem range) */
   .bar{position:absolute;top:8px;height:38px;display:flex;flex-direction:column;justify-content:center;padding:0 32px 0 14px;font-size:11px;font-weight:500;line-height:1.1;color:var(--off-white);background:var(--verde-caqui);clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%);box-shadow:0 1px 3px rgba(0,0,0,0.1);}
   .bar.v-purple{background:var(--purple);color:#fff;}
   .bar.v-blue{background:var(--blue);color:#fff;}
@@ -85,36 +62,43 @@
   .bar.v-teal{background:var(--teal);color:#fff;}
   .bar.v-gov{background:linear-gradient(90deg,var(--verde-caqui) 0%, var(--verde-medio) 100%);color:var(--off-white);}
   .bar .title{display:block;font-weight:600;letter-spacing:0.1px;font-size:11.5px;}
-  .bar .range{display:block;font-size:9.5px;opacity:0.8;font-weight:400;margin-top:1px;letter-spacing:0.3px;}
 
-  .milestones{position:relative;margin-top:48px;height:60px;}
-  .tick{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;width:100px;z-index:4;}
-  .tick .connector{width:1.5px;height:8px;background:var(--verde-caqui-200);}
-  .tick .dot{width:10px;height:10px;border-radius:50%;background:var(--lime);border:2px solid #fff;box-shadow:0 0 0 1.5px var(--verde-caqui);margin-top:-5px;}
-  .tick.gate .dot{background:#fff;border:2px solid var(--lime);box-shadow:0 0 0 1.5px var(--verde-caqui);}
-  .tick .lbl{font-size:9px;font-weight:700;color:var(--verde-caqui);background:var(--off-white);padding:1px 5px;border-radius:3px;margin-top:3px;letter-spacing:0.3px;}
-  .tick.gate .lbl{background:var(--lime);}
-  .tick .date{font-size:9px;color:var(--cinza-400);margin-top:2px;font-weight:500;}
-  .tick .desc{font-size:9px;color:var(--cinza-700);margin-top:1px;text-align:center;line-height:1.2;max-width:90px;}
+  /* MILESTONES LANE (ticks alternados acima/abaixo de trilho central) */
+  .tick{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;width:110px;z-index:4;}
+  .tick.top{top:0;height:85px;}
+  .tick.bottom{top:75px;height:85px;}
+  .tick .lbl{font-size:9px;font-weight:700;letter-spacing:0.03em;padding:2px 8px;border-radius:3px;white-space:nowrap;color:var(--verde-escuro);background:var(--lime);}
+  .tick.regular .lbl{color:var(--off-white);background:var(--verde-escuro);}
+  .tick .date{font-size:9px;color:var(--verde-caqui);margin-top:3px;font-weight:600;letter-spacing:0.02em;}
+  .tick .desc{font-size:8.5px;color:var(--verde-claro);margin-top:1px;text-align:center;line-height:1.2;max-width:100px;}
+  .tick .connector{width:1.5px;flex:1;background:var(--verde-caqui-200);margin:4px 0;}
+  .tick .dot{width:10px;height:10px;border-radius:50%;background:var(--lime);border:2px solid #fff;box-shadow:0 0 0 1.5px var(--verde-caqui);}
+  .tick.gate .dot{background:#fff;border:2px solid var(--verde-escuro);box-shadow:0 0 0 2px var(--lime);}
+  .tick.top .dot{margin-top:-5px;}
 
-  .lane.gov .qr{position:absolute;top:8px;background:var(--lime);color:var(--verde-caqui);font-size:9.5px;font-weight:600;padding:6px 12px;border-radius:18px;box-shadow:0 1px 3px rgba(0,0,0,0.15);transform:translateX(-50%);}
+  /* GOV LANE QR badges */
+  .lane.gov .qr{position:absolute;top:50%;transform:translate(-50%,-50%);background:var(--lime);color:var(--verde-escuro);padding:5px 12px;border-radius:14px;font-size:10.5px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;box-shadow:0 0 0 3px rgba(238,247,124,0.25);white-space:nowrap;z-index:5;}
   .lane.gov .qr-label{display:block;text-align:center;}
 
-  .roadmap-legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;font-size:11px;color:var(--cinza-400);}
-  .roadmap-legend .legend-item{display:flex;align-items:center;gap:6px;}
-  .roadmap-legend .legend-dot{width:12px;height:12px;border-radius:3px;}
-
-  /* MILESTONES */
-  .milestone-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-  .milestone{background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);padding:20px;border-left:4px solid var(--verde-caqui);}
-  .milestone.major{border-left-color:var(--lime);background:rgba(238,247,124,0.08);}
-  .milestone .date{font-size:11px;font-weight:600;color:var(--cinza-400);text-transform:uppercase;letter-spacing:0.5px;}
-  .milestone .wbs{font-size:10px;color:var(--verde-caqui);background:var(--cinza-100);padding:1px 6px;border-radius:3px;display:inline-block;margin-left:6px;}
-  .milestone h4{font-size:14px;font-weight:400;margin-top:4px;line-height:1.4;}
-  .milestone p{font-size:12px;color:var(--cinza-400);margin-top:6px;line-height:1.5;}
+  /* TABELA DE MARCOS */
+  .marcos-table{width:100%;border:1px solid var(--cinza-200);border-radius:var(--radius);overflow:hidden;background:#fff;display:flex;flex-direction:column;}
+  .marcos-table .header-row{display:flex;background:var(--verde-caqui);color:var(--off-white);font-size:10.5px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;}
+  .marcos-table .header-row .col{padding:12px 14px;border-right:1px solid rgba(255,253,239,0.12);}
+  .marcos-table .header-row .col:first-child{color:var(--lime);}
+  .marcos-table .header-row .col:last-child{border-right:none;}
+  .marcos-table .data-row{display:flex;border-top:1px solid var(--cinza-200);font-size:12px;color:var(--verde-caqui);background:#fff;}
+  .marcos-table .data-row.alt{background:#fafaf2;}
+  .marcos-table .col-tipo{width:60px;flex-shrink:0;padding:14px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--cinza-100);}
+  .marcos-table .col-marco{width:220px;flex-shrink:0;padding:14px;font-weight:500;line-height:1.4;border-right:1px solid var(--cinza-100);}
+  .marcos-table .col-data{width:90px;flex-shrink:0;padding:14px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:0.02em;border-right:1px solid var(--cinza-100);}
+  .marcos-table .col-wbs{width:130px;flex-shrink:0;padding:14px;border-right:1px solid var(--cinza-100);display:flex;align-items:center;}
+  .marcos-table .col-wbs .chip{font-size:10.5px;font-weight:600;color:var(--verde-caqui);background:var(--cinza-100);padding:2px 8px;border-radius:3px;font-variant-numeric:tabular-nums;}
+  .marcos-table .col-desc{flex:1;padding:14px;color:var(--verde-claro);line-height:1.5;}
+  .marcos-table .tipo-dot{width:10px;height:10px;border-radius:50%;background:var(--lime);border:2px solid #fff;box-shadow:0 0 0 1.5px var(--verde-caqui);}
+  .marcos-table .tipo-dot.gate{background:#fff;border:2px solid var(--verde-escuro);box-shadow:0 0 0 2px var(--lime);}
 
   .footer{text-align:center;padding:24px;font-size:12px;color:var(--cinza-400);border-top:1px solid var(--cinza-200);margin-top:48px;}
-  @media(max-width:768px){.page-header{padding:16px 24px 32px;}.page-header h1{font-size:24px;}.container{padding:32px 16px 60px;}.milestone-grid{grid-template-columns:1fr;}.phase-bar{flex-direction:column;}}
+  @media(max-width:768px){.page-header{padding:16px 24px 32px;}.page-header h1{font-size:24px;}.container{padding:32px 16px 60px;}}
 </style>
 </head>
 <body>
@@ -125,32 +109,25 @@
 
 <div class="container">
 
-  <div class="phase-bar">
-{{phase_bar_html}}
-  </div>
-
-  <div class="timeline-wrapper">
-    <div class="timeline">
-{{timeline_blocks_html}}
-    </div>
-  </div>
-
-  <div class="section-title">Roadmap por Frente</div>
   <div class="roadmap">
     <div class="months-row">
       <div class="corner">Frente / Fase</div>
 {{months_row_html}}
     </div>
+{{milestones_lane_html}}
 {{lanes_html}}
   </div>
 
-  <div class="roadmap-legend">
-{{roadmap_legend_html}}
-  </div>
-
-  <div class="section-title">Marcos do Projeto</div>
-  <div class="milestone-grid">
-{{milestones_html}}
+  <div class="section-title">Tabela de Marcos</div>
+  <div class="marcos-table">
+    <div class="header-row">
+      <div class="col col-tipo">Tipo</div>
+      <div class="col col-marco">Marco</div>
+      <div class="col col-data">Data</div>
+      <div class="col col-wbs">WBS</div>
+      <div class="col col-desc">Descrição</div>
+    </div>
+{{marcos_table_rows_html}}
   </div>
 
 </div>
