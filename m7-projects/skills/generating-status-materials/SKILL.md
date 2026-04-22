@@ -37,10 +37,23 @@ Ambos os formatos consomem o mesmo dict normalizado emitido por `scripts/collect
 ## Pré-requisitos
 
 - Projeto inicializado (`initializing-project`): `<proj>/CLAUDE.md` + `<proj>/4-status-report/`
-- Plano construído (`building-project-plan`): 10 HTMLs em `<proj>/1-planning/` com stakeholders, marcos, riscos
+- Plano construído (`building-project-plan`): 10 HTMLs em `<proj>/1-planning/` — **obrigatórios para esta skill**: `roadmap-marcos.html` (fonte visual da swim-lane + marcos) e `riscos.html` (fonte dos riscos mapeados)
 - Plano de ação inicializado (`managing-action-plan`): `<proj>/4-status-report/Cronograma.xlsx` LIVE + `changelog.md`
-- Python 3.10+ com: `openpyxl`, `jinja2`, `beautifulsoup4`, `python-pptx`, **e** (`playwright` **ou** `weasyprint`) para HTML→PDF
+- Python 3.10+ com: `openpyxl`, `jinja2`, `beautifulsoup4`, `python-pptx`, **e** `playwright` + chromium (`python3 -m playwright install chromium`). Playwright é **obrigatório** — usado para (1) screenshot do roadmap para slides 3/4, (2) renderização HTML→PDF do OPR
 - Fontes: **Arial** (padrão — conforme canvas Paper). TWK Everett é suportado se instalado, mas fallback Arial é silencioso.
+
+### Contrato de reuso com `building-project-plan`
+
+Esta skill **consome** artefatos produzidos pela `building-project-plan`, não reinventa:
+
+| Artefato upstream | Usado por esta skill | Como |
+|---|---|---|
+| `roadmap-marcos.html` | Slides 3, 4 e OPR | Screenshot headless da swim-lane completa (`preset: roadmap-full`) e dos marcos (`preset: marcos-lane`) via playwright |
+| `roadmap-marcos.html` `.lane.milestones` | Slide 6 cronograma macro | Parse dos 8 marcos M0-M7 (label, data, status computado por data) |
+| `riscos.html` `.risk-item` | Slide 7 e OPR | Parse estruturado de 16 riscos com `severity_class` (crit/high/med/low), contramedidas, upsides filtrados |
+| `BRIEFING.md` objetivo | Cover + OPR | Primeiro parágrafo da seção Objetivo |
+
+**Granularidade herdada**: a skill **não decide** granularidade. Ela espelha a granularidade já aprovada em `roadmap-marcos.html` — se a fase PLANEJAMENTO aparece como 1 bar, o status report a trata como 1 bloco; se EXECUÇÃO aparece com 8+4 bars (playbooks), o status report detalha no mesmo nível.
 
 ## Estado da arte
 
@@ -91,10 +104,11 @@ python3 scripts/build_opr.py \
   --data /tmp/collect-<ts>.json \
   --template templates/opr.tmpl.html \
   --assets-dir assets \
-  --out-dir <proj>/4-status-report/YYYY-MM-DD
+  --out-dir <proj>/4-status-report/YYYY-MM-DD \
+  --roadmap-html <proj>/1-planning/artefatos/roadmap-marcos.html
 ```
 
-Emite `opr.html` + `opr.pdf`. Usa playwright (Chromium headless) como primeiro driver; cai em weasyprint se playwright indisponível. Detalhes em [`opr-layout.md`](references/opr-layout.md).
+Emite `opr.html` + `opr.pdf`. Usa playwright (Chromium headless) para renderização HTML→PDF. Detalhes em [`opr-layout.md`](references/opr-layout.md).
 
 ### 4. Renderizar PPTX
 
@@ -102,10 +116,11 @@ Emite `opr.html` + `opr.pdf`. Usa playwright (Chromium headless) como primeiro d
 python3 scripts/build_pptx.py \
   --data /tmp/collect-<ts>.json \
   --assets-dir assets \
-  --out-dir <proj>/4-status-report/YYYY-MM-DD
+  --out-dir <proj>/4-status-report/YYYY-MM-DD \
+  --roadmap-html <proj>/1-planning/artefatos/roadmap-marcos.html
 ```
 
-Emite `status-presentation.pptx` com 8 slides construídos programaticamente (sem master template). Layout fiel ao canvas Paper `status-report`. Detalhes em [`presentation-structure.md`](references/presentation-structure.md).
+Emite `status-presentation.pptx` com 8 slides construídos programaticamente (sem master template). Slides 3 e 4 embedam screenshots headless do `roadmap-marcos.html`; Slide 6 renderiza a timeline M0-M7 via python-pptx com linha "HOJE" computada pela data do reporte; Slide 7 renderiza cards de risco fiéis ao Paper (até 6, severidade crit+high por padrão). Detalhes em [`presentation-structure.md`](references/presentation-structure.md).
 
 ### 5. Reportar ao usuário
 
@@ -137,18 +152,18 @@ Executado em `collect_data.py` (não em LLM). Regras em [`narrative-synthesis.md
 
 O canvas Paper `status-report` contém **8 artboards 1280×720** que mapeiam 1:1 para os slides PPTX:
 
-| # | Paper artboard | Slide PPTX | Dados consumidos |
+| # | Paper artboard | Slide PPTX | Fonte de conteúdo |
 |---|---|---|---|
-| 1 | `01 — Cover` | Capa (fundo escuro com imagem) | `project.name`, `report_date`, `project.period_label` |
-| 2 | `02 — Agenda` | Sumário de seções | lista fixa de seções |
-| 3 | `03 — Visão Geral do Roadmap` | Tabela sprints × frentes | `milestones`, `sprints` |
-| 4 | `04 — Roadmap · Detalhe` | Swimlane Gantt-style (imagem renderizada) | `milestones`, `sprint_bars` |
-| 5 | `05 — Section Divider` | Divisor da sprint ativa | `status.active_sprint` |
-| 6 | `06 — Executive Status` | Cronograma macro + highlights + next + attentions | `highlights`, `next_steps`, `attentions`, `macro_milestones` |
-| 7 | `07 — Risks` | Cards de riscos com severidade | `risks` |
-| 8 | `08 — Closing` | Próximos passos + contato | `next_steps[0]`, `project.pm_email` |
+| 1 | `01 — Cover` | Capa (foto M7 + dark overlay) | `assets/m7-hero-dark.png` + `project.name`, `period_label` |
+| 2 | `02 — Agenda` | Sumário de seções | lista fixa |
+| 3 | `03 — Marcos` | Timeline horizontal dos marcos M0-M7 | **screenshot** `roadmap-marcos.html > .lane.milestones` |
+| 4 | `04 — Roadmap Completo` | Swim-lane completa do plano | **screenshot** `roadmap-marcos.html > .roadmap` (todas lanes expandidas) |
+| 5 | `05 — Section Divider` | Divisor da sprint ativa | `status.active_sprint` (eyebrow + título separados automaticamente por "—") |
+| 6 | `06 — Cronograma Macro` | Timeline M0-M7 python-pptx + HOJE overlay + highlights + próximos + atenções | `macro_milestones` (8 gates do roadmap-marcos) + `highlights`, `next_steps`, `attentions` |
+| 7 | `07 — Riscos` | Até 6 cards de risco (crit+high) em 2 colunas | `risks` filtrado por `severity_class` |
+| 8 | `08 — Closing` | Próxima ação prioritária + contato | `next_steps[0]`, `project.pm_email` |
 
-Slide 4 (swimlane Gantt) é construído via shapes python-pptx diretamente — detalhes em [`presentation-structure.md`](references/presentation-structure.md#slide-4--roadmap-detalhe).
+Slides 3 e 4 são screenshots fiéis ao `roadmap-marcos.html` aprovado no plano — garantem fidelidade visual sem reinvenção. Slide 6 é renderizado via python-pptx para permitir o overlay "HOJE" dinâmico por data do reporte. Detalhes em [`presentation-structure.md`](references/presentation-structure.md).
 
 ## Anti-patterns a evitar
 

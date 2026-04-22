@@ -7,8 +7,13 @@ Inputs:
   --template <path>             Jinja2 template (default: templates/opr.tmpl.html)
   --assets-dir <path>           Directory with m7-logo-*.png
   --out-dir <path>              Where to write opr.html + opr.pdf
+  --roadmap-html <path>         1-planning/artefatos/roadmap-marcos.html (for mini-swimlane embed)
 
 Output files: opr.html (the rendered HTML), opr.pdf (A4 portrait).
+
+The OPR is a one-page status snapshot. It reuses visual material from
+building-project-plan (roadmap-marcos.html) by embedding a screenshot of the
+milestones lane, rather than reinventing the timeline.
 
 Tries playwright first, falls back to weasyprint. Aborts if neither installed.
 """
@@ -19,22 +24,70 @@ import argparse
 import base64
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 
 STATUS_LABEL = {"green": "🟢 OK", "yellow": "🟡 Atenção", "red": "🔴 Crítico"}
 
 
-def encode_logo(assets_dir: Path, filename: str) -> str | None:
-    path = assets_dir / filename
+def encode_image_b64(path: Path, mime: str = "image/png") -> str | None:
     if not path.exists():
         return None
     with open(path, "rb") as f:
         data = base64.b64encode(f.read()).decode("ascii")
-    return f"data:image/png;base64,{data}"
+    return f"data:{mime};base64,{data}"
 
 
-def render_html(data: dict, template_path: Path, assets_dir: Path, compact: bool = False) -> str:
+def encode_logo(assets_dir: Path, filename: str) -> str | None:
+    return encode_image_b64(assets_dir / filename, mime="image/png")
+
+
+def generate_mini_swimlane(roadmap_html: Path | None, tmp_dir: Path) -> str | None:
+    """Screenshot of the .lane.milestones strip from roadmap-marcos.html,
+    encoded as base64 data URL for inline embed in the OPR HTML."""
+    if not roadmap_html or not roadmap_html.exists():
+        return None
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from render_html_section import render as render_section, PRESETS
+        out = tmp_dir / "mini-marcos-lane.png"
+        preset = PRESETS["marcos-lane"]
+        render_section(
+            input_path=roadmap_html,
+            output_path=out,
+            selector=preset["selector"],
+            viewport=preset["viewport"],
+            device_scale=preset["device_scale"],
+            inject_css=preset["inject_css"],
+        )
+        return encode_image_b64(out, mime="image/png")
+    except Exception as e:
+        print(f"⚠ Mini-swimlane geração falhou: {e}", file=sys.stderr)
+        return None
+
+
+def pick_top_risks(risks: list[dict], limit: int = 3) -> list[dict]:
+    """Top-N risks by severity (crit > high > med), excluding upsides."""
+    actual = [r for r in risks if not r.get("is_upside")]
+    order = {"crit": 0, "high": 1, "med": 2, "low": 3}
+    actual.sort(key=lambda r: order.get(r.get("severity_class"), 99))
+    return actual[:limit]
+
+
+def pick_next_milestones(milestones: list[dict], limit: int = 3) -> list[dict]:
+    """Next N milestones that are not yet 'done' — shows what's ahead."""
+    upcoming = [m for m in milestones if m.get("status") != "done"]
+    return upcoming[:limit]
+
+
+def render_html(
+    data: dict,
+    template_path: Path,
+    assets_dir: Path,
+    roadmap_html: Path | None,
+    compact: bool = False,
+) -> str:
     try:
         from jinja2 import Template
     except ImportError:
@@ -42,6 +95,15 @@ def render_html(data: dict, template_path: Path, assets_dir: Path, compact: bool
 
     template = Template(template_path.read_text(encoding="utf-8"))
     logo_url = encode_logo(assets_dir, "m7-logo-offwhite.png")
+
+    # Generate mini-swimlane screenshot once (shared across renders)
+    tmp_dir = Path(tempfile.mkdtemp(prefix="opr-swimlane-"))
+    mini_swimlane_url = generate_mini_swimlane(roadmap_html, tmp_dir)
+
+    all_risks = data.get("risks", [])
+    total_risks = sum(1 for r in all_risks if not r.get("is_upside"))
+    top_risks = pick_top_risks(all_risks, limit=3)
+    next_marcos = pick_next_milestones(data.get("macro_milestones", []), limit=3)
 
     return template.render(
         project=data.get("project", {}),
@@ -52,7 +114,11 @@ def render_html(data: dict, template_path: Path, assets_dir: Path, compact: bool
         next_steps=data.get("next_steps", []),
         attentions=data.get("attentions", []),
         macro_milestones=data.get("macro_milestones", []),
+        next_marcos=next_marcos,
+        top_risks=top_risks,
+        total_risks=total_risks,
         logo_url=logo_url,
+        mini_swimlane_url=mini_swimlane_url,
         compact=compact,
     )
 
@@ -120,6 +186,10 @@ def main():
     ap.add_argument("--template", type=Path)
     ap.add_argument("--assets-dir", type=Path)
     ap.add_argument("--out-dir", required=True, type=Path)
+    ap.add_argument(
+        "--roadmap-html", type=Path,
+        help="Path to 1-planning/artefatos/roadmap-marcos.html (embeds mini-swimlane).",
+    )
     ap.add_argument("--keep-html", action="store_true")
     args = ap.parse_args()
 
@@ -138,15 +208,15 @@ def main():
     data = json.loads(args.data.read_text(encoding="utf-8"))
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    html = render_html(data, template_path, assets_dir, compact=False)
+    html = render_html(data, template_path, assets_dir, args.roadmap_html, compact=False)
     html_path = args.out_dir / "opr.html"
     html_path.write_text(html, encoding="utf-8")
 
-    # Try to detect overflow
+    # Try to detect overflow (A4 portrait is ~1123px high at 96dpi)
     height = measure_overflow_playwright(html)
     if height and height > 1123:
         print(f"⚠ OPR excede A4 ({height}px > 1123px). Rerenderizando em modo compacto.", file=sys.stderr)
-        html = render_html(data, template_path, assets_dir, compact=True)
+        html = render_html(data, template_path, assets_dir, args.roadmap_html, compact=True)
         html_path.write_text(html, encoding="utf-8")
 
     pdf_path = args.out_dir / "opr.pdf"
@@ -162,9 +232,6 @@ def main():
 
     print(f"✓ OPR gerado: {html_path}")
     print(f"✓ OPR PDF:    {pdf_path}")
-
-    if not args.keep_html:
-        pass  # keep html anyway — it is useful for the user
 
     if data.get("warnings"):
         print(f"⚠ {len(data['warnings'])} warning(s):", file=sys.stderr)

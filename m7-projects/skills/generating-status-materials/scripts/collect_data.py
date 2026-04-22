@@ -55,6 +55,14 @@ MONTH_PT = {
     9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
 }
 
+# Portuguese abbreviated month names → English (locale "C" uses English %b).
+# Used to pre-translate dates like "14/abr" before parsing.
+MONTH_PT_ABBREV_TO_EN = {
+    "jan": "jan", "fev": "feb", "mar": "mar", "abr": "apr",
+    "mai": "may", "jun": "jun", "jul": "jul", "ago": "aug",
+    "set": "sep", "out": "oct", "nov": "nov", "dez": "dec",
+}
+
 
 @dataclass
 class CollectResult:
@@ -101,14 +109,25 @@ def normalize_date(value, default_year: int) -> datetime | None:
         s = value.strip()
         if s in ("—", "-", ""):
             return None
-        for fmt in DATE_FORMATS:
-            try:
-                dt = datetime.strptime(s, fmt)
-                if dt.year == 1900:
-                    dt = dt.replace(year=default_year)
-                return dt
-            except ValueError:
-                continue
+        # Pre-translate Portuguese month abbreviations to English to match %b in C locale
+        s_translated = s
+        for pt, en in MONTH_PT_ABBREV_TO_EN.items():
+            # Case-insensitive replace of 3-letter PT abbrev when bordered by / or end
+            s_translated = re.sub(
+                rf"(?<=/){pt}(?=/|$)",
+                en,
+                s_translated,
+                flags=re.IGNORECASE,
+            )
+        for candidate in (s, s_translated):
+            for fmt in DATE_FORMATS:
+                try:
+                    dt = datetime.strptime(candidate, fmt)
+                    if dt.year == 1900:
+                        dt = dt.replace(year=default_year)
+                    return dt
+                except ValueError:
+                    continue
     return None
 
 
@@ -235,6 +254,16 @@ def read_html_text(path: Path, warnings: list, label: str) -> dict:
 
 
 def parse_risks(path: Path, warnings: list) -> list[dict]:
+    """Parses .risk-item cards from the riscos.html artifact produced by building-project-plan.
+
+    Schema extracted per card:
+      - .risk-id (text = code like "R01"/"O01"; class in {crit, high, med, low} = severity)
+      - .risk-content > h4 = title
+      - .risk-content > .tags > .tag-prob = "Prob: Alta/Média/Baixa"
+      - .risk-content > .tags > .tag-imp  = "Imp: Crítico/Alto/Médio/Baixo"
+      - .risk-content > p                 = description
+      - .risk-content > .mitigation > span = contramedida
+    """
     if not path.exists():
         warnings.append("riscos.html não encontrado — seção Riscos vazia")
         return []
@@ -244,41 +273,68 @@ def parse_risks(path: Path, warnings: list) -> list[dict]:
         return []
     soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
     risks = []
-    # Strategy 1: look for <tr data-risk-id="...">
-    rows = soup.select("tr[data-risk-id], tr.risk-row")
-    for i, tr in enumerate(rows, 1):
-        code = tr.get("data-risk-id") or f"R{i}"
-        cells = [td.get_text(strip=True) for td in tr.find_all("td")]
-        if not cells:
-            continue
-        title = cells[0] if len(cells) > 0 else ""
-        prob = (cells[1] if len(cells) > 1 else "baixa").lower()
-        impact = (cells[2] if len(cells) > 2 else "baixo").lower()
-        mitigation = cells[3] if len(cells) > 3 else ""
+
+    sev_class_map = {"crit": "critico", "high": "alto", "med": "medio", "low": "baixo"}
+
+    for idx, card in enumerate(soup.select(".risk-item"), 1):
+        id_el = card.select_one(".risk-id")
+        code = id_el.get_text(strip=True) if id_el else f"R{idx:02d}"
+
+        # Severity comes from the class of .risk-id (crit/high/med/low).
+        # This is the authoritative visual severity from the plan.
+        sev_raw = "low"
+        if id_el:
+            for c in id_el.get("class", []):
+                if c in sev_class_map:
+                    sev_raw = c
+                    break
+        severity_label = sev_class_map[sev_raw]
+
+        title_el = card.select_one(".risk-content h4") or card.select_one("h4")
+        title = title_el.get_text(strip=True) if title_el else ""
+
+        prob_el = card.select_one(".tag-prob")
+        prob_text = prob_el.get_text(strip=True) if prob_el else ""
+        prob_value = _extract_after_colon(prob_text)
+
+        imp_el = card.select_one(".tag-imp")
+        imp_text = imp_el.get_text(strip=True) if imp_el else ""
+        imp_value = _extract_after_colon(imp_text)
+
+        desc_el = card.select_one(".risk-content > p")
+        description = desc_el.get_text(" ", strip=True) if desc_el else ""
+
+        mitig_el = card.select_one(".mitigation span") or card.select_one(".mitigation")
+        mitigation = ""
+        if mitig_el:
+            raw = mitig_el.get_text(" ", strip=True)
+            # Remove leading "Ação de Mitigação" header if present
+            mitigation = re.sub(r"^Ação de Mitigação\s*", "", raw).strip()
+
+        is_upside = code.upper().startswith("O")
+
         risks.append({
             "code": code,
             "title": title,
-            "probability": _normalize_level(prob),
-            "impact": _normalize_impact(impact),
+            "probability": _normalize_level(prob_value),
+            "impact": _normalize_impact(imp_value),
+            "severity": severity_label,
+            "severity_class": sev_raw,
+            "description": description,
             "mitigation": mitigation,
+            "is_upside": is_upside,
         })
+
     if not risks:
-        # Strategy 2: look for cards/sections
-        for i, card in enumerate(soup.select(".risk, .risk-card, article.risk"), 1):
-            title_el = card.select_one(".title, h3, h4")
-            prob_el = card.select_one(".probability, [data-key='probability']")
-            impact_el = card.select_one(".impact, [data-key='impact']")
-            mitig_el = card.select_one(".mitigation, [data-key='mitigation']")
-            risks.append({
-                "code": card.get("data-risk-id") or f"R{i}",
-                "title": title_el.get_text(strip=True) if title_el else "",
-                "probability": _normalize_level(prob_el.get_text(strip=True).lower() if prob_el else "baixa"),
-                "impact": _normalize_impact(impact_el.get_text(strip=True).lower() if impact_el else "baixo"),
-                "mitigation": mitig_el.get_text(strip=True) if mitig_el else "",
-            })
-    if not risks:
-        warnings.append("riscos.html: estrutura não reconhecida — nenhum risco extraído")
+        warnings.append("riscos.html: nenhum .risk-item encontrado — verifique se o arquivo foi gerado por building-project-plan")
     return risks
+
+
+def _extract_after_colon(text: str) -> str:
+    """Parses labels like 'Prob: Alta' or 'Imp: Crítico' -> 'alta' / 'crítico'."""
+    if ":" in text:
+        return text.split(":", 1)[1].strip().lower()
+    return text.strip().lower()
 
 
 def _normalize_level(s: str) -> str:
@@ -316,7 +372,22 @@ def parse_plano_projeto(path: Path, warnings: list) -> dict:
     return result
 
 
-def parse_milestones(path: Path, warnings: list, default_year: int) -> list[dict]:
+def parse_milestones(path: Path, warnings: list, default_year: int, report_date: datetime) -> list[dict]:
+    """Parses project milestones from roadmap-marcos.html.
+
+    Looks for the canonical structure produced by building-project-plan:
+      .lane.milestones > .track > .tick.{top|bottom}.{gate|regular}
+        ├ .lbl  ("M0 KICKOFF")
+        ├ .date ("14/abr")
+        └ .desc ("TAP + OKRs aprovados")
+
+    Status is inferred deterministically by date:
+      - date <= report_date  → "done"   (treat as passed)
+      - date == report_date ± 3 days → "in_progress"
+      - date > report_date   → "not_started"
+
+    `major` flag is True for .gate ticks (critical gates), False for .regular (informational).
+    """
     if not path.exists():
         warnings.append("roadmap-marcos.html não encontrado — lista de marcos vazia")
         return []
@@ -325,23 +396,73 @@ def parse_milestones(path: Path, warnings: list, default_year: int) -> list[dict
     except ImportError:
         return []
     soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+
     milestones = []
-    for item in soup.select(".milestone, [data-milestone], li.milestone"):
-        name_el = item.select_one(".name, .title, h4")
-        date_el = item.select_one(".date, [data-key='date'], time")
-        status_el = item.select_one(".status, [data-key='status']")
-        if not name_el:
+    # Primary: ticks inside the milestones lane
+    for tick in soup.select(".lane.milestones .tick"):
+        lbl_el = tick.select_one(".lbl")
+        date_el = tick.select_one(".date")
+        desc_el = tick.select_one(".desc")
+        if not lbl_el or not date_el:
             continue
-        date_val = None
-        if date_el:
-            date_val = date_el.get("datetime") or date_el.get_text(strip=True)
-        dt = normalize_date(date_val, default_year) if date_val else None
+        label = lbl_el.get_text(" ", strip=True)
+        date_str = date_el.get_text(strip=True)
+        dt = normalize_date(date_str, default_year)
+
+        # Classes: tick top|bottom gate|regular
+        classes = tick.get("class", [])
+        is_gate = "gate" in classes
+
+        if dt is None:
+            status = "not_started"
+        else:
+            delta_days = (report_date - dt).days
+            if delta_days > 3:
+                status = "done"
+            elif delta_days >= -3:
+                status = "in_progress"
+            else:
+                status = "not_started"
+
         milestones.append({
-            "name": name_el.get_text(strip=True),
+            "code": label.split()[0] if label else "",
+            "label": label,
+            "name": label,
             "date": dt.strftime("%Y-%m-%d") if dt else None,
-            "status": (status_el.get_text(strip=True).lower() if status_el else "not_started"),
-            "is_critical": "critical" in (item.get("class") or []),
+            "date_short": date_str,
+            "description": desc_el.get_text(" ", strip=True) if desc_el else "",
+            "status": status,
+            "is_critical": is_gate,
+            "major": is_gate,
         })
+
+    # Fallback: generic .milestone lookup (legacy HTML structure)
+    if not milestones:
+        for item in soup.select(".milestone, [data-milestone], li.milestone"):
+            name_el = item.select_one(".name, .title, h4")
+            date_el = item.select_one(".date, [data-key='date'], time")
+            if not name_el:
+                continue
+            date_val = None
+            if date_el:
+                date_val = date_el.get("datetime") or date_el.get_text(strip=True)
+            dt = normalize_date(date_val, default_year) if date_val else None
+            status = "not_started"
+            if dt:
+                delta = (report_date - dt).days
+                status = "done" if delta > 3 else ("in_progress" if delta >= -3 else "not_started")
+            milestones.append({
+                "code": "",
+                "label": name_el.get_text(strip=True),
+                "name": name_el.get_text(strip=True),
+                "date": dt.strftime("%Y-%m-%d") if dt else None,
+                "date_short": date_val if isinstance(date_val, str) else None,
+                "description": "",
+                "status": status,
+                "is_critical": "critical" in (item.get("class") or []),
+                "major": "critical" in (item.get("class") or []),
+            })
+
     return milestones
 
 
@@ -499,10 +620,20 @@ def synthesize(
     )
     next_steps = next_candidates[:5]
 
-    # Attentions
+    # Attentions — prefer authoritative severity_class from riscos.html;
+    # skip upsides (codes starting with O = Oportunidade, not risk to watch).
     attentions = []
     for risk in risks:
-        sev = _risk_severity(risk["probability"], risk["impact"])
+        if risk.get("is_upside"):
+            continue
+        sc = risk.get("severity_class") or ""
+        if sc == "crit":
+            sev = "critical"
+        elif sc == "high":
+            sev = "warning"
+        else:
+            # Fallback: derive from prob×impact for legacy data without severity_class
+            sev = _risk_severity(risk.get("probability", ""), risk.get("impact", ""))
         if sev in ("critical", "warning"):
             attentions.append({
                 "severity": sev,
@@ -527,23 +658,43 @@ def synthesize(
     attentions.sort(key=lambda a: order.get(a["severity"], 99))
     attentions = attentions[:5]
 
-    # Macro milestones (top 7 root phases by inicio_plan)
+    # Macro milestones — prefer gates M0-M7 parsed from roadmap-marcos.html (canonical
+    # source of visual truth from building-project-plan). Falls back to xlsx root phases
+    # only if the HTML artifact is absent or doesn't have a .milestones lane.
     root_phases = [p for p in phases if p.get("no") and "." not in str(p["no"])]
     root_phases.sort(key=lambda p: p.get("inicio_plan") or datetime.max)
-    macro_milestones = []
-    for p in root_phases[:7]:
-        status = "not_started"
-        if p.get("status") == "done":
-            status = "done"
-        elif isinstance(p.get("fim_plan"), datetime) and p["fim_plan"] < report_date and p.get("status") != "done":
-            status = "overdue"
-        elif p.get("status") == "in_progress":
-            status = "in_progress"
-        macro_milestones.append({
-            "label": truncate(p.get("etapa", ""), 28),
-            "status": status,
-            "no": p.get("no"),
-        })
+
+    if milestones:
+        # Show all milestones up to 8 (full M0-M7 strip like the Paper artboard).
+        # If there are more than 8, filter to .gate (major) to avoid clutter.
+        chosen = milestones if len(milestones) <= 8 else [m for m in milestones if m.get("major")]
+        macro_milestones = [
+            {
+                "label": truncate(m.get("label", ""), 22),
+                "status": m.get("status", "not_started"),
+                "date": m.get("date"),
+                "date_short": m.get("date_short"),
+                "description": m.get("description", ""),
+                "code": m.get("code", ""),
+                "major": m.get("major", False),
+            }
+            for m in chosen[:8]
+        ]
+    else:
+        macro_milestones = []
+        for p in root_phases[:7]:
+            status = "not_started"
+            if p.get("status") == "done":
+                status = "done"
+            elif isinstance(p.get("fim_plan"), datetime) and p["fim_plan"] < report_date and p.get("status") != "done":
+                status = "overdue"
+            elif p.get("status") == "in_progress":
+                status = "in_progress"
+            macro_milestones.append({
+                "label": truncate(p.get("etapa", ""), 28),
+                "status": status,
+                "no": p.get("no"),
+            })
 
     # Sprints — simplified: treat root phases as sprints
     sprints = []
@@ -569,13 +720,18 @@ def synthesize(
     hero_executive = f"{done} de {total} tarefas concluídas ({pct_done}%)" if total else "Sem ações cadastradas"
     active_count = sum(1 for s in sprints if s["status"] == "active")
     sprint_progress = f"{active_count} de {len(sprints)} sprint(s) em execução" if sprints else "Sem sprints"
-    high_risks = sum(1 for r in risks if r["probability"] == "alta")
-    if not risks:
+    # Exclude upsides (O01, O02...) from risk counting — they are opportunities, not threats
+    actual_risks = [r for r in risks if not r.get("is_upside")]
+    critical_risks = sum(1 for r in actual_risks if r.get("severity_class") == "crit")
+    high_risks = sum(1 for r in actual_risks if r.get("severity_class") == "high")
+    if not actual_risks:
         risks_sentence = "Nenhum risco mapeado"
-    elif high_risks == 0:
-        risks_sentence = f"{len(risks)} risco(s) mapeado(s) — nenhum com probabilidade alta"
+    elif critical_risks:
+        risks_sentence = f"{len(actual_risks)} risco(s) mapeado(s) — {critical_risks} crítico(s)"
+    elif high_risks:
+        risks_sentence = f"{len(actual_risks)} risco(s) mapeado(s) — {high_risks} alto(s)"
     else:
-        risks_sentence = f"{len(risks)} risco(s) mapeado(s) — {high_risks} com probabilidade alta"
+        risks_sentence = f"{len(actual_risks)} risco(s) mapeado(s) — severidade média/baixa"
 
     return {
         "overall": overall,
@@ -656,6 +812,7 @@ def collect(project_dir: Path, report_date_str: str) -> dict:
         project_dir / "1-planning" / "artefatos" / "roadmap-marcos.html",
         warnings,
         default_year=report_date.year,
+        report_date=report_date,
     )
 
     synth = synthesize(entries, risks, changelog, milestones, report_date, warnings)

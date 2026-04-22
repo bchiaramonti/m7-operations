@@ -13,6 +13,43 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.3.0] - 2026-04-22
+
+Refactor completo da skill `generating-status-materials` para consumir os artefatos visuais produzidos por `building-project-plan` como fonte única de verdade, em vez de reinventá-los. Resultado: slides 3/4 passam a ser screenshots fiéis do `roadmap-marcos.html` aprovado no plano (todas lanes expandidas), Slide 6 exibe a timeline M0-M7 real com linha "HOJE" computada pela data do reporte, Slide 7 renderiza até 6 cards de risco baseados no `severity_class` autoritativo do HTML (antes retornava "Nenhum risco mapeado" apesar de 16 riscos existirem), e a Cover ganha fundo com foto hero M7 + overlay. Granularidade deixa de ser decisão arbitrária da skill e passa a espelhar a granularidade já aprovada no roadmap-marcos.html (se PLANEJAMENTO é 1 bar no plano, é 1 bloco no status; se EXECUÇÃO tem 8+4 bars, o status detalha no mesmo nível).
+
+### Added
+- [scripts/render_html_section.py](skills/generating-status-materials/scripts/render_html_section.py) — novo helper playwright headless com presets nomeados (`roadmap-full`, `marcos-lane`, `phase-bar`, `mini-swimlane`, `risks-heatmap`). Injeta CSS para forçar todas lanes abertas antes do screenshot, captura por seletor CSS específico com device scale 2x para nitidez, suporta viewport configurável.
+- [assets/m7-hero-dark.png](skills/generating-status-materials/assets/m7-hero-dark.png) + `.b64` — hero photo (silhuetas + skyline) para fundo da Cover do PPTX, copiado de `m7-design-system/reviewing-html-design/assets/`.
+- [assets/m7-hero.png](skills/generating-status-materials/assets/m7-hero.png) + `.b64` — variante clara do hero para usos futuros.
+- `collect_data.py` · Parser de marcos M0-M7 — lê `.lane.milestones .tick` do `roadmap-marcos.html` extraindo label, data (`date_short`), descrição, classe (`.gate` = major, `.regular` = minor), e computa status por data (`done` se `delta > 3 dias`, `in_progress` se `delta ∈ [-3,3]`, `not_started` se futuro).
+- `collect_data.py` · `MONTH_PT_ABBREV_TO_EN` — mapeamento de abreviações portuguesas (abr/mai/ago/set/out/dez) para inglês antes do parsing via `%b`, habilitando datas curtas tipo "14/abr" no roadmap-marcos.html.
+- `build_pptx.py` · Helper `add_bg_image` + `add_bg_overlay` (com controle de transparência via XML lxml) + `_render_roadmap_screenshot` — reutilizam o render_html_section pelo tempo da build do PPTX.
+- `build_opr.py` · `generate_mini_swimlane`, `pick_top_risks`, `pick_next_milestones` — helpers para condensar o roadmap na OPR.
+- Flag `--roadmap-html <path>` em `build_pptx.py` e `build_opr.py` — aponta para `1-planning/artefatos/roadmap-marcos.html` para os screenshots e a mini-timeline.
+
+### Changed
+- `collect_data.py` · Parser de riscos reescrito para o schema real de `.risk-item` produzido por building-project-plan (`.risk-id.{crit|high|med|low}` + `h4` + `.tag-prob` + `.tag-imp` + `p` + `.mitigation span`). Extrai `severity_class` autoritativo (vs derivação frouxa de prob×impact), marca upsides (`O01+`) com flag `is_upside=True` para serem excluídos das atenções, e gera `risks_sentence` com contador de críticos em vez de "nenhum com probabilidade alta".
+- `collect_data.py` · Synthesize agora prefere `severity_class` do risco (crit→critical, high→warning) sobre derivação legacy, e exclui upsides das atenções. `macro_milestones` passa a usar os 8 gates M0-M7 do roadmap-marcos.html quando disponíveis, com fallback para as root phases do xlsx. Quando há ≤8 marcos, mostra todos; acima de 8, filtra para `.gate` (major) para evitar cluttering.
+- `build_pptx.py` · **Slide 1 (Cover)** — fundo agora é `m7-hero-dark.png` full-bleed + overlay 35% transparência (gradient simulando o do Paper), tipografia reposicionada (título+"Status Report" stacked em size 64, subtitle lime em size 20, footer com divider subtle). Fallback para retângulo sólido caso o asset esteja ausente.
+- `build_pptx.py` · **Slides 3 e 4 (Roadmap)** — reescritos para embedar screenshot do `roadmap-marcos.html` em vez de tabela/Gantt reinventada em python-pptx. Slide 3 usa preset `marcos-lane` (só o strip M0-M7), Slide 4 usa `roadmap-full` (swim-lane completa, todas lanes abertas, viewport 2400x1300 device_scale 2x).
+- `build_pptx.py` · **Slide 5 (Section Divider)** — deriva eyebrow (categoria) e title (nome) automaticamente do `active_sprint.title`, partindo por " — ", ": " ou " - "; omite eyebrow quando duplicaria o título. Corrige duplicação "FASE 2 — EXECUÇÃO / FASE 2 — EXECUÇÃO" para "FASE 2 / EXECUÇÃO".
+- `build_pptx.py` · **Slide 6 (Cronograma Macro)** — timeline agora renderiza os 8 marcos M0-M7 reais (com label em caps tracked, data abaixo) em vez de 3 fases genéricas. Linha vertical "HOJE" calculada por interpolação `(report_date - first_ms_date) / total_span` com cor crítica, sobreposta à timeline.
+- `build_pptx.py` · **Slide 7 (Riscos)** — até 6 cards em layout 2 colunas × 3 linhas (antes: 3 cards em 1 coluna). Filtro padrão: severity_class in {crit, high}; completa com `med` se < 4; upsides sempre excluídos. Cada card tem accent bar colorida pela severidade, código + título em bold, tag "PROB · IMPACTO" à direita com bg colorido, descrição em texto secundário, "CONTRAMEDIDA" em caps + contramedida abaixo.
+- `build_pptx.py` · Função `risk_severity_label` migrada para usar `severity_class` autoritativo com fallback para derivação prob×impact.
+- `build_opr.py` · Reescrito para consumir `roadmap-marcos.html` e `riscos.html` como fontes. Novo parâmetro `--roadmap-html`. Helpers `pick_top_risks` (ordena por severity_class crit > high > med > low, exclui upsides) e `pick_next_milestones` (próximos 3 marcos não concluídos).
+- [templates/opr.tmpl.html](skills/generating-status-materials/templates/opr.tmpl.html) — redesenho completo para zonas: (1) header denso dark, (2) objetivo + próximo marco em 2 colunas, (3) highlights + próximos passos em 2 colunas com deadline alinhado à direita, (4) timeline M0-M7 CSS-renderizada (nome em caps + data abaixo, connectors coloridos por status), (5) 3 cards de risco horizontais com accent bar + contramedida, (6) footer. Tokens reduzidos para densidade (body 11px, caption 8px). Sparkline histórico removido (não era necessário — status overall + timeline já bastam).
+- [SKILL.md](skills/generating-status-materials/SKILL.md) — contrato de reuso com `building-project-plan` documentado em tabela, explicando granularidade herdada; playwright + chromium listados como obrigatórios (antes era "playwright ou weasyprint"); mapeamento Paper → PPTX atualizado para refletir os novos slides 3/4/6.
+
+### Fixed
+- `parse_risks` retornava 0 riscos mesmo com 16 definidos em `riscos.html` — procurava `tr[data-risk-id]` e `.risk-card` mas o HTML real usa `.risk-item`. Resultado: Slide 7 mostrava "Nenhum risco mapeado" e `status.overall` ficava green apesar de 4 riscos críticos ativos.
+- `parse_milestones` não encontrava marcos M0-M7 — procurava `.milestone` mas o HTML usa `.lane.milestones .tick`.
+- Datas PT curtas "14/abr", "28/abr", "20/mai" não eram parseadas — locale C só reconhece abreviações inglesas. Agora traduz antes de aplicar `%b`.
+- Slide 5 duplicava o nome da fase no eyebrow e no título quando o `active_sprint.phase_name` === `active_sprint.title`.
+
+### Validation
+- Smoke test no projeto `H1-02 Playbook de Processos` (2026-05-playbook-processos, 91 ações, 16 riscos em riscos.html, 8 marcos em roadmap-marcos.html, report date 2026-04-22): `collect_data.py` emite 13 riscos (3 upsides filtrados) + 4 críticos + 5 altos + 4 médios, macro_milestones M0 (done, 14/abr) através de M7 (not_started, 18/jul), status overall=yellow corretamente detectado, 5 atenções críticas (R01, R02, R10, R13 + 1 warning). PPTX gera 8 slides com 2 screenshots embedados (1.9MB, antes era 55KB), OPR gera HTML 18KB + PDF 188KB em 1 página A4.
+- Screenshots do roadmap renderizados via playwright em 2400×1300 device_scale 2x com todas lanes abertas (F1, F2A com 8 playbook bars, F2B com 4 bars, F3 com 2 bars, GOV macro-bar) — visualmente fiel ao `roadmap-marcos.html` navegável.
+
 ## [1.2.0] - 2026-04-22
 
 Refactor completo do artefato `roadmap-marcos.html` em `building-project-plan`, incorporando ao template e ao renderer as 10 customizações que antes viviam num wrapper de pós-processamento externo (`render_roadmap_only.py`). Resultado: o plugin passa a emitir o roadmap no estado final aprovado sem etapa de pós-processamento, com zero CSS `!important` e um stylesheet consolidado. Backward-compatible: planos já gerados continuam renderizando (sem phase-dividers).

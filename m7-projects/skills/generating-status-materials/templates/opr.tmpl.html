@@ -19,226 +19,235 @@
     --tag-bg-critical:  #FDEDED;
     --tag-bg-warning:   #FDF3E0;
     --tag-bg-neutral:   #EFEFEC;
-    --size-body: 12px;
-    --size-small: 11px;
-    --size-dense: 10px;
-    --size-caption: 9px;
-    --size-h1: 18px;
-    --size-eyebrow: 9px;
-    --gap-2: 6px;
-    --gap-3: 8px;
-    --gap-4: 10px;
-    --gap-5: 12px;
-  }
-  body.compact {
+    --row-border:       #E5E2CE;
+
     --size-body: 11px;
     --size-small: 10px;
     --size-dense: 9px;
-    --size-h1: 16px;
-    --gap-3: 6px;
-    --gap-4: 8px;
-    --gap-5: 10px;
+    --size-caption: 8px;
+    --size-h1: 17px;
+    --size-h2: 10px;
+    --size-eyebrow: 8px;
+    --gap-2: 5px;
+    --gap-3: 7px;
+    --gap-4: 9px;
+    --gap-5: 11px;
+  }
+  body.compact {
+    --size-body: 10px;
+    --size-small: 9px;
+    --size-dense: 8px;
+    --size-h1: 15px;
+    --gap-3: 5px;
+    --gap-4: 7px;
+    --gap-5: 9px;
   }
   @page { size: A4 portrait; margin: 8mm 10mm; }
   * { box-sizing: border-box; }
   html, body {
-    margin: 0;
-    padding: 0;
+    margin: 0; padding: 0;
     background: var(--m7-bg-light);
     color: var(--m7-primary);
     font-family: Arial, "ArialMT", system-ui, sans-serif;
     font-size: var(--size-body);
-    line-height: 1.45;
+    line-height: 1.4;
   }
-  .opr {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap-3);
-  }
-  .eyebrow {
+  .opr { display: flex; flex-direction: column; gap: var(--gap-3); }
+
+  .section-label {
     font-size: var(--size-eyebrow);
     letter-spacing: 0.18em;
     font-weight: 700;
+    color: var(--m7-text-subtle);
     text-transform: uppercase;
-    color: var(--m7-primary);
+    margin-bottom: var(--gap-2);
   }
 
-  /* HEADER */
+  /* ============ HEADER (dark strip) ============ */
   .header {
     display: grid;
     grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     background: var(--m7-primary);
     color: var(--m7-bg-light);
-    padding: 8px 12px;
+    padding: 9px 14px;
     border-radius: 2px;
   }
-  .header .logo img { height: 28px; display: block; }
-  .header .logo.no-image { font-style: italic; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
-  .header .title { line-height: 1.2; }
-  .header .title h1 { margin: 0; font-size: var(--size-h1); font-weight: 700; letter-spacing: -0.01em; }
+  .header .logo img { height: 26px; display: block; }
+  .header .logo.no-image {
+    font-style: italic; font-weight: 700; font-size: 20px;
+    letter-spacing: -0.02em;
+  }
+  .header .title h1 {
+    margin: 0; font-size: var(--size-h1); font-weight: 700;
+    letter-spacing: -0.01em;
+  }
   .header .title .sub {
-    font-size: var(--size-small);
-    opacity: 0.85;
+    font-size: var(--size-small); opacity: 0.82;
     margin-top: 2px;
   }
-  .header .status {
-    text-align: right;
-    font-size: var(--size-small);
-    line-height: 1.4;
-  }
+  .header .status { text-align: right; line-height: 1.4; font-size: var(--size-small); }
   .header .status .dot {
-    display: inline-block;
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    vertical-align: middle;
-    margin-right: 4px;
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    vertical-align: middle; margin-right: 4px;
   }
   .dot-green  { background: var(--status-ok); }
   .dot-yellow { background: var(--status-warning); }
   .dot-red    { background: var(--status-critical); }
 
-  /* OBJETIVO */
-  .objective {
-    padding: 4px 0;
-    border-bottom: 1px solid #E5E2CE;
+  /* ============ TOP ROW: Objetivo + Próximo marco ============ */
+  .top-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: var(--gap-5);
+    padding: 2px 0;
+    border-bottom: 1px solid var(--row-border);
   }
-  .objective .label {
-    font-size: var(--size-eyebrow);
-    letter-spacing: 0.18em;
-    font-weight: 700;
-    color: var(--m7-text-subtle);
-    text-transform: uppercase;
-    margin-bottom: 2px;
-  }
-  .objective .goal {
+  .top-row .objective .goal,
+  .top-row .next-gate .value {
     font-size: var(--size-body);
     color: var(--m7-text-muted);
   }
+  .top-row .next-gate .value { font-weight: 700; color: var(--m7-primary); }
+  .top-row .next-gate .meta { font-size: var(--size-small); color: var(--m7-text-subtle); }
 
-  /* TWO COLUMNS */
+  /* ============ TWO COLUMNS: Highlights + Próximos ============ */
   .two-cols {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--gap-5);
   }
-  .col .label {
-    font-size: var(--size-eyebrow);
-    letter-spacing: 0.14em;
-    font-weight: 700;
-    color: var(--m7-text-subtle);
-    text-transform: uppercase;
-    margin-bottom: var(--gap-2);
-  }
-  ul.bullets {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
+  ul.bullets { margin: 0; padding: 0; list-style: none; }
   ul.bullets li {
-    display: flex;
-    gap: 6px;
-    align-items: flex-start;
+    display: flex; gap: 6px; align-items: flex-start;
     padding: 2px 0;
     font-size: var(--size-small);
     color: var(--m7-text-muted);
   }
   ul.bullets li::before {
-    content: "";
-    flex-shrink: 0;
+    content: ""; flex-shrink: 0;
     width: 4px; height: 4px;
     background: var(--m7-primary);
     margin-top: 6px;
     border-radius: 1px;
   }
-
-  /* MILESTONES */
-  .milestones {
-    padding: 4px 0;
-    border-top: 1px solid #E5E2CE;
-    border-bottom: 1px solid #E5E2CE;
-  }
-  .milestones .label {
-    font-size: var(--size-eyebrow);
-    letter-spacing: 0.14em;
-    font-weight: 700;
+  ul.bullets li .deadline {
+    margin-left: auto;
+    font-size: var(--size-dense);
     color: var(--m7-text-subtle);
-    text-transform: uppercase;
-    margin-bottom: var(--gap-3);
+    font-weight: 700;
+  }
+
+  /* ============ MARCOS TIMELINE (CSS-rendered, crisper than screenshot) ============ */
+  .swimlane {
+    padding: 6px 4px;
+    border-top: 1px solid var(--row-border);
   }
   .timeline {
-    display: flex;
-    align-items: center;
+    display: flex; align-items: flex-start;
+    padding: 14px 4px 4px 4px;
     gap: 0;
   }
-  .milestone {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  .timeline .milestone {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
     min-width: 0;
-    flex: 1;
   }
-  .milestone .diamond {
-    width: 12px; height: 12px;
-    transform: rotate(45deg);
-    flex-shrink: 0;
+  .timeline .diamond {
+    width: 14px; height: 14px; transform: rotate(45deg); flex-shrink: 0;
   }
-  .milestone .diamond.done         { background: var(--status-ok); }
-  .milestone .diamond.in_progress  { background: var(--status-progress); }
-  .milestone .diamond.overdue      { background: var(--status-critical); }
-  .milestone .diamond.not_started  { background: transparent; border: 1.5px solid var(--status-neutral); width: 10px; height: 10px; }
-  .milestone .name {
-    margin-top: 6px;
-    font-size: var(--size-dense);
-    text-align: center;
-    color: var(--m7-text-muted);
-    max-width: 80px;
+  .diamond.done         { background: var(--status-ok); }
+  .diamond.in_progress  { background: var(--status-progress); }
+  .diamond.overdue      { background: var(--status-critical); }
+  .diamond.not_started  {
+    background: transparent;
+    border: 1.5px solid var(--status-neutral);
+    width: 11px; height: 11px;
   }
-  .connector {
-    flex: 1;
-    height: 1.5px;
-    background: var(--status-neutral);
-    margin: 0 -4px 18px -4px;
+  .timeline .name {
+    margin-top: 8px;
+    font-size: var(--size-dense); font-weight: 700;
+    text-align: center; color: var(--m7-text-muted);
+    max-width: 90px;
+    letter-spacing: 0.04em;
   }
-  .connector.active { background: var(--status-progress); }
+  .timeline .date {
+    margin-top: 2px;
+    font-size: var(--size-caption);
+    text-align: center; color: var(--m7-text-subtle);
+  }
+  .timeline .connector {
+    flex: 1; height: 1.5px; background: var(--status-neutral);
+    margin: 7px -6px 28px -6px; align-self: flex-start;
+  }
+  .timeline .connector.active { background: var(--status-progress); }
+  .timeline .connector.done { background: var(--status-ok); }
 
-  /* ATTENTIONS */
-  .attentions .label {
-    font-size: var(--size-eyebrow);
-    letter-spacing: 0.14em;
-    font-weight: 700;
-    color: var(--status-warning);
-    text-transform: uppercase;
-    margin-bottom: var(--gap-2);
+  /* ============ RISKS: 3 compact cards horizontal ============ */
+  .risks {
+    padding: 4px 0;
+    border-top: 1px solid var(--row-border);
   }
-  ul.attention-list {
-    margin: 0; padding: 0; list-style: none;
+  .risks-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gap-4);
   }
-  ul.attention-list li {
-    display: flex;
+  .risk-card {
+    display: grid;
+    grid-template-columns: 4px 1fr;
     gap: 8px;
-    align-items: flex-start;
-    padding: 2px 0;
-    font-size: var(--size-small);
-    color: var(--m7-text-muted);
+    padding: 6px 0;
+    background: var(--m7-bg-light);
+    border: 1px solid var(--row-border);
+    border-radius: 2px;
+    overflow: hidden;
   }
-  ul.attention-list li .sev {
-    flex-shrink: 0;
-    width: 8px; height: 8px;
-    margin-top: 5px;
-    border-radius: 50%;
+  .risk-card .accent-bar { height: 100%; }
+  .risk-card.crit .accent-bar { background: var(--status-critical); }
+  .risk-card.high .accent-bar { background: var(--status-warning); }
+  .risk-card.med  .accent-bar { background: var(--status-warning); opacity: 0.6; }
+  .risk-card.low  .accent-bar { background: var(--status-neutral); }
+  .risk-card .body { padding: 4px 8px 4px 0; }
+  .risk-card .code-tag {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 2px;
   }
-  .sev.critical { background: var(--status-critical); }
-  .sev.warning  { background: var(--status-warning); }
-  .sev.neutral  { background: var(--status-neutral); }
+  .risk-card .code {
+    font-size: var(--size-dense); font-weight: 700; letter-spacing: 0.1em;
+    color: var(--m7-primary);
+  }
+  .risk-card .tag {
+    font-size: var(--size-caption); font-weight: 700;
+    padding: 1px 6px; border-radius: 2px;
+    letter-spacing: 0.1em;
+    color: var(--m7-primary);
+  }
+  .risk-card.crit .tag { background: var(--tag-bg-critical); }
+  .risk-card.high .tag { background: var(--tag-bg-warning); }
+  .risk-card.med  .tag { background: var(--tag-bg-neutral); }
+  .risk-card.low  .tag { background: var(--tag-bg-neutral); }
+  .risk-card .title {
+    font-size: var(--size-small); font-weight: 700;
+    color: var(--m7-primary); line-height: 1.25;
+    margin-bottom: 3px;
+  }
+  .risk-card .contra-label {
+    font-size: var(--size-caption); font-weight: 700;
+    letter-spacing: 0.1em; color: var(--m7-text-subtle);
+    text-transform: uppercase; margin-top: 3px;
+  }
+  .risk-card .contra {
+    font-size: var(--size-dense); color: var(--m7-text-muted);
+    line-height: 1.3;
+  }
 
-  /* FOOTER */
+  /* ============ FOOTER ============ */
   .footer {
     display: grid;
     grid-template-columns: 1fr auto;
     padding-top: 4px;
-    border-top: 1px solid #E5E2CE;
+    border-top: 1px solid var(--row-border);
     font-size: var(--size-caption);
     color: var(--m7-text-caption);
   }
@@ -249,7 +258,7 @@
 <body class="{{ 'compact' if compact else '' }}">
 <div class="opr">
 
-  <!-- HEADER -->
+  <!-- ============ HEADER ============ -->
   <div class="header">
     <div class="logo">
       {% if logo_url %}
@@ -268,43 +277,59 @@
     </div>
   </div>
 
-  <!-- OBJETIVO -->
-  {% if project.goal %}
-  <div class="objective">
-    <div class="label">Objetivo</div>
-    <div class="goal">{{ project.goal }}</div>
+  <!-- ============ OBJETIVO + PRÓXIMO MARCO ============ -->
+  <div class="top-row">
+    <div class="objective">
+      <div class="section-label">Objetivo</div>
+      <div class="goal">{{ project.goal or '—' }}</div>
+    </div>
+    <div class="next-gate">
+      <div class="section-label">Próximo Marco</div>
+      {% if next_marcos %}
+        <div class="value">{{ next_marcos[0].label }}</div>
+        <div class="meta">{{ next_marcos[0].date_short or next_marcos[0].date }} — {{ next_marcos[0].description or '' }}</div>
+      {% else %}
+        <div class="value" style="color: var(--m7-text-caption)">— sem marcos futuros —</div>
+      {% endif %}
+    </div>
   </div>
-  {% endif %}
 
-  <!-- TWO COLUMNS -->
+  <!-- ============ HIGHLIGHTS + PRÓXIMOS PASSOS ============ -->
   <div class="two-cols">
-    <div class="col">
-      <div class="label">Highlights (o que avançou)</div>
+    <div>
+      <div class="section-label">Highlights (o que avançou)</div>
       <ul class="bullets">
-        {% for h in highlights[:3] %}<li>{{ h }}</li>{% endfor %}
-        {% if highlights|length == 0 %}<li style="color: var(--m7-text-caption)">— nenhum highlight no período —</li>{% endif %}
+        {% for h in highlights[:4] %}<li>{{ h }}</li>{% endfor %}
+        {% if highlights|length == 0 %}
+          <li style="color: var(--m7-text-caption)">— nenhum highlight no período —</li>
+        {% endif %}
       </ul>
     </div>
-    <div class="col">
-      <div class="label">Próximos passos</div>
+    <div>
+      <div class="section-label">Próximos passos</div>
       <ul class="bullets">
-        {% for n in next_steps[:3] %}<li>{{ n.action }} — até {{ n.deadline }}</li>{% endfor %}
-        {% if next_steps|length == 0 %}<li style="color: var(--m7-text-caption)">— sem próximos passos cadastrados —</li>{% endif %}
+        {% for n in next_steps[:4] %}
+          <li>{{ n.action }}<span class="deadline">{{ n.deadline }}</span></li>
+        {% endfor %}
+        {% if next_steps|length == 0 %}
+          <li style="color: var(--m7-text-caption)">— sem próximos passos cadastrados —</li>
+        {% endif %}
       </ul>
     </div>
   </div>
 
-  <!-- MILESTONES -->
-  <div class="milestones">
-    <div class="label">Marcos</div>
+  <!-- ============ MARCOS TIMELINE (CSS-rendered for crispness at small sizes) ============ -->
+  <div class="swimlane">
+    <div class="section-label">Marcos do Projeto</div>
     <div class="timeline">
-      {% for m in macro_milestones[:7] %}
+      {% for m in macro_milestones[:8] %}
         <div class="milestone">
           <div class="diamond {{ m.status }}"></div>
           <div class="name">{{ m.label }}</div>
+          <div class="date">{{ m.date_short or '' }}</div>
         </div>
         {% if not loop.last %}
-          <div class="connector {{ 'active' if m.status in ['done','in_progress'] else '' }}"></div>
+          <div class="connector {{ 'done' if m.status == 'done' else ('active' if m.status == 'in_progress' else '') }}"></div>
         {% endif %}
       {% endfor %}
       {% if macro_milestones|length == 0 %}
@@ -313,20 +338,34 @@
     </div>
   </div>
 
-  <!-- ATTENTIONS -->
-  <div class="attentions">
-    <div class="label">Pontos de atenção</div>
-    <ul class="attention-list">
-      {% for a in attentions[:3] %}
-        <li><span class="sev {{ a.severity }}"></span>{{ a.text }}</li>
-      {% endfor %}
-      {% if attentions|length == 0 %}
-        <li style="color: var(--m7-text-caption)">— sem pontos de atenção —</li>
-      {% endif %}
-    </ul>
+  <!-- ============ RISCOS CRÍTICOS (top 3) ============ -->
+  <div class="risks">
+    <div class="section-label">Riscos críticos ({{ top_risks|length }} exibidos · {{ total_risks }} mapeados)</div>
+    {% if top_risks %}
+      <div class="risks-grid">
+        {% for r in top_risks %}
+          <div class="risk-card {{ r.severity_class }}">
+            <div class="accent-bar"></div>
+            <div class="body">
+              <div class="code-tag">
+                <span class="code">{{ r.code }}</span>
+                <span class="tag">{{ r.probability|upper }} · {{ r.impact|upper }}</span>
+              </div>
+              <div class="title">{{ r.title }}</div>
+              <div class="contra-label">Contramedida</div>
+              <div class="contra">{{ r.mitigation or '—' }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div style="color: var(--m7-text-caption); font-size: var(--size-small); padding: 6px 0;">
+        — nenhum risco crítico ou alto ativo —
+      </div>
+    {% endif %}
   </div>
 
-  <!-- FOOTER -->
+  <!-- ============ FOOTER ============ -->
   <div class="footer">
     <div>
       {% if project.clickup_list_url %}
