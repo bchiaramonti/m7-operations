@@ -117,7 +117,9 @@ campos do `data` JSON alimentam cada secao.
 
 ## 03 — `roadmap-marcos.html`
 
-**Secoes:** `.roadmap` swim-lane (`.months-row` + `.lane.milestones` no topo + `.lane`s de frente + `.lane.gov`) → `.section-title "Tabela de Marcos"` → `.marcos-table`.
+**Secoes:** `.roadmap` swim-lane (`.roadmap-controls` + `.months-row` + `.lane.milestones` no topo + `.lane.phase-divider`s entre fases + `.lane`s de frente + `.lane.gov`) → `.section-title "Tabela de Marcos"` → `.marcos-table`.
+
+O roadmap é **interativo**: cada frente pode ser recolhida/expandida individualmente (clicando no `.lane-label` ou no `.lane-toggle`), e cada fase inteira pode ser togglada clicando no `.lane.phase-divider`. Quando uma lane é recolhida, suas `.bar`s/`.qr`s somem e uma `.lane-macro-bar` (chip lime cobrindo o span da lane) aparece no lugar. Controles globais `Expandir tudo` / `Recolher tudo` ficam em `.roadmap-controls`.
 
 Sem `phase-bar`, sem `timeline-wrapper` (bloco de pontos horizontais), sem `roadmap-legend` e sem `milestone-grid` (cards) — versao enxuta alinhada ao design no Paper.
 
@@ -126,14 +128,35 @@ Sem `phase-bar`, sem `timeline-wrapper` (bloco de pontos horizontais), sem `road
 | Placeholder | Origem |
 |---|---|
 | `{{n_months}}` | Calculado de `data.period_start`/`period_end` (numero de meses no intervalo) |
+| `{{fr_cols}}` | Calculado de `data.period_start`/`period_end` (ex: `"5fr 30fr 31fr 30fr 18fr"`) — colunas do header ponderadas pelos dias reais que cada mês contribui ao período, para alinhar com bars/ticks em escala day-linear |
 | `{{months_row_html}}` | Mesma fonte (gera 1 cell por mes) |
 | `{{milestones_lane_html}}` | `data.roadmap.milestones` — renderiza lane do topo com ticks alternados (top/bottom) ao redor de trilho central |
-| `{{lanes_html}}` | `data.roadmap.lanes: [{is_gov?, code, name, owner, bars: [{start, end, class, title}], qrs: [{date, label}]}]` — `range` e `ticks` ignorados (ticks agora na lane unica do topo) |
+| `{{lanes_html}}` | `data.roadmap.lanes: [{phase?, is_gov?, code, name, owner, bars: [{start, end, class, title}], qrs: [{date, label}]}]` — lanes com `phase` geram `.phase-divider`s automáticos antes do primeiro bloco de cada fase |
 | `{{marcos_table_rows_html}}` | `data.roadmap.milestones: [{date, date_iso, wbs, h4, p, major, lbl?, desc?}]` — cada marco vira uma linha da tabela |
 
-**Posicionamento:**
-- **Bars** (frentes L1, L2, ...): `_percent_position(start, end)` proporcional ao `period_start..period_end` (escala cronograma).
-- **Milestones lane (ticks) + GOV .qr**: `_percent_calendar(date, months)` — cada coluna-mes ocupa `100/n_months%`, alinhando ticks visualmente com os headers MAR/ABR/MAI/... (escala calendario).
+**Lane schema — campo `phase` (opcional):**
+- String livre (ex: `"Planejamento"`, `"Execução"`, `"Encerramento"`, `"Governança"`). Usado para agrupar lanes consecutivas.
+- Se **alguma** lane tiver `phase`, o renderer emite `.lane.phase-divider`s automaticamente entre blocos de fases (preservando a ordem de aparição). Se **nenhuma** lane tiver `phase`, não há dividers (compat com planos antigos).
+- A ordem das fases segue a ordem das lanes no array (primeira aparição define a ordem do divider).
+
+**Posicionamento (day-linear — escala única):**
+- **Bars** (frentes): `_percent_position(start, end)` sobre `period_start..period_end`.
+- **Milestones (ticks do topo) + GOV `.qr`s + macro-flotilhas**: `_percent_anchor(date)` sobre `period_start..period_end` — mesma escala dos bars, garantindo alinhamento visual (ex: tick M0 encosta no fim da bar da fase inicial).
+- **Header `.months-row`**: colunas ponderadas em `{{fr_cols}}` por dias do período — mesmo eixo dos bars.
+
+**Stacking vertical (bars sobrepostas na mesma lane):**
+- Algoritmo greedy `_assign_rows()` atribui cada bar a uma row (evitando overlap com tolerância 0.05pp).
+- Constantes: `top = 8 + row * 54 px`, `bar-height = 46 px`, `row-gap = 8 px`.
+- `track.min-height` calculado dinamicamente para acomodar a maior row da lane.
+
+**Narrow bars (título não cabe dentro):**
+- `_chars_fit_in_bar(width_pct)` estima quantos chars cabem (track ~1195px, char-width 6.2px, line-clamp 2, margem 2 chars).
+- Se `len(title) > max_chars`, a bar recebe classe `narrow` (título interno fica invisível) e um `<div class="bar-ext-label">` é injetado no `.track` ao lado direito da bar.
+- Se a bar termina após 70% do track, o ext-label recebe `flip-left` e fica ancorado à esquerda da bar.
+
+**Macro-flotilhas por lane:**
+- Cada `.lane` não-milestones recebe uma `.lane-macro-bar` cujo `left%/width%` = span `min(start)..max(end)` das bars + qrs daquela lane. Label central = `{start} · {nome} · {end}` em formato curto BR (`28/abr`).
+- Escondida por default (`display:none`); o CSS a revela apenas quando `.lane.collapsed`. É não-clicável (`pointer-events:none`).
 
 **Milestones — campos opcionais para a lane de topo:**
 - `lbl`: label curto do chip (ex: `"M0 KICKOFF"`). Se ausente, extrai de `h4` antes do primeiro ` · ` em uppercase.
@@ -141,6 +164,12 @@ Sem `phase-bar`, sem `timeline-wrapper` (bloco de pontos horizontais), sem `road
 - `major: true` aplica visual gate (anel lime) nos ticks e na coluna `Tipo` da tabela.
 
 **Alternancia dos ticks:** indice par → top (chip acima do trilho, conector desce). Indice impar → bottom (chip abaixo, conector sobe). Evita sobreposicao quando marcos estao proximos no calendario.
+
+**Interatividade (JS embutido no template, sem deps externas):**
+- Click/Enter/Space em `.lane.phase-divider` → toggle inteligente: se todas as sub-lanes da fase estão recolhidas, expande; senão, recolhe todas.
+- Click em `.lane-label` de qualquer frente (exceto milestones/phase-divider) → toggle daquela lane apenas.
+- Click em `.roadmap-controls button[data-action=expand-all|collapse-all]` → aplica em todas as lanes.
+- `syncPhaseMacros()` roda após cada toggle e mantém o indicador visual do phase-divider (seta rotacionada) sincronizado com o estado agregado das sub-lanes.
 
 ---
 

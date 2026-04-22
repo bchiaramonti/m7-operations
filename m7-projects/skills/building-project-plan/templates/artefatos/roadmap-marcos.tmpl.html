@@ -11,8 +11,10 @@
     --cinza-700:#3d3d3d;--cinza-400:#9a9a8e;--cinza-200:#d9d9c8;--cinza-100:#f0f0e4;
     --verde-medio:#4f4e3c;--verde-claro:#79755c;--verde-escuro:#2d2d24;
     --verde-caqui-50:#f6f6f5;--verde-caqui-100:#d0d0cc;--verde-caqui-200:#aeada8;
+    --verde-caqui-600:#6a6956;
     --blue:#0066ff;--amber:#F59E0B;--purple:#8B5CF6;--teal:#14B8A6;
     --radius:12px;
+    --bar-h:46px;--row-gap:8px;--row-step:54px;--lane-label-w:180px;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
   body{font-family:'Inter',sans-serif;background:var(--off-white);color:var(--verde-caqui);}
@@ -24,24 +26,33 @@
   .page-header h1 { font-size:32px; font-weight:400; margin-top:-10px; }
   .page-header-left { flex:1; }
   .page-header .logo { height:56px; opacity:0.85; flex-shrink:0; }
-  .container{max-width:1200px;margin:0 auto;padding:48px 32px 80px;}
+  .container{max-width:1440px;margin:0 auto;padding:48px 32px 80px;}
 
   /* SECTION TITLES */
   .section-title{font-size:13px;text-transform:uppercase;letter-spacing:1.5px;color:var(--cinza-400);font-weight:600;margin-bottom:16px;margin-top:48px;}
 
   /* SWIM-LANE ROADMAP */
   .roadmap{width:100%;background:#fff;border:1px solid var(--cinza-200);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;}
-  .months-row{display:grid;grid-template-columns:200px repeat({{n_months}}, 1fr);background:var(--verde-caqui);color:var(--off-white);}
+
+  /* Controles globais de collapse/expand no topo */
+  .roadmap-controls{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:8px 18px;background:var(--verde-caqui-100);border-bottom:1px solid var(--verde-caqui-200);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;}
+  .roadmap-controls .hint{color:var(--verde-caqui-600);font-weight:500;letter-spacing:0.04em;text-transform:none;margin-right:auto;font-style:italic;font-size:9.5px;}
+  .roadmap-controls button{cursor:pointer;padding:4px 10px;font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--verde-caqui);background:transparent;border:1px solid var(--verde-caqui);border-radius:3px;transition:all .15s ease;font-family:inherit;}
+  .roadmap-controls button:hover{background:var(--verde-caqui);color:var(--lime);}
+
+  /* Header de meses — colunas ponderadas por dias reais ({{fr_cols}}) */
+  .months-row{display:grid;grid-template-columns:var(--lane-label-w) {{fr_cols}};background:var(--verde-caqui);color:var(--off-white);}
   .months-row .corner{padding:8px 14px;font-size:10px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--lime);border-right:1px solid rgba(255,253,239,0.15);display:flex;align-items:center;}
   .month-cell{text-align:center;font-size:11px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--off-white);padding:8px 4px;border-right:1px solid rgba(255,253,239,0.1);}
   .month-cell:last-child{border-right:none;}
   .month-cell .year{display:block;font-size:8px;color:rgba(255,253,239,0.55);letter-spacing:0.5px;margin-top:1px;font-weight:400;}
 
-  .lane{display:grid;grid-template-columns:200px 1fr;border-top:1px solid var(--verde-caqui-100);min-height:100px;}
+  .lane{display:grid;grid-template-columns:var(--lane-label-w) 1fr;border-top:1px solid var(--verde-caqui-100);min-height:100px;}
   .lane.gov{border-top:3px solid var(--lime);background:var(--verde-caqui-50);}
   .lane.milestones{background:var(--off-white);}
-  .lane-label{padding:12px 14px;display:flex;flex-direction:column;justify-content:center;background:var(--verde-caqui-50);border-right:1px solid var(--verde-caqui-100);}
+  .lane-label{padding:12px 14px;display:flex;flex-direction:column;justify-content:center;background:var(--verde-caqui-50);border-right:1px solid var(--verde-caqui-100);position:relative;cursor:pointer;user-select:none;}
   .lane.gov .lane-label{background:var(--verde-caqui);}
+  .lane.milestones .lane-label{cursor:default;}
   .lane-label .code{font-size:10px;font-weight:500;letter-spacing:1.5px;color:var(--verde-claro);text-transform:uppercase;}
   .lane.gov .lane-label .code{color:var(--lime);}
   .lane-label .name{font-size:12px;font-weight:500;color:var(--verde-caqui);margin-top:2px;line-height:1.25;}
@@ -49,19 +60,109 @@
   .lane-label .owner{font-size:9.5px;color:var(--verde-claro);margin-top:4px;line-height:1.35;}
   .lane.gov .lane-label .owner{color:var(--verde-caqui-200);}
 
+  /* Lane toggle button (por frente) */
+  .lane-toggle{position:absolute;top:6px;right:6px;width:14px;height:14px;line-height:12px;text-align:center;font-size:9px;color:var(--lime);background:var(--verde-caqui);border:1px solid var(--lime);border-radius:3px;transition:transform .18s ease;cursor:pointer;font-family:inherit;padding:0;}
+  .lane.collapsed .lane-toggle{transform:rotate(-90deg);}
+
+  /* Phase-divider (agrupamento de lanes por fase) */
+  .lane.phase-divider{display:grid;grid-template-columns:var(--lane-label-w) 1fr;min-height:auto;background:var(--verde-caqui);border-top:2px solid var(--lime);cursor:pointer;user-select:none;}
+  .lane.phase-divider .phase-title{padding:7px 18px;font-size:10.5px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--lime);display:flex;align-items:center;gap:10px;grid-column:1 / -1;}
+  .lane.phase-divider .phase-meta{color:var(--verde-caqui-200);font-weight:500;letter-spacing:0.08em;margin-left:10px;font-size:9.5px;}
+  .lane.phase-divider .phase-toggle{display:inline-block;width:14px;height:14px;line-height:12px;text-align:center;font-size:9px;color:var(--lime);border:1px solid var(--lime);border-radius:3px;margin-left:auto;transition:transform .18s ease;}
+  .lane.phase-divider.collapsed .phase-toggle{transform:rotate(-90deg);}
+
   .track{position:relative;padding:8px 0 6px;background-image:repeating-linear-gradient(to right,transparent 0,transparent calc((100% / {{n_months}}) - 1px),var(--verde-caqui-100) calc((100% / {{n_months}}) - 1px),var(--verde-caqui-100) calc(100% / {{n_months}}));}
   .lane.milestones .track{min-height:160px;padding:0;background-image:none;}
   .lane.milestones .rail{position:absolute;top:80px;left:0;right:0;height:1.5px;background:var(--verde-caqui-200);z-index:1;}
 
-  /* BARS — apenas nome da entrega (sem range) */
-  .bar{position:absolute;top:8px;height:38px;display:flex;flex-direction:column;justify-content:center;padding:0 32px 0 14px;font-size:11px;font-weight:500;line-height:1.1;color:var(--off-white);background:var(--verde-caqui);clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%);box-shadow:0 1px 3px rgba(0,0,0,0.1);}
-  .bar.v-purple{background:var(--purple);color:#fff;}
-  .bar.v-blue{background:var(--blue);color:#fff;}
-  .bar.v-amber{background:var(--amber);color:var(--verde-escuro);}
-  .bar.v-dark{background:var(--verde-caqui);color:var(--off-white);}
-  .bar.v-teal{background:var(--teal);color:#fff;}
-  .bar.v-gov{background:linear-gradient(90deg,var(--verde-caqui) 0%, var(--verde-medio) 100%);color:var(--off-white);}
-  .bar .title{display:block;font-weight:600;letter-spacing:0.1px;font-size:11.5px;}
+  /* BARS — altura fixa, cor neutra uniforme, texto em até 2 linhas com ellipsis */
+  .bar{
+    position:absolute;
+    height:var(--bar-h);
+    padding:6px 18px 6px 10px;
+    display:flex;
+    align-items:center;
+    background:#5a594b;
+    color:var(--off-white);
+    border:1px solid #6b6a5a;
+    box-shadow:0 1px 3px rgba(0,0,0,0.1);
+    overflow:hidden;
+  }
+  .bar .title{
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    white-space:normal;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    font-size:10.5px;
+    line-height:1.18;
+    letter-spacing:0.12px;
+    font-weight:600;
+    text-align:left;
+    width:100%;
+  }
+  .bar.narrow .title{visibility:hidden;}
+
+  /* Rótulo externo para bars estreitas (texto não cabe dentro) */
+  .bar-ext-label{
+    position:absolute;
+    font-size:10.5px;
+    letter-spacing:0.12px;
+    line-height:1.18;
+    font-weight:600;
+    color:var(--verde-caqui);
+    pointer-events:none;
+    max-width:170px;
+    height:var(--bar-h);
+    display:flex;
+    align-items:center;
+    overflow:hidden;
+  }
+  .bar-ext-label .t{
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:normal;
+    width:100%;
+    padding:0 8px;
+  }
+  .bar-ext-label.flip-left{justify-content:flex-end;text-align:right;}
+  .bar-ext-label.flip-left .t{text-align:right;}
+
+  /* Macro-flotilha por lane — visível apenas quando a própria lane está recolhida */
+  .lane-macro-bar{
+    display:none;
+    position:absolute;
+    top:8px;
+    height:var(--bar-h);
+    align-items:center;
+    justify-content:space-between;
+    padding:0 14px;
+    background:var(--lime);
+    color:var(--verde-caqui);
+    border:1px solid var(--lime);
+    border-radius:3px;
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.08em;
+    box-shadow:0 2px 6px rgba(0,0,0,.14);
+    pointer-events:none;
+  }
+  .lane-macro-bar .lmb-start, .lane-macro-bar .lmb-end{font-size:10px;font-weight:600;letter-spacing:0.04em;opacity:.92;white-space:nowrap;}
+  .lane-macro-bar .lmb-label{font-weight:700;letter-spacing:0.14em;text-transform:uppercase;white-space:nowrap;flex:1;text-align:center;padding:0 8px;overflow:hidden;text-overflow:ellipsis;}
+
+  /* Estado recolhido (track continua visível mas esconde bars/qrs/ext-labels e mostra a macro) */
+  .lane.collapsed{min-height:auto;}
+  .lane.collapsed .track{display:block;min-height:62px;position:relative;}
+  .lane.collapsed .track .bar{display:none;}
+  .lane.collapsed .track .bar-ext-label{display:none;}
+  .lane.collapsed .track .qr{display:none;}
+  .lane.collapsed .lane-macro-bar{display:flex;}
+  .lane.collapsed .lane-label{padding-top:6px;padding-bottom:6px;}
+  .lane.collapsed .lane-label .owner{display:none;}
 
   /* MILESTONES LANE (ticks alternados acima/abaixo de trilho central) */
   .tick{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;width:110px;z-index:4;}
@@ -110,8 +211,13 @@
 <div class="container">
 
   <div class="roadmap">
+    <div class="roadmap-controls">
+      <span class="hint">Clique em cada frente ou fase para recolher/expandir</span>
+      <button type="button" data-action="expand-all">Expandir tudo</button>
+      <button type="button" data-action="collapse-all">Recolher tudo</button>
+    </div>
     <div class="months-row">
-      <div class="corner">Frente / Fase</div>
+      <div class="corner">Frente (por fase)</div>
 {{months_row_html}}
     </div>
 {{milestones_lane_html}}
@@ -133,6 +239,76 @@
 </div>
 
 {{footer_html}}
+
+<script>
+(function(){
+  function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+  function laneCollapse(lane, collapsed){
+    if(!lane) return;
+    lane.classList.toggle('collapsed', !!collapsed);
+    lane.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+  // Sincroniza apenas o indicador visual do phase-divider (seta) com o estado
+  // das suas sub-lanes. A visibilidade das sub-lanes nao muda — cada lane
+  // controla sua propria macro-flotilha via .lane.collapsed.
+  function syncPhaseMacros(){
+    $all('.lane.phase-divider').forEach(function(div){
+      var phase = div.getAttribute('data-phase');
+      var subs = $all('.lane[data-phase="' + phase + '"]:not(.phase-divider)');
+      if(subs.length === 0) return;
+      var allCollapsed = subs.every(function(l){ return l.classList.contains('collapsed'); });
+      div.classList.toggle('collapsed', allCollapsed);
+      div.setAttribute('aria-expanded', allCollapsed ? 'false' : 'true');
+    });
+  }
+  function phaseToggle(divider, forceCollapse){
+    if(!divider) return;
+    var phase = divider.getAttribute('data-phase');
+    var subs = $all('.lane[data-phase="' + phase + '"]:not(.phase-divider)');
+    var target;
+    if(typeof forceCollapse === 'boolean'){
+      target = forceCollapse;
+    } else {
+      var allCollapsed = subs.every(function(l){ return l.classList.contains('collapsed'); });
+      target = !allCollapsed;
+    }
+    subs.forEach(function(l){ laneCollapse(l, target); });
+    syncPhaseMacros();
+  }
+  // Click em lane (toggle individual)
+  $all('.lane:not(.phase-divider):not(.milestones) .lane-label').forEach(function(label){
+    label.addEventListener('click', function(ev){
+      var lane = label.closest('.lane');
+      laneCollapse(lane, !lane.classList.contains('collapsed'));
+      syncPhaseMacros();
+    });
+  });
+  // Click em phase-divider (toggle toda a fase)
+  $all('.lane.phase-divider').forEach(function(div){
+    div.addEventListener('click', function(){ phaseToggle(div); });
+    div.addEventListener('keydown', function(ev){
+      if(ev.key === 'Enter' || ev.key === ' '){
+        ev.preventDefault();
+        phaseToggle(div);
+      }
+    });
+  });
+  // Controles globais
+  var ctrls = document.querySelector('.roadmap-controls');
+  if(ctrls){
+    ctrls.addEventListener('click', function(ev){
+      var btn = ev.target.closest('button[data-action]');
+      if(!btn) return;
+      var action = btn.getAttribute('data-action');
+      var collapse = action === 'collapse-all';
+      $all('.lane:not(.phase-divider):not(.milestones)').forEach(function(l){ laneCollapse(l, collapse); });
+      syncPhaseMacros();
+    });
+  }
+  // sync inicial
+  syncPhaseMacros();
+})();
+</script>
 
 </body>
 </html>

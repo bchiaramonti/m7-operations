@@ -371,7 +371,7 @@ def render_roadmap_marcos(data: dict, logo_b64: str, output_dir: Path,
     template = load_template("artefatos/roadmap-marcos.tmpl.html")
     roadmap = data.get("roadmap") or {}
 
-    # Month columns (cada mês = 100/n % da largura do track)
+    # Month columns
     period_start = parse_date(data.get("period_start"))
     period_end = parse_date(data.get("period_end"))
     months: list[tuple[int, int]] = []
@@ -386,18 +386,22 @@ def render_roadmap_marcos(data: dict, logo_b64: str, output_dir: Path,
                 cur = dt.datetime(cur.year, cur.month + 1, 1)
     n_months = max(len(months), 1)
 
+    # Colunas ponderadas pelos dias que cada mês contribui ao período
+    fr_cols = _compute_month_fractions(period_start, period_end, months)
+
     months_row_html = "\n".join(
         f'      <div class="month-cell">{MESES_BR[m].upper()}<span class="year">{y}</span></div>'
         for (y, m) in months
     )
 
-    # Data lanes (bars com apenas .title — range removido)
+    # Data lanes — agrupadas por `phase` (campo opcional no schema).
+    # Se alguma lane tiver `phase`, emite phase-dividers entre os blocos.
     lanes = roadmap.get("lanes") or []
-    lanes_html = "\n".join(_render_lane(lane, period_start, period_end) for lane in lanes)
+    lanes_html = _render_lanes_with_phase_dividers(lanes, period_start, period_end)
 
-    # Milestones — usadas tanto na lane do topo quanto na tabela abaixo
+    # Milestones — lane do topo + tabela abaixo (day-linear scale)
     milestones = roadmap.get("milestones") or []
-    milestones_lane_html = _render_milestones_lane(milestones, months)
+    milestones_lane_html = _render_milestones_lane(milestones, period_start, period_end)
     marcos_table_rows_html = "\n".join(
         _render_marco_row(m, idx) for idx, m in enumerate(milestones)
     )
@@ -409,6 +413,7 @@ def render_roadmap_marcos(data: dict, logo_b64: str, output_dir: Path,
     )
     subs.update({
         "{{n_months}}": str(n_months),
+        "{{fr_cols}}": fr_cols,
         "{{months_row_html}}": months_row_html,
         "{{milestones_lane_html}}": milestones_lane_html,
         "{{lanes_html}}": lanes_html,
@@ -420,9 +425,33 @@ def render_roadmap_marcos(data: dict, logo_b64: str, output_dir: Path,
     return output_path
 
 
-def _render_milestones_lane(milestones: list[dict], months: list[tuple[int, int]]) -> str:
+def _compute_month_fractions(period_start, period_end,
+                             months: list[tuple[int, int]]) -> str:
+    """Gera `grid-template-columns` ponderado pelos dias reais que cada mês
+    contribui ao período. Retorna algo como '5fr 30fr 31fr 30fr 18fr'.
+
+    Quando o período não começa no dia 1 ou não termina no último dia do mês,
+    isso mantém as colunas do header alinhadas com as bars/ticks (day-linear).
+    """
+    if not (period_start and period_end and months):
+        return " ".join("1fr" for _ in months) if months else "1fr"
+    parts: list[str] = []
+    for (y, m) in months:
+        first = dt.date(y, m, 1)
+        next_first = dt.date(y + 1, 1, 1) if m == 12 else dt.date(y, m + 1, 1)
+        last = next_first - dt.timedelta(days=1)
+        seg_start = max(first, period_start.date() if hasattr(period_start, "date") else period_start)
+        seg_end = min(last, period_end.date() if hasattr(period_end, "date") else period_end)
+        days = (seg_end - seg_start).days + 1 if seg_end >= seg_start else 1
+        parts.append(f"{days}fr")
+    return " ".join(parts)
+
+
+def _render_milestones_lane(milestones: list[dict],
+                            period_start, period_end) -> str:
     """Lane no topo do roadmap com ticks alternados (top/bottom) ao redor de um trilho central.
-    Posicionamento calendário: cada coluna-mês ocupa 100/n_months%."""
+    Usa posicionamento day-linear (mesma escala das bars e QRs) para manter alinhamento
+    visual entre os marcos do topo e as entregas das frentes."""
     if not milestones:
         return ""
 
@@ -431,7 +460,7 @@ def _render_milestones_lane(milestones: list[dict], months: list[tuple[int, int]
         m_date = parse_date(m.get("date_iso") or m.get("date"))
         if not m_date:
             continue
-        left = _percent_calendar(m_date, months)
+        left = _percent_anchor(m_date, period_start, period_end)
         is_major = m.get("major", False)
         gate_class = " gate" if is_major else " regular"
         position = "top" if idx % 2 == 0 else "bottom"
@@ -501,32 +530,174 @@ def _short_lbl(h4: str) -> str:
     return h4[:18].upper()
 
 
+# Constantes visuais do swim-lane (espelham as CSS vars no template)
+_BAR_H_PX = 46
+_ROW_GAP_PX = 8
+_ROW_STEP_PX = _BAR_H_PX + _ROW_GAP_PX  # 54
+_BAR_TOP_BASE_PX = 8
+_LANE_PAD_BOTTOM_PX = 8
+_OVERLAP_TOL_PCT = 0.05
+
+# Largura estimada do track (px) — usada para decidir se título cabe dentro da bar.
+# Corresponde a container 1440 - 2*32 padding - 180 lane-label - borders ≈ 1195.
+_TRACK_WIDTH_PX = 1195
+_CHAR_W_PX = 6.2       # largura média de char no font-size 10.5 (com margem p/ acentos)
+_SAFETY_CHARS = 2      # margem conservadora p/ evitar truncate
+_BAR_LINE_CLAMP = 2    # -webkit-line-clamp:2 permite título em até 2 linhas
+
+
+def _assign_rows(bars_pos: list[tuple[float, float]]) -> list[int]:
+    """Greedy: atribui cada bar a uma row sem overlap temporal (com tolerância
+    _OVERLAP_TOL_PCT). Retorna lista de row-index na mesma ordem das bars."""
+    if not bars_pos:
+        return []
+    # Rows: cada row armazena o maior `right` (left+width) já alocado
+    rows: list[float] = []
+    assignment: list[int] = []
+    # Mantém ordem original, mas prioriza bars que começam mais cedo
+    order = sorted(range(len(bars_pos)), key=lambda i: bars_pos[i][0])
+    result: list[int] = [0] * len(bars_pos)
+    for i in order:
+        left, width = bars_pos[i]
+        right = left + width
+        placed = False
+        for r_idx, r_right in enumerate(rows):
+            if left + _OVERLAP_TOL_PCT >= r_right:
+                rows[r_idx] = right
+                result[i] = r_idx
+                placed = True
+                break
+        if not placed:
+            rows.append(right)
+            result[i] = len(rows) - 1
+    return result
+
+
+def _chars_fit_in_bar(width_pct: float) -> int:
+    """Estima quantos chars cabem dentro de uma bar de `width_pct` do track.
+    Considera que o CSS aplica `-webkit-line-clamp:2` (até 2 linhas) e aplica
+    _SAFETY_CHARS de margem para evitar truncate inesperado."""
+    usable_px = (width_pct / 100.0) * _TRACK_WIDTH_PX - 28  # 28 = padding 6+18+margem
+    if usable_px <= 0:
+        return 0
+    per_line = max(0, usable_px / _CHAR_W_PX - _SAFETY_CHARS)
+    return int(per_line * _BAR_LINE_CLAMP)
+
+
+def _format_br_short(d) -> str:
+    """Formato curto para macro-flotilha: '28/abr' (sem ano)."""
+    parsed = parse_date(d)
+    if not parsed:
+        return ""
+    return f"{parsed.day:02d}/{MESES_BR[parsed.month]}"
+
+
+def _render_lanes_with_phase_dividers(lanes: list[dict], period_start, period_end) -> str:
+    """Renderiza todas as lanes, injetando phase-dividers entre blocos de fases
+    quando pelo menos uma lane tem campo `phase`. Mantém a ordem original das lanes."""
+    if not lanes:
+        return ""
+    has_any_phase = any(lane.get("phase") for lane in lanes)
+
+    # Conta lanes por fase (preservando ordem de aparição)
+    phase_order: list[str] = []
+    phase_counts: dict[str, int] = {}
+    if has_any_phase:
+        for lane in lanes:
+            p = lane.get("phase") or ""
+            if not p:
+                continue
+            if p not in phase_counts:
+                phase_order.append(p)
+                phase_counts[p] = 0
+            phase_counts[p] += 1
+
+    parts: list[str] = []
+    emitted_phase: set[str] = set()
+    for lane in lanes:
+        phase = lane.get("phase") or ""
+        if has_any_phase and phase and phase not in emitted_phase:
+            emitted_phase.add(phase)
+            count = phase_counts[phase]
+            parts.append(_render_phase_divider(phase, count))
+        parts.append(_render_lane(lane, period_start, period_end))
+    return "\n".join(parts)
+
+
+def _render_phase_divider(phase: str, count: int) -> str:
+    """Banner clicável entre blocos de fases, com contador de lanes e seta."""
+    plural = "s" if count != 1 else ""
+    return (
+        f'    <div class="lane phase-divider" data-phase="{html_escape(phase)}" '
+        'role="button" tabindex="0" aria-expanded="true" '
+        'title="Clique para recolher/expandir toda a fase">\n'
+        f'      <div class="phase-title">Fase · {html_escape(phase)}'
+        f'<span class="phase-meta">{count} lane{plural}</span>'
+        '<span class="phase-toggle" aria-hidden="true">&#9662;</span></div>\n'
+        '    </div>'
+    )
+
+
 def _render_lane(lane: dict, period_start, period_end) -> str:
-    """Renderiza uma .lane do swim-lane com chevron .bar (apenas título) + .qr (governança)."""
+    """Renderiza uma .lane do swim-lane com bars (com stacking + bar-ext-label para
+    estreitas), qrs de governança e macro-flotilha (visível quando recolhida)."""
     is_gov = lane.get("is_gov", False)
     code = html_escape(lane.get("code", ""))
     name = html_escape(lane.get("name", ""))
     owner = html_escape(lane.get("owner", ""))
+    phase = lane.get("phase") or ""
 
-    # Position bars (chevron) within the track — apenas title (sem range)
+    # ── 1. Computa posições de bars e determina rows (stacking)
     bars = lane.get("bars") or []
-    bars_html_parts = []
+    bar_positions: list[tuple[float, float]] = []
     for bar in bars:
         bar_start = parse_date(bar.get("start"))
         bar_end = parse_date(bar.get("end"))
-        left, width = _percent_position(bar_start, bar_end, period_start, period_end)
+        bar_positions.append(_percent_position(bar_start, bar_end, period_start, period_end))
+    rows = _assign_rows(bar_positions)
+    max_rows = (max(rows) + 1) if rows else 0
+
+    # ── 2. Renderiza cada bar + ext-label quando necessário
+    bars_html_parts: list[str] = []
+    ext_labels_html_parts: list[str] = []
+    for idx, bar in enumerate(bars):
+        left, width = bar_positions[idx]
+        row = rows[idx]
+        top_px = _BAR_TOP_BASE_PX + row * _ROW_STEP_PX
         bar_class = bar.get("class", "v-dark")
-        title = html_escape(bar.get("title", ""))
+        title = bar.get("title", "")
+        title_escaped = html_escape(title)
+
+        # Narrow detection: título não cabe dentro da bar?
+        max_chars = _chars_fit_in_bar(width)
+        is_narrow = len(title) > max_chars
+        extra_cls = " narrow" if is_narrow else ""
+
         bars_html_parts.append(
-            f'        <div class="bar {html_escape(bar_class)}" '
-            f'style="left:{left:.1f}%; width:{width:.1f}%;">\n'
-            f'          <span class="title">{title}</span>\n'
-            '        </div>'
+            f'        <div class="bar {html_escape(bar_class)}{extra_cls}" '
+            f'style="left:{left:.1f}%; width:{width:.1f}%; top:{top_px}px;">'
+            f'<span class="title">{title_escaped}</span></div>'
         )
 
-    # Qr badges (governance lane)
+        if is_narrow:
+            # Se a bar termina após 70% do track, flip o label para a esquerda
+            right_pct = left + width
+            if right_pct > 70.0:
+                ext_labels_html_parts.append(
+                    f'        <div class="bar-ext-label flip-left" '
+                    f'style="right:{100.0 - left:.2f}%; top:{top_px}px;">'
+                    f'<span class="t">{title_escaped}</span></div>'
+                )
+            else:
+                ext_labels_html_parts.append(
+                    f'        <div class="bar-ext-label" '
+                    f'style="left:{right_pct:.2f}%; top:{top_px}px;">'
+                    f'<span class="t">{title_escaped}</span></div>'
+                )
+
+    # ── 3. Qr badges (governance lane) — day-linear
     qrs = lane.get("qrs") or []
-    qrs_html_parts = []
+    qrs_html_parts: list[str] = []
     for qr in qrs:
         qr_date = parse_date(qr.get("date"))
         left = _percent_anchor(qr_date, period_start, period_end)
@@ -536,25 +707,83 @@ def _render_lane(lane: dict, period_start, period_end) -> str:
             f'<span class="qr-label">{label}</span></div>'
         )
 
+    # ── 4. Macro-flotilha: span da lane (min start, max end das bars + qrs)
+    macro_html = _render_lane_macro(lane, bars, qrs, period_start, period_end)
+
+    # ── 5. Altura dinâmica do track (acomoda max_rows sem cortar a última bar)
+    if max_rows > 0:
+        track_min_h = _BAR_TOP_BASE_PX + max_rows * _ROW_STEP_PX + _LANE_PAD_BOTTOM_PX - _ROW_GAP_PX
+        track_style = f' style="min-height:{track_min_h}px;"'
+    else:
+        track_style = ' style="min-height:62px;"' if not is_gov else ""
+
+    # ── 6. Monta lane-label (com toggle button) e track
     lane_class = "lane gov" if is_gov else "lane"
+    data_attrs = (
+        f' data-phase="{html_escape(phase)}"' if phase else ""
+    ) + (f' data-code="{code}"' if code else "") + ' aria-expanded="true"'
+    toggle_btn = (
+        f'<button type="button" class="lane-toggle" '
+        f'aria-label="Recolher/expandir {code}" title="Recolher/expandir">&#9662;</button>'
+    )
     lane_label_html = (
-        '      <div class="lane-label">\n'
+        '      <div class="lane-label">'
+        f'{toggle_btn}\n'
         f'        <div class="code">{code}</div>\n'
         f'        <div class="name">{name}</div>\n'
         + (f'        <div class="owner">{owner}</div>\n' if owner else "")
         + '      </div>'
     )
+    track_inner_parts = []
+    if macro_html:
+        track_inner_parts.append(macro_html)
+    track_inner_parts.extend(bars_html_parts)
+    track_inner_parts.extend(ext_labels_html_parts)
+    track_inner_parts.extend(qrs_html_parts)
     track_html = (
-        '      <div class="track">\n'
-        + "\n".join(bars_html_parts) + "\n"
-        + ("\n".join(qrs_html_parts) + "\n" if qrs_html_parts else "")
+        f'      <div class="track"{track_style}>\n'
+        + "\n".join(track_inner_parts) + "\n"
         + '      </div>'
     )
     return (
-        f'    <div class="{lane_class}">\n'
+        f'    <div class="{lane_class}"{data_attrs}>\n'
         + lane_label_html + "\n"
         + track_html + "\n"
         + '    </div>'
+    )
+
+
+def _render_lane_macro(lane: dict, bars: list[dict], qrs: list[dict],
+                       period_start, period_end) -> str:
+    """Macro-flotilha da lane: um chip lime cobrindo min(start)..max(end) das
+    bars + qrs. Renderizada sempre; CSS a esconde por padrão e a revela quando
+    a própria lane está .collapsed."""
+    dates_start: list = []
+    dates_end: list = []
+    for bar in bars:
+        bs = parse_date(bar.get("start"))
+        be = parse_date(bar.get("end"))
+        if bs: dates_start.append(bs)
+        if be: dates_end.append(be)
+    for qr in qrs:
+        d = parse_date(qr.get("date"))
+        if d:
+            dates_start.append(d)
+            dates_end.append(d)
+    if not (dates_start and dates_end and period_start and period_end):
+        return ""
+    lane_min = min(dates_start)
+    lane_max = max(dates_end)
+    left, width = _percent_position(lane_min, lane_max, period_start, period_end)
+    label = html_escape(lane.get("name", ""))
+    start_txt = _format_br_short(lane_min)
+    end_txt = _format_br_short(lane_max)
+    return (
+        f'        <div class="lane-macro-bar" '
+        f'style="left:{left:.3f}%; width:{width:.3f}%;" aria-hidden="true">'
+        f'<span class="lmb-start">{start_txt}</span>'
+        f'<span class="lmb-label">{label}</span>'
+        f'<span class="lmb-end">{end_txt}</span></div>'
     )
 
 
@@ -577,29 +806,6 @@ def _percent_anchor(point, period_start, period_end) -> float:
     total = (period_end - period_start).days or 1
     d = (point - period_start).days
     return max(0.0, min(100.0, 100.0 * d / total))
-
-
-def _percent_calendar(point, months: list[tuple[int, int]]) -> float:
-    """Posição baseada em colunas-mês iguais (cada mês = 100/n_months %).
-    Usa o dia dentro do mês como fração linear. Alinha ticks visualmente com
-    os headers de mês, mesmo quando o período do projeto não começa no dia 1."""
-    if not point or not months:
-        return 0.0
-    n = len(months)
-    cell_width = 100.0 / n
-    for idx, (y, m) in enumerate(months):
-        if point.year == y and point.month == m:
-            if m == 12:
-                next_first = dt.date(y + 1, 1, 1)
-            else:
-                next_first = dt.date(y, m + 1, 1)
-            first = dt.date(y, m, 1)
-            days_in_month = (next_first - first).days
-            day_fraction = (point.day - 1) / max(days_in_month, 1)
-            return (idx + day_fraction) * cell_width
-    first_y, first_m = months[0]
-    first_dt = dt.date(first_y, first_m, 1)
-    return 0.0 if point < first_dt else 100.0
 
 
 # ---------------------------------------------------------------------------

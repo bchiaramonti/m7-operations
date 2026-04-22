@@ -13,6 +13,32 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.2.0] - 2026-04-22
+
+Refactor completo do artefato `roadmap-marcos.html` em `building-project-plan`, incorporando ao template e ao renderer as 10 customizações que antes viviam num wrapper de pós-processamento externo (`render_roadmap_only.py`). Resultado: o plugin passa a emitir o roadmap no estado final aprovado sem etapa de pós-processamento, com zero CSS `!important` e um stylesheet consolidado. Backward-compatible: planos já gerados continuam renderizando (sem phase-dividers).
+
+### Added
+- [templates/artefatos/roadmap-marcos.tmpl.html](skills/building-project-plan/templates/artefatos/roadmap-marcos.tmpl.html) — CSS novo: `.lane.phase-divider` (banner clicável entre blocos de fases), `.lane-macro-bar` (chip lime cobrindo o span da lane, visível apenas quando `.lane.collapsed`), `.lane-toggle` (botão absolute no canto do lane-label), `.bar.narrow` + `.bar-ext-label` (com variante `.flip-left`) para títulos que não cabem dentro de bars estreitas, `.roadmap-controls` (barra no topo com hint + botões `Expandir tudo`/`Recolher tudo`), CSS vars `--bar-h`, `--row-gap`, `--row-step`, `--lane-label-w`.
+- Placeholder `{{fr_cols}}` — colunas do header `.months-row` ponderadas pelos dias reais que cada mês contribui ao período (ex: `"5fr 30fr 31fr 30fr 18fr"`), mantendo alinhamento day-linear entre calendar header, bars, ticks e macro-flotilhas.
+- Campo opcional `phase` em `data.roadmap.lanes[]` — quando presente, o renderer emite `.lane.phase-divider`s automáticos entre blocos de fases consecutivas (preservando ordem de aparição). Backward-compatible: se nenhuma lane tiver `phase`, não há dividers.
+- Script embutido no template — JS puro (sem deps) que trata toggle por lane (click no label), toggle por fase (click/Enter/Space no phase-divider), controles globais (expand/collapse all) e sincronização da seta do phase-divider com o estado agregado das sub-lanes via `syncPhaseMacros()`.
+- [scripts/render_html.py](skills/building-project-plan/scripts/render_html.py) — helpers `_compute_month_fractions(period_start, period_end, months)`, `_assign_rows(bars_pos)` (greedy stacking, tol=0.05pp), `_chars_fit_in_bar(width_pct)` (calibrado `_CHAR_W_PX=6.2` + line-clamp 2 + safety 2 chars), `_render_phase_divider(phase, count)`, `_render_lanes_with_phase_dividers(lanes, ps, pe)`, `_render_lane_macro(lane, bars, qrs, ps, pe)`, `_format_br_short(d)`.
+
+### Changed
+- `_render_lane` reescrito — agora calcula rows (stacking vertical para bars sobrepostas na mesma lane), detecta bars narrow e emite `bar-ext-label` (com `flip-left` quando a bar termina após 70% do track), injeta macro-flotilha como primeiro filho do track, e propaga atributos `data-phase`/`data-code`/`aria-expanded` + botão `.lane-toggle`. Altura do track calculada dinamicamente: `8 + max_rows * 54 + 8 - 8 px`.
+- `_render_milestones_lane(milestones, period_start, period_end)` — assinatura mudou de `(milestones, months)` para `(milestones, period_start, period_end)`. Passa a usar `_percent_anchor` (day-linear) em vez de `_percent_calendar` (calendar-based), corrigindo o deslocamento de ~12pp que afetava ticks quando o período não começava no dia 1 (ex: M0 Kickoff 14/abr agora fica visualmente alinhado com o fim da bar F1).
+- Template `.container` passa de `max-width:1200px` para `max-width:1440px`; `.lane` grid passa de `200px 1fr` para `180px 1fr` (via CSS var `--lane-label-w`); bars passam de altura 38px para 46px e cor uniforme `#5a594b` em vez de classes variadas (`.v-purple`/`.v-blue`/`.v-teal`/etc. ainda existem mas caem no mesmo neutro neutro para não competir com o lime do phase-divider).
+- [references/artifact-catalog.md](skills/building-project-plan/references/artifact-catalog.md) — seção `03 — roadmap-marcos.html` reescrita com novo schema de lane (`phase?`), nova tabela de placeholders (inclui `{{fr_cols}}`), seções dedicadas a day-linear positioning, row stacking, narrow bars, macro-flotilhas e interatividade JS.
+
+### Removed
+- Função `_percent_calendar(point, months)` — helper morto após migração para day-linear. Ticks e QRs agora usam `_percent_anchor` (mesma escala dos bars), eliminando 3 sistemas de posicionamento e consolidando em 1.
+- CSS com 60+ `!important` que antes vinha do wrapper de pós-processamento. Stylesheet consolidado agora tem uma única fonte de verdade.
+
+### Validation
+- Parity estrutural contra HTML aprovado do projeto H1-02 Playbook de Processos (período 2026-03-27 a 2026-07-18, 5 lanes, 15 bars, 8 ticks, 8 qrs): 13 de 14 contadores estruturais batem exatamente (phase-divider=17, lane-macro-bar=9, lane-toggle=7, bar-ext-label=4, class="tick"=8, data-code=5, data-phase=11, class="bar"=15, narrow=4, top:62=4, top:116=3, phase-title=5). Única diferença é ordem das classes CSS (`bar v-dark narrow` vs `bar narrow v-dark`, cosmética, mesmo resultado visual).
+- `warnings = []` no render end-to-end.
+- Backward-compatibility: teste com `lanes[]` sem campo `phase` confirma que nenhum phase-divider é emitido e o layout antigo é preservado.
+
 ## [1.1.0] - 2026-04-20
 
 Redesenho do artefato `roadmap-marcos.html` em `building-project-plan` para refletir a v2 prototipada no Paper: `.phase-bar`, `.timeline-wrapper` (blocos de pontos horizontais) e `.roadmap-legend` removidos; lane dedicada de Marcos do Projeto adicionada no topo do swim-lane com ticks alternados acima/abaixo de um trilho central; grid 3×3 de cards substituido por Tabela de Marcos com colunas `Tipo · Marco · Data · WBS · Descricao`; barras das lanes passaram a exibir apenas o nome da entrega (sem `range` de datas).
