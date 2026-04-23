@@ -80,6 +80,7 @@ class CollectResult:
     risks: list = field(default_factory=list)
     changelog_entries: list = field(default_factory=list)
     roadmap_overlays: dict = field(default_factory=dict)
+    roadmap_structure: dict = field(default_factory=dict)
     warnings: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -98,6 +99,7 @@ class CollectResult:
             "risks": self.risks,
             "changelog_entries": self.changelog_entries,
             "roadmap_overlays": self.roadmap_overlays,
+            "roadmap_structure": self.roadmap_structure,
             "warnings": self.warnings,
         }
 
@@ -573,6 +575,303 @@ def aggregate_bar_status(bar_title: str, entries: list[dict], report_date: datet
     return "future"
 
 
+def infer_matrix_structure(entries: list[dict], bar_titles: list[str]) -> dict | None:
+    """Attempts to infer the (processo, fase) matrix structure from the project's WBS.
+
+    Heuristic: uses `bar_titles` (from roadmap-marcos.html .bar .title elements) as
+    the canonical list of processos. For each bar_title, collects Ação-type tasks
+    whose `etapa` contains the title. If all processos have the same count N of
+    matched tasks AND the tasks can be split into N uniform "fase" patterns
+    (prefixes that appear across all processos), returns the inferred structure.
+
+    Returns None when the project doesn't follow a uniform processo × fase pattern
+    (signals the caller to fall back to user-driven configuration).
+    """
+    if not bar_titles:
+        return None
+    acoes = [e for e in entries if str(e.get("tipo", "")).lower() in ("ação", "acao")]
+    if not acoes:
+        return None
+
+    # For each bar_title, collect matching tasks (ordered by WBS code)
+    processo_tasks: dict[str, list[dict]] = {}
+    for title in bar_titles:
+        t_norm = _normalize_match(title)
+        if not t_norm:
+            continue
+        matches = [
+            e for e in acoes
+            if t_norm in _normalize_match(str(e.get("etapa", "")))
+        ]
+        # Sort by "No." (WBS code) if numeric-like
+        matches.sort(key=lambda e: str(e.get("no", "")))
+        if matches:
+            processo_tasks[title] = matches
+
+    if len(processo_tasks) < 2:
+        return None  # need at least 2 processos to triangulate common fases
+
+    # Keep only processos with the modal task count (most common count)
+    from collections import Counter
+    counts = Counter(len(v) for v in processo_tasks.values())
+    modal_count, modal_freq = counts.most_common(1)[0]
+    if modal_count < 2 or modal_freq < len(processo_tasks) * 0.8:
+        # Too much variance in task counts → can't assume uniform fases
+        return None
+
+    uniform_processos = {p: ts for p, ts in processo_tasks.items() if len(ts) == modal_count}
+    if len(uniform_processos) < 2:
+        return None
+
+    # Extract "fase" pattern from task etapa: remove processo label from etapa, keep prefix
+    # E.g. "Mapa N2 — Jornada do cliente Crédito" - "Crédito" = "Mapa N2 — Jornada do cliente"
+    def strip_processo(etapa: str, processo: str) -> str:
+        e_norm = _normalize_match(etapa)
+        p_norm = _normalize_match(processo)
+        idx = e_norm.find(p_norm)
+        if idx == -1:
+            return etapa.strip()
+        # Find the same position in original (case-insensitive find on original)
+        lower = etapa.lower()
+        p_lower = processo.lower()
+        real_idx = lower.find(p_lower)
+        if real_idx == -1:
+            return etapa.strip()
+        return etapa[:real_idx].strip().rstrip("—–-·:").strip()
+
+    # Build fase_slots: for position i (0..N-1), collect the stripped prefixes across processos
+    fase_slots: list[list[str]] = [[] for _ in range(modal_count)]
+    for processo, tasks in uniform_processos.items():
+        for i, task in enumerate(tasks):
+            prefix = strip_processo(str(task.get("etapa", "")), processo)
+            fase_slots[i].append(prefix)
+
+    # For each slot, if all (or nearly all) prefixes are identical, use that as the fase pattern
+    fases = []
+    for i, prefixes in enumerate(fase_slots):
+        if not prefixes:
+            return None
+        most_common, freq = Counter(prefixes).most_common(1)[0]
+        if freq < len(prefixes) * 0.7:
+            # Inconsistent prefixes in this slot → structure isn't uniform
+            return None
+        if not most_common:
+            return None
+        # Short label: extract the most descriptive "head" of the pattern.
+        # Strategy: first non-stopword token, with two overrides:
+        #   (1) Generic openers (Plano, Mapa, Fase) → try second token:
+        #       - if it's a code (N1, N2, P1...), concat: "Mapa N2"
+        #       - else use it alone: "Plano de implementação" → "Implementação"
+        #   (2) Short codes in second slot that look like N2/P1 → concat with first.
+        # Examples:
+        #   "Mapa N2 — Jornada do cliente" → "Mapa N2"
+        #   "DEIP + Tabela de Desconexões" → "DEIP"
+        #   "Políticas e manuais aplicáveis" → "Políticas"
+        #   "Playbook consolidado" → "Playbook"
+        #   "Plano de implementação" → "Implementação"
+        _STOP_LABEL = {"de", "da", "do", "das", "dos", "e", "em", "a", "o",
+                       "para", "por", "com", "sem", "na", "no"}
+        _GENERIC = {"plano", "mapa", "fase", "etapa"}
+        tokens = [t for t in re.split(r"[\s—–·+]+", most_common) if t]
+        head_tokens: list[str] = []
+        for tok in tokens:
+            if tok.lower() in _STOP_LABEL:
+                continue
+            head_tokens.append(tok)
+            if len(head_tokens) >= 2:
+                break
+        if not head_tokens:
+            short_label = most_common.split()[0] if most_common.split() else most_common
+        else:
+            t0 = head_tokens[0]
+            t0_is_generic = t0.lower() in _GENERIC
+            if len(head_tokens) == 1:
+                short_label = t0
+            else:
+                t1 = head_tokens[1]
+                t1_is_code = (len(t1) <= 3 and t1[0].isalpha()
+                              and t1[1:].replace(".", "").isdigit())
+                if t1_is_code:
+                    short_label = f"{t0} {t1}"
+                elif t0_is_generic:
+                    # Generic opener + noun: use noun with Title-casing
+                    short_label = t1[:1].upper() + t1[1:]
+                else:
+                    short_label = t0
+
+        # Code = normalized uppercase version of label (accent-stripped)
+        import unicodedata
+        code_base = unicodedata.normalize("NFD", short_label)
+        code_base = "".join(c for c in code_base if unicodedata.category(c) != "Mn")
+        code = re.sub(r"[^A-Z0-9]+", "_", code_base.upper()).strip("_") or f"FASE_{i+1}"
+        fases.append({
+            "code": code,
+            "label": short_label,
+            "match_pattern": most_common,
+        })
+
+    # Extract WBS prefix for each processo (from first task's "no" field)
+    processos_out = []
+    for processo, tasks in uniform_processos.items():
+        wbs_no = str(tasks[0].get("no", ""))
+        # Prefix is everything except the last "." segment (e.g., "2.5.1" → "2.5")
+        parts = wbs_no.split(".")
+        wbs_prefix = ".".join(parts[:-1]) if len(parts) > 1 else wbs_no
+        processos_out.append({
+            "label": processo,
+            "wbs_prefix": wbs_prefix,
+        })
+
+    # Sort processos by wbs_prefix (natural order in WBS)
+    def wbs_key(p):
+        parts = p["wbs_prefix"].split(".")
+        return tuple(int(x) if x.isdigit() else x for x in parts)
+    processos_out.sort(key=wbs_key)
+
+    return {"processos": processos_out, "fases": fases}
+
+
+def load_or_infer_matrix_structure(
+    project_dir: Path,
+    entries: list[dict],
+    bar_titles: list[str],
+    warnings: list,
+    force_reinfer: bool = False,
+) -> dict:
+    """Loads matrix-structure.json if present, else infers and saves it.
+
+    Returns a dict with at least {processos, fases, source}. When inference
+    fails and no file exists, writes a "pending_user_input" stub with
+    candidate_processos — the Claude Code agent is expected to complete it
+    interactively via AskUserQuestion before the next run.
+    """
+    config_path = project_dir / "4-status-report" / "matrix-structure.json"
+
+    if config_path.exists() and not force_reinfer:
+        try:
+            existing = json.loads(config_path.read_text(encoding="utf-8"))
+            if existing.get("source") == "pending_user_input":
+                warnings.append(
+                    f"matrix-structure.json está aguardando input do usuário. "
+                    f"Rode AskUserQuestion para confirmar processos e fases e atualize o arquivo."
+                )
+            return existing
+        except json.JSONDecodeError as e:
+            warnings.append(f"matrix-structure.json inválido ({e}), re-inferindo")
+
+    inferred = infer_matrix_structure(entries, bar_titles)
+    if inferred is None:
+        # Emit stub for user to complete
+        stub = {
+            "version": 1,
+            "source": "pending_user_input",
+            "inferred_at": datetime.now().isoformat(timespec="seconds"),
+            "candidate_processos": [{"label": t, "wbs_prefix": ""} for t in bar_titles],
+            "processos": [],
+            "fases": [],
+            "_note": (
+                "Inferência automática falhou. Preencha 'processos' (ordem das linhas) "
+                "e 'fases' (ordem das colunas com match_pattern). Depois altere "
+                "'source' para 'user_defined' e rode de novo."
+            ),
+        }
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(json.dumps(stub, indent=2, ensure_ascii=False), encoding="utf-8")
+        warnings.append(
+            f"matrix-structure.json criado como stub em {config_path}. "
+            "Complete processos + fases via AskUserQuestion e rode de novo."
+        )
+        return stub
+
+    structure = {
+        "version": 1,
+        "source": "inferred",
+        "inferred_at": datetime.now().isoformat(timespec="seconds"),
+        "processos": inferred["processos"],
+        "fases": inferred["fases"],
+    }
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(structure, indent=2, ensure_ascii=False), encoding="utf-8")
+    return structure
+
+
+def build_matrix_cells(
+    structure: dict,
+    entries: list[dict],
+    report_date: datetime,
+) -> dict:
+    """Builds the processos × fases status grid using the provided structure.
+
+    For each (processo, fase), finds the single task in `entries` whose `etapa`
+    contains both the fase.match_pattern AND the processo.label (case-folded
+    NFD-normalized). Uses the task's `status` field + fim_plan vs report_date
+    to classify the cell: done, active (in_progress/blocked), overdue, not_started.
+
+    Returns:
+    {
+        "processos": [...],  # from structure
+        "fases": [...],      # from structure
+        "matrix": [[cell, ...], ...],  # 2D grid [processo][fase]
+        "meta": {"total_cells": int, "done_cells": int, "active_cells": int,
+                 "overdue_cells": int, "not_started_cells": int}
+    }
+    """
+    processos = structure.get("processos", [])
+    fases = structure.get("fases", [])
+    acoes = [e for e in entries if str(e.get("tipo", "")).lower() in ("ação", "acao")]
+
+    matrix = []
+    counters = {"done": 0, "active": 0, "overdue": 0, "not_started": 0, "missing": 0}
+    for processo in processos:
+        row = []
+        p_norm = _normalize_match(processo.get("label", ""))
+        for fase in fases:
+            f_norm = _normalize_match(fase.get("match_pattern", ""))
+            match = None
+            for e in acoes:
+                e_norm = _normalize_match(str(e.get("etapa", "")))
+                if p_norm and f_norm and p_norm in e_norm and f_norm in e_norm:
+                    match = e
+                    break
+            if not match:
+                row.append({"status": "missing", "task_no": None, "deadline": None})
+                counters["missing"] += 1
+                continue
+            status = match.get("status", "not_started")
+            fim = match.get("fim_plan")
+            deadline = fim.strftime("%d/%m") if isinstance(fim, datetime) else None
+            if status == "done":
+                cell_status = "done"
+            elif status in ("in_progress", "blocked"):
+                cell_status = "active"
+            elif isinstance(fim, datetime) and fim < report_date and status != "done":
+                cell_status = "overdue"
+            else:
+                cell_status = "not_started"
+            row.append({
+                "status": cell_status,
+                "task_no": str(match.get("no", "")),
+                "deadline": deadline,
+            })
+            counters[cell_status] += 1
+        matrix.append(row)
+
+    total = sum(v for k, v in counters.items() if k != "missing")
+    return {
+        "processos": processos,
+        "fases": fases,
+        "matrix": matrix,
+        "meta": {
+            "total_cells": total,
+            "done_cells": counters["done"],
+            "active_cells": counters["active"],
+            "overdue_cells": counters["overdue"],
+            "not_started_cells": counters["not_started"],
+            "missing_cells": counters["missing"],
+        },
+    }
+
+
 def compute_today_pct(milestones: list[dict], report_date: datetime) -> float | None:
     """Interpolates today's x-axis position (%) on the roadmap timeline using two
     milestone anchors (earliest and latest with known `date` + `left_pct`).
@@ -972,6 +1271,26 @@ def collect(project_dir: Path, report_date_str: str) -> dict:
         "bar_status_by_title": bar_status_map,
     }
 
+    # Processos × Fases matrix for the "Visão Geral do Roadmap" slide.
+    # Reads or infers structure; persists to <proj>/4-status-report/matrix-structure.json
+    matrix_structure_cfg = load_or_infer_matrix_structure(
+        project_dir, entries, bar_titles, warnings,
+    )
+    if matrix_structure_cfg.get("source") == "pending_user_input":
+        # Stub exists → slide 3 will render empty; other slides OK
+        roadmap_structure = {
+            "processos": [],
+            "fases": [],
+            "matrix": [],
+            "meta": {"total_cells": 0, "done_cells": 0, "active_cells": 0,
+                     "overdue_cells": 0, "not_started_cells": 0, "missing_cells": 0},
+            "source": "pending_user_input",
+            "candidate_processos": matrix_structure_cfg.get("candidate_processos", []),
+        }
+    else:
+        roadmap_structure = build_matrix_cells(matrix_structure_cfg, entries, report_date)
+        roadmap_structure["source"] = matrix_structure_cfg.get("source", "inferred")
+
     synth = synthesize(entries, risks, changelog, milestones, report_date, warnings)
 
     clickup_url = None
@@ -1016,6 +1335,7 @@ def collect(project_dir: Path, report_date_str: str) -> dict:
         risks=risks,
         changelog_entries=[{k: v for k, v in e.items() if k != "raw"} for e in changelog[:30]],
         roadmap_overlays=roadmap_overlays,
+        roadmap_structure=roadmap_structure,
         warnings=warnings,
     )
     return result.to_dict()

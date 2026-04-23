@@ -13,6 +13,39 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.5.0] - 2026-04-22
+
+Reintroduz o slide "Visão Geral do Roadmap" (Paper artboard `03 — Visão Geral`) como
+matriz processos × fases. Deck cresce de 6 para 7 slides. A estrutura da matriz é
+inferida automaticamente da WBS do `Cronograma.xlsx` LIVE usando os títulos de bars
+do `roadmap-marcos.html` como lista canônica de processos, e é persistida em
+`<proj>/4-status-report/matrix-structure.json` para reuso nas rodadas seguintes e
+edição manual quando necessário.
+
+### Added
+- [scripts/collect_data.py](skills/generating-status-materials/scripts/collect_data.py) · `infer_matrix_structure(entries, bar_titles)` — heurística que triangula os títulos de bars do roadmap-marcos.html com as tarefas `Ação` do xlsx: se todos os processos têm o mesmo número N de tasks com prefixos uniformes, extrai as N fases comuns. Retorna `None` quando padrão não existe (sinaliza fallback).
+- `collect_data.py` · `load_or_infer_matrix_structure(project_dir, entries, bar_titles, warnings, force_reinfer=False)` — pipeline completo de descoberta e persistência. Lê JSON se existir (usuário pode ter editado); se ausente, infere e salva; se inferência falha, gera stub `pending_user_input` com `candidate_processos` para o agente completar via AskUserQuestion.
+- `collect_data.py` · `build_matrix_cells(structure, entries, report_date)` — lookup determinístico de cada célula (processo × fase) na intersecção: filtra task cujo `etapa` contém processo.label E fase.match_pattern (matching NFD-normalized), extrai status do Cronograma LIVE, classifica em `done | active | overdue | not_started | missing`.
+- Label heurística inteligente para fases: `"Plano de implementação"` → `"Implementação"`, `"Mapa N2 — Jornada do cliente"` → `"Mapa N2"`, `"DEIP + Tabela de Desconexões"` → `"DEIP"`. Usa palavras genéricas ({plano, mapa, fase, etapa}) como sinal para pegar o substantivo principal no lugar do opener.
+- [scripts/build_pptx.py](skills/generating-status-materials/scripts/build_pptx.py) · `slide_03_visao_geral_roadmap` reescrito: renderiza grid processos × fases com header "PROCESSO" + 1 coluna por fase, linhas com WBS prefix + nome do processo, células como quadrados coloridos (18×18) ou dash "—" quando sem task mapeada. Hero dinâmico: `"X de Y entregas em execução (P% concluídas)"`.
+- Novo artefato persistente `<proj>/4-status-report/matrix-structure.json` — estrutura schema com `version`, `source` (inferred/user_defined/pending_user_input), `processos[]` (label + wbs_prefix), `fases[]` (code + label + match_pattern).
+- [SKILL.md](skills/generating-status-materials/SKILL.md) · nova seção "Matriz Processos × Fases no Slide Visão Geral (v1.5)" documentando schema do JSON, algoritmo de inferência, fluxo de conversa interativa (script escreve stub, agente orquestra AskUserQuestion), e política de tasks estruturais fora da matriz.
+
+### Changed
+- Schema de `roadmap_structure` no output JSON do `collect_data.py` — **breaking change internal** (consumido apenas por build_pptx.py). Antes: `{months, lanes, active_lanes_count, total_lanes}`. Agora: `{processos, fases, matrix: [[cell]], meta: {total_cells, done_cells, active_cells, overdue_cells, not_started_cells, missing_cells}, source}`.
+- Deck cresce de 6 para 7 slides: Cover, Agenda, Visão Geral, Roadmap Completo, Mapa de Status Executivo, Riscos, Closing. Agenda (slide 2) atualizada com 5 itens.
+- Eyebrows renumerados: "04 · ROADMAP" → "04 · ROADMAP" (slide 4 agora é Roadmap), "05 · STATUS EXECUTIVO", "06 · RISCOS", e novo "03 · VISÃO GERAL".
+- Funções renomeadas em build_pptx.py: `slide_04_mapa_status_executivo` → `slide_05_mapa_status_executivo`, `slide_05_risks` → `slide_06_risks`, `slide_06_closing` → `slide_07_closing`. `slide_04_roadmap` mantém nome mas agora é chamado na posição 4 em vez de 3.
+
+### Validation
+- Smoke test no projeto `H1-02 Playbook de Processos` (91 tasks no xlsx, 15 bars no roadmap-marcos.html):
+  - Inferência identificou 11 processos (Seguros 2.2 → Relacionamento & Retenção 2.12) + 6 fases (Mapa N2, Mapa N3, DEIP, Políticas, Playbook, Implementação)
+  - Matriz 11 × 6 = 66 células, todas `not_started` em 22/04/2026 (projeto em Sprint F1, tasks F2A+F2B+F3 ainda não iniciadas)
+  - Hero correto: "0 de 66 entregas em execução (0% concluídas)"
+  - 25 tasks estruturais (F1 Planejamento, F2.0 Fundação Transversal, F2.13 Monitoramento, F3 Encerramento) ficaram fora da matriz conforme especificado — continuam visíveis em outros slides
+  - `matrix-structure.json` gerado automaticamente em 4-status-report/, pronto para edição manual se usuário quiser ajustar labels ou ordem
+- Preview HTML equivalente aprovado visualmente pelo usuário antes do commit
+
 ## [1.4.0] - 2026-04-22
 
 Refinamento visual do deck de status após validação da v1.3.0 em produção. Três mudanças principais:

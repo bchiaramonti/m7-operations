@@ -310,12 +310,13 @@ def slide_02_agenda(prs, data, assets_dir):
              size=48, color=COL_BG_LIGHT)
     # Divider
     add_rect(slide, 80, 220, 1120, 1, COL_BG_LIGHT)
-    # Items — deck de 6 slides (Cover · Agenda · Roadmap · Mapa Status · Riscos · Closing)
+    # Items — deck de 7 slides (Cover · Agenda · Visão Geral · Roadmap · Mapa Status · Riscos · Closing)
     items = [
-        ("01", "Roadmap Completo", "Slide 03"),
-        ("02", "Mapa de Status Executivo", "Slide 04"),
-        ("03", "Riscos Ativos", "Slide 05"),
-        ("04", "Próximos Passos", "Slide 06"),
+        ("01", "Visão Geral do Roadmap", "Slide 03"),
+        ("02", "Roadmap Completo", "Slide 04"),
+        ("03", "Mapa de Status Executivo", "Slide 05"),
+        ("04", "Riscos Ativos", "Slide 06"),
+        ("05", "Próximos Passos", "Slide 07"),
     ]
     y = 246
     for num, title, rng in items:
@@ -373,8 +374,145 @@ def _render_roadmap_screenshot(
         return None
 
 
-def slide_03_roadmap(prs, data, assets_dir, ctx):
-    """Slide 3 — Roadmap: full swim-lane screenshot from roadmap-marcos.html
+def slide_03_visao_geral_roadmap(prs, data, assets_dir, ctx):
+    """Slide 3 — Visão Geral do Roadmap (Paper artboard `03 — Visão Geral`).
+
+    Renders a processos × fases matrix:
+      - Rows: processos from matrix-structure.json (11 playbooks for this project)
+      - Columns: fases do trabalho (Mapa N2, Mapa N3, DEIP, Políticas, Playbook, Implementação)
+      - Cells: status-colored squares per task in the (processo, fase) intersection
+
+    Structure is inferred once (persisted to <proj>/4-status-report/matrix-structure.json)
+    and can be edited by the user. When inference fails, the JSON has
+    source="pending_user_input" and the slide renders a helpful placeholder.
+    """
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_BG_LIGHT)
+
+    structure = data.get("roadmap_structure") or {}
+    processos = structure.get("processos", [])
+    fases = structure.get("fases", [])
+    matrix = structure.get("matrix", [])
+    meta = structure.get("meta", {}) or {}
+    source = structure.get("source", "inferred")
+
+    # Header
+    add_text(slide, 80, 40, 400, 16, "03 · VISÃO GERAL",
+             size=12, bold=True, color=COL_PRIMARY, tracking=0.2)
+    add_logo(slide, 1180, 36, 60, assets_dir, "dark")
+
+    done = meta.get("done_cells", 0)
+    active = meta.get("active_cells", 0)
+    total = meta.get("total_cells", 0)
+    if total > 0:
+        pct = round(100 * done / total)
+        hero = f"{done + active} de {total} entregas em execução ({pct}% concluídas)"
+    else:
+        hero = "Visão Geral do Roadmap"
+    add_text(slide, 80, 58, 1100, 40, hero, size=26, color=COL_PRIMARY)
+    add_text(slide, 80, 100, 1120, 20,
+             "Status por processo × fase do trabalho · fonte: Cronograma.xlsx LIVE.",
+             size=12, color=COL_TEXT_SUBTLE)
+
+    # Handle pending/empty structure — inform the user
+    if source == "pending_user_input" or not processos or not fases:
+        add_text(slide, 80, 300, 1120, 30,
+                 "Estrutura da matriz ainda não definida.",
+                 size=18, bold=True, color=COL_STATUS_WARN, align="center")
+        add_text(slide, 80, 340, 1120, 30,
+                 "Edite <proj>/4-status-report/matrix-structure.json ou rode o fluxo interativo da skill.",
+                 size=12, color=COL_TEXT_SUBTLE, align="center")
+        return
+
+    # Matrix layout — adapts column width to number of fases
+    n_fases = len(fases)
+    table_x = 80
+    table_y = 160
+    proc_col_w = 260
+    # Available width for fase columns:
+    avail_w = 1120 - proc_col_w
+    fase_col_w = avail_w // max(n_fases, 1)
+    header_h = 38
+    # Row height adapts to fit up to 12 rows within ~440px of vertical space
+    n_rows = len(processos)
+    max_rows_space = 440
+    row_h = min(40, max_rows_space // max(n_rows, 1))
+    cell_square_size = 18
+
+    # Header row — PROCESSO column + one column per fase
+    add_rect(slide, table_x, table_y, proc_col_w + n_fases * fase_col_w, header_h,
+             COL_TABLE_HDR_BG)
+    add_text(slide, table_x + 16, table_y + 11, proc_col_w - 16, 18,
+             "PROCESSO", size=10, bold=True, color=COL_TEXT_MUTED, tracking=0.14)
+    for i, fase in enumerate(fases):
+        fx = table_x + proc_col_w + i * fase_col_w
+        add_text(slide, fx, table_y + 11, fase_col_w, 18,
+                 fase.get("label", "").upper(), size=10, bold=True,
+                 color=COL_TEXT_MUTED, tracking=0.14, align="center")
+
+    # Data rows — one per processo
+    status_color = {
+        "done": COL_STATUS_OK,
+        "active": COL_STATUS_PROG,
+        "overdue": COL_STATUS_CRIT,
+        "not_started": COL_STATUS_NEUTRAL,
+    }
+    for row_idx, processo in enumerate(processos):
+        ry = table_y + header_h + row_idx * row_h
+        # Row bottom border (subtle)
+        add_rect(slide, table_x, ry + row_h - 1,
+                 proc_col_w + n_fases * fase_col_w, 1, COL_ROW_BORDER)
+        # Processo label: small WBS prefix + name
+        wbs = processo.get("wbs_prefix", "")
+        name = processo.get("label", "")
+        if wbs:
+            add_text(slide, table_x + 16, ry + row_h // 2 - 10, 52, 20,
+                     wbs, size=10, bold=True, color=COL_TEXT_SUBTLE)
+            add_text(slide, table_x + 72, ry + row_h // 2 - 10, proc_col_w - 72, 20,
+                     truncate(name, 32), size=12, color=COL_TEXT_MUTED)
+        else:
+            add_text(slide, table_x + 16, ry + row_h // 2 - 10, proc_col_w - 16, 20,
+                     truncate(name, 36), size=12, color=COL_TEXT_MUTED)
+        # Cells
+        row_cells = matrix[row_idx] if row_idx < len(matrix) else []
+        for i in range(n_fases):
+            cell = row_cells[i] if i < len(row_cells) else {"status": "missing"}
+            cx_center = table_x + proc_col_w + i * fase_col_w + fase_col_w // 2
+            cy_center = ry + row_h // 2
+            cell_status = cell.get("status", "missing")
+            if cell_status == "missing":
+                add_text(slide, cx_center - 30, cy_center - 9, 60, 18,
+                         "—", size=16, color=COL_TEXT_CAPTION, align="center")
+            else:
+                color = status_color.get(cell_status, COL_STATUS_NEUTRAL)
+                add_rect(slide,
+                         cx_center - cell_square_size // 2,
+                         cy_center - cell_square_size // 2,
+                         cell_square_size, cell_square_size, color)
+
+    # Legend + footer
+    legend_y = 650
+    legend_items = [
+        ("Concluída", COL_STATUS_OK),
+        ("Em andamento", COL_STATUS_PROG),
+        ("Atrasada", COL_STATUS_CRIT),
+        ("Não iniciada", COL_STATUS_NEUTRAL),
+    ]
+    lx = 80
+    for label, color in legend_items:
+        add_rect(slide, lx, legend_y + 4, 12, 12, color)
+        add_text(slide, lx + 18, legend_y + 2, 110, 14,
+                 label, size=9, color=COL_TEXT_MUTED)
+        lx += 140
+    add_text(slide, lx, legend_y + 2, 140, 14,
+             "—  Sem task mapeada", size=9, color=COL_TEXT_CAPTION)
+    add_text(slide, 80, 680, 1120, 14,
+             f"Fonte: Cronograma.xlsx LIVE + matrix-structure.json · atualizado em {data.get('report_date','')}",
+             size=9, color=COL_TEXT_CAPTION)
+
+
+def slide_04_roadmap(prs, data, assets_dir, ctx):
+    """Slide 4 — Roadmap Completo: full swim-lane screenshot from roadmap-marcos.html
     with status-based bar coloring and the HOJE vertical reference line.
 
     Visual source of truth is the same HTML approved when building the plan.
@@ -386,7 +524,7 @@ def slide_03_roadmap(prs, data, assets_dir, ctx):
     add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_BG_LIGHT)
 
     # Header
-    add_text(slide, 80, 40, 400, 16, "03 · ROADMAP",
+    add_text(slide, 80, 40, 400, 16, "04 · ROADMAP",
              size=12, bold=True, color=COL_PRIMARY, tracking=0.2)
     add_logo(slide, 1180, 36, 60, assets_dir, "dark")
     add_text(slide, 80, 58, 900, 36, "Roadmap Completo",
@@ -423,8 +561,8 @@ def slide_03_roadmap(prs, data, assets_dir, ctx):
              size=9, color=COL_TEXT_CAPTION)
 
 
-def slide_04_mapa_status_executivo(prs, data, assets_dir, ctx):
-    """Slide 4 — Mapa de Status Executivo (Paper artboard `06 — Executive Status`).
+def slide_05_mapa_status_executivo(prs, data, assets_dir, ctx):
+    """Slide 5 — Mapa de Status Executivo (Paper artboard `06 — Executive Status`).
 
     Layout replicando o Paper:
       - Header: eyebrow "04 · STATUS EXECUTIVO" + título evocativo + hero sentence (X/Y tarefas)
@@ -436,7 +574,7 @@ def slide_04_mapa_status_executivo(prs, data, assets_dir, ctx):
     add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_BG_LIGHT)
 
     # Header — eyebrow numerado + título explícito + hero sentence
-    add_text(slide, 40, 28, 800, 14, "04 · STATUS EXECUTIVO",
+    add_text(slide, 40, 28, 800, 14, "05 · STATUS EXECUTIVO",
              size=11, bold=True, color=COL_PRIMARY, tracking=0.2)
     add_text(slide, 40, 44, 900, 32, "Mapa de Status Executivo",
              size=24, color=COL_PRIMARY)
@@ -558,8 +696,8 @@ def slide_04_mapa_status_executivo(prs, data, assets_dir, ctx):
              size=10, color=COL_TEXT_CAPTION)
 
 
-def slide_05_risks(prs, data, assets_dir):
-    """Slide 5 — Riscos Ativos: top-N por severidade (crit + high), em 2 colunas.
+def slide_06_risks(prs, data, assets_dir):
+    """Slide 6 — Riscos Ativos: top-N por severidade (crit + high), em 2 colunas.
 
     Design fiel ao artboard Paper `07 — Risks`:
       - Accent bar vertical colorida à esquerda (pela severidade)
@@ -572,7 +710,7 @@ def slide_05_risks(prs, data, assets_dir):
     add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_BG_LIGHT)
 
     # Header
-    add_text(slide, 80, 56, 400, 16, "05 · RISCOS",
+    add_text(slide, 80, 56, 400, 16, "06 · RISCOS",
              size=12, bold=True, color=COL_PRIMARY, tracking=0.2)
     add_logo(slide, 1180, 48, 60, assets_dir, "dark")
     add_text(slide, 80, 80, 900, 40,
@@ -661,7 +799,7 @@ def truncate(s, max_len):
     return s if len(s) <= max_len else s[: max_len - 1].rstrip() + "…"
 
 
-def slide_06_closing(prs, data, assets_dir):
+def slide_07_closing(prs, data, assets_dir):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_PRIMARY)
     add_text(slide, 80, 64, 400, 20, "PRÓXIMOS PASSOS",
@@ -699,8 +837,8 @@ def slide_06_closing(prs, data, assets_dir):
 # ---- Main ----
 
 def build(data: dict, out_path: Path, assets_dir: Path, ctx: dict):
-    """Builds the 6-slide status presentation. Ordering reflects the v1.4 redesign:
-    Cover · Agenda · Roadmap · Mapa de Status Executivo · Riscos · Closing.
+    """Builds the 7-slide status presentation. Ordering (v1.5):
+    Cover · Agenda · Visão Geral · Roadmap · Mapa de Status Executivo · Riscos · Closing.
     """
     prs = Presentation()
     prs.slide_width = Inches(13.333)
@@ -708,10 +846,11 @@ def build(data: dict, out_path: Path, assets_dir: Path, ctx: dict):
 
     slide_01_cover(prs, data, assets_dir)
     slide_02_agenda(prs, data, assets_dir)
-    slide_03_roadmap(prs, data, assets_dir, ctx)
-    slide_04_mapa_status_executivo(prs, data, assets_dir, ctx)
-    slide_05_risks(prs, data, assets_dir)
-    slide_06_closing(prs, data, assets_dir)
+    slide_03_visao_geral_roadmap(prs, data, assets_dir, ctx)
+    slide_04_roadmap(prs, data, assets_dir, ctx)
+    slide_05_mapa_status_executivo(prs, data, assets_dir, ctx)
+    slide_06_risks(prs, data, assets_dir)
+    slide_07_closing(prs, data, assets_dir)
 
     prs.save(str(out_path))
 

@@ -150,17 +150,64 @@ Executado em `collect_data.py` (não em LLM). Regras em [`narrative-synthesis.md
 
 ## Mapeamento Paper → PPTX
 
-O deck produzido tem **6 slides** executivos (v1.4 simplificou de 8 para 6 removendo
-o "Marcos do Projeto" redundante e o Section Divider):
+O deck produzido tem **7 slides** executivos (v1.5 reintroduziu "Visão Geral" como
+matriz processos × fases):
 
 | # | Slide | Fonte de conteúdo |
 |---|---|---|
 | 1 | Cover (foto M7 + dark overlay) | `assets/m7-hero-dark.png` + `project.name`, `period_label` |
-| 2 | Agenda (4 itens) | lista fixa refletindo slides 3-6 |
-| 3 | **Roadmap Completo** | **screenshot** `roadmap-marcos.html > .roadmap` com **overlays dinâmicos**: bars coloridas por status de execução (verde=done, azul=active, vermelho=overdue, fade=future) + linha vertical HOJE interpolada |
-| 4 | **Mapa de Status Executivo** | Timeline M0-M7 python-pptx + HOJE overlay + 2 colunas (Status Executivo + Próximas Atividades) + Pontos de Atenção. Título visível "Mapa de Status Executivo" |
-| 5 | Riscos Ativos | Até 6 cards (crit+high) em 2 colunas, de `risks` filtrado por `severity_class` |
-| 6 | Closing | Próxima ação prioritária + contato |
+| 2 | Agenda (5 itens) | lista fixa refletindo slides 3-7 |
+| 3 | **Visão Geral do Roadmap** | Matriz **processos × fases** renderizada em python-pptx. Linhas = processos do plano; colunas = fases uniformes do trabalho; células = status da task intersectada. Fonte: `matrix-structure.json` + `Cronograma.xlsx` LIVE |
+| 4 | **Roadmap Completo** | **screenshot** `roadmap-marcos.html > .roadmap` com **overlays dinâmicos**: bars coloridas por status de execução (verde=done, azul=active, vermelho=overdue, fade=future) + linha vertical HOJE interpolada |
+| 5 | **Mapa de Status Executivo** | Timeline M0-M7 python-pptx + HOJE overlay + 2 colunas (Status Executivo + Próximas Atividades) + Pontos de Atenção. Título visível "Mapa de Status Executivo" |
+| 6 | Riscos Ativos | Até 6 cards (crit+high) em 2 colunas, de `risks` filtrado por `severity_class` |
+| 7 | Closing | Próxima ação prioritária + contato |
+
+### Matriz Processos × Fases no Slide Visão Geral (v1.5)
+
+Estrutura persistida em `<proj>/4-status-report/matrix-structure.json`:
+
+```json
+{
+  "version": 1,
+  "source": "inferred",
+  "processos": [{"label": "Crédito", "wbs_prefix": "2.5"}, ...],
+  "fases": [
+    {"code": "MAPA_N2", "label": "Mapa N2", "match_pattern": "Mapa N2 — Jornada do cliente"},
+    ...
+  ]
+}
+```
+
+**Inferência automática** (primeira execução):
+1. `collect_data.py::infer_matrix_structure` usa `bar_titles` do `roadmap-marcos.html` como
+   lista canônica de processos (linhas)
+2. Para cada processo, coleta tasks-Ação cujo `etapa` contém o título (matching NFD-normalized)
+3. Se todos os processos têm **N tasks com prefixos uniformes**, extrai as N fases comuns
+   (colunas). Exemplos: "Mapa N2 — Jornada do cliente", "Mapa N3 — Processos detalhados",
+   "DEIP + Tabela de Desconexões", "Políticas e manuais aplicáveis", "Playbook consolidado",
+   "Plano de implementação"
+4. Labels curtos derivados heuristicamente ("Plano de implementação" → "Implementação",
+   "Mapa N2 — Jornada do cliente" → "Mapa N2", etc.)
+
+**Fallback: conversa interativa** (quando inferência falha — projetos sem padrão uniforme):
+
+Scripts Python não têm acesso direto a `AskUserQuestion` (tool do runtime Claude Code).
+Fluxo da skill quando o `matrix-structure.json` tem `"source": "pending_user_input"`:
+
+1. `collect_data.py` escreve stub com campo `candidate_processos` (títulos das bars do roadmap)
+   + warning + continua gerando os demais slides normalmente
+2. **Agente (Claude Code) deve**, ao ver o warning:
+   a. Rodar `AskUserQuestion` com lista de `candidate_processos` → usuário confirma/edita
+   b. Coletar lista de fases (label + match_pattern) via prompt ou AskUserQuestion
+   c. Atualizar o JSON: `source: "user_defined"`, `processos: [...]`, `fases: [...]`
+   d. Re-rodar `collect_data.py` + `build_pptx.py` — estrutura agora carregada do arquivo
+3. Em rodadas subsequentes, o arquivo JSON é fonte de verdade (nunca reinferido)
+
+**Tasks estruturais fora da matriz**: F1 Planejamento, F2.0 Fundação Transversal,
+F2.13 Monitoramento, F3 Encerramento. Essas não entram nas células — aparecem em outros
+slides (Roadmap Completo, Mapa de Status Executivo, Riscos). A matriz fica enxuta e
+consistente entre projetos.
 
 ### Overlays dinâmicos no Slide Roadmap (v1.4)
 
