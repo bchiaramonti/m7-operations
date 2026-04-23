@@ -36,6 +36,13 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* body como flex column garante que footer gruda no bottom; espaço branco
+     residual fica ANTES do footer em vez de depois (fim da página A4). */
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 1123px;  /* A4 portrait @ 96dpi */
+  }
 
   /* Compact mode: aplicado quando o conteúdo estoura A4.
      Reduz padding vertical sem mexer em font-size (legibilidade preservada). */
@@ -43,14 +50,17 @@
   body.compact .hero__title { font-size: 22px; }
   body.compact .zone { padding: 12px 32px 6px 32px; gap: 8px; }
   body.compact .section-title { font-size: 14px; }
-  body.compact .roadmap__track { padding: 24px 0 14px 0; }
-  body.compact .roadmap__marker { top: 38px; }
+  body.compact .roadmap__track { padding: 10px 0 32px 0; min-height: 120px; }
+  body.compact .roadmap__rail { margin: 32px 0 0 0; }
+  body.compact .roadmap__marker { top: 50px; }
+  body.compact .roadmap__marker--below .roadmap__labels { top: 16px; }
+  body.compact .roadmap__marker--above .roadmap__labels { bottom: 16px; }
   body.compact .matrix__colhdr { padding: 5px 0; }
   body.compact .matrix__row { padding: 3px 0; }
   body.compact .progress__cols { padding-top: 8px; }
   body.compact .progress__item { padding: 1px 0; }
   body.compact .risks__empty { padding: 10px 12px; }
-  body.compact .footer { padding: 10px 32px 12px 32px; margin-top: 6px; }
+  body.compact .footer { padding: 10px 32px 12px 32px; /* margin-top: auto still applies */ }
 
   .section-label {
     font-size: 9px;
@@ -136,35 +146,52 @@
   }
 
   /* ============ ROADMAP (Timeline) ============ */
+  /* Layout vertical do track (top → bottom):
+       - months row (14px padding-bottom)
+       - gap para "above" labels (~30px livres)
+       - rail (2px) + diamond
+       - gap para "below" labels (~30px livres)
+     Isso evita que marker labels acima do rail colidam com os months (ABR/MAI/...). */
   .roadmap__track {
     position: relative;
     border-top: 1px solid var(--m7-primary);
-    padding: 32px 0 24px 0;
+    padding: 12px 0 40px 0;
+    min-height: 140px;
   }
   .roadmap__months {
-    display: flex; justify-content: space-between; padding: 0 0 14px 0;
+    display: flex; justify-content: space-between;
+    padding: 0;
+    height: 14px;
   }
   .roadmap__months span {
     font-size: 8px; font-weight: 700; letter-spacing: 0.18em; color: var(--m7-text-caption);
   }
-  .roadmap__rail { height: 2px; background: var(--row-border); margin-bottom: 8px; }
+  /* Gap vertical entre months row e o rail — hospeda os labels "above" dos markers. */
+  .roadmap__rail {
+    height: 2px; background: var(--row-border);
+    margin: 38px 0 0 0;  /* 38px de ar acima do rail p/ labels "above" */
+  }
+  /* HOJE line atravessa do topo (abaixo dos months) até o final do track,
+     cortando a rail e cobrindo ambas áreas "above" e "below" dos markers. */
   .roadmap__hoje-line {
-    position: absolute; top: 14px; bottom: 0;
+    position: absolute; top: 18px; bottom: 4px;
     width: 2px; background: var(--status-critical);
   }
   .roadmap__hoje-label {
-    position: absolute; top: 0;
+    position: absolute; top: 4px;
     transform: translateX(-50%);
     font-size: 9px; font-weight: 700; letter-spacing: 0.14em; color: var(--status-critical);
     background: var(--m7-bg-light);
     padding: 2px 6px; border: 1px solid var(--status-critical); border-radius: 2px;
     white-space: nowrap;
   }
+  /* Marker: diamond fica fixo na rail; labels alternam above/below por índice.
+     Rail position = 12px (track pad-top) + 14px (months) + 38px (gap above-labels)
+                   = 64px from track top. Diamond center = 64-6 = 58px. */
   .roadmap__marker {
-    position: absolute; top: 46px;
+    position: absolute;
+    top: 58px;
     transform: translateX(-50%);
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    text-align: center;
   }
   .roadmap__marker--last { transform: translateX(-90%); }
   .roadmap__diamond {
@@ -174,8 +201,18 @@
   .diamond-active { background: var(--status-progress); }
   .diamond-overdue { background: var(--status-critical); }
   .diamond-not_started { background: transparent; border: 1.5px solid var(--status-neutral); }
-  .roadmap__marker .label { font-size: 9px; font-weight: 700; color: var(--m7-primary); white-space: nowrap; }
-  .roadmap__marker .date  { font-size: 9px; color: var(--m7-text-subtle); }
+  .roadmap__labels {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .roadmap__marker--below .roadmap__labels { top: 18px; }
+  .roadmap__marker--above .roadmap__labels { bottom: 18px; }
+  .roadmap__labels .label { font-size: 9px; font-weight: 700; color: var(--m7-primary); }
+  .roadmap__labels .date  { font-size: 9px; color: var(--m7-text-subtle); }
 
   /* ============ MATRIX (Processos × Fases) ============ */
   .matrix {
@@ -321,7 +358,7 @@
   .footer {
     display: flex; justify-content: space-between; align-items: center;
     padding: 16px 32px 20px 32px;
-    margin-top: 12px;
+    margin-top: auto;  /* pushes footer to the bottom of the A4 viewport */
     border-top: 1px solid var(--row-border);
     font-size: 9px; color: var(--m7-text-caption);
   }
@@ -401,10 +438,13 @@
         <div class="roadmap__hoje-label" style="left: {{ roadmap_overlays.today_pct }}%;">{{ roadmap_overlays.today_label }}</div>
       {% endif %}
       {% for m in macro_milestones %}
-        <div class="roadmap__marker {% if loop.last %}roadmap__marker--last{% endif %}" style="left: {{ m.left_pct or (loop.index0 * 14) }}%;">
+        <div class="roadmap__marker roadmap__marker--{{ 'above' if loop.index0 % 2 == 0 else 'below' }}{% if loop.last %} roadmap__marker--last{% endif %}"
+             style="left: {{ m.left_pct or (loop.index0 * 14) }}%;">
           <div class="roadmap__diamond diamond-{{ m.status }}"></div>
-          <div class="label">{{ m.label }}</div>
-          <div class="date">{{ m.date_short or '' }}</div>
+          <div class="roadmap__labels">
+            <div class="label">{{ m.label }}</div>
+            <div class="date">{{ m.date_short or '' }}</div>
+          </div>
         </div>
       {% endfor %}
     </div>

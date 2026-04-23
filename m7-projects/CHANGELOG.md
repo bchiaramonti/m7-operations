@@ -13,6 +13,25 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.7.2] - 2026-04-23
+
+Dois polimentos visuais do OPR após feedback de render no PDF:
+
+### Fixed
+- **Timeline com sobreposição de labels**: mesmo após filtrar para gates majors em v1.7.1, labels M4 COBERTURA 100% e M7 TE ASSINADO colidiam (gap de left_pct de ~13pp, mas labels longos). Solução: alternar labels **acima** e **abaixo** do rail (markers pares = above, ímpares = below). Diamond permanece fixo na rail. Padrão editorial clássico de timelines densas Swiss/PMBOK.
+- **Espaço em branco abaixo do footer**: com `min-height: 1123px` + footer sem ancoragem, o PDF deixava ~60px de off-white após o footer ao fim da página A4. Solução: `body { display: flex; flex-direction: column; min-height: 1123px; }` + `footer { margin-top: auto; }` — o espaço disponível passa a ficar ANTES do footer (ajustes entre zonas), e o footer gruda na base.
+
+### Changed
+- `.roadmap__track` layout reestruturado: padding-top reduzido (months row encostado no topo) + `margin: 38px` acima do rail para hospedar labels "above" + padding-bottom expandido para labels "below". Total height ~140px (antes ~120px).
+- `.roadmap__marker` agora tem `.roadmap__labels` como wrapper posicionado absoluto com `top`/`bottom` alternando via modifier classes `--above`/`--below`. O diamond fica no próprio marker (fixo na rail).
+- `.roadmap__hoje-line` agora se estende de `top: 18px` (abaixo dos months) até `bottom: 4px`, cobrindo ambas as áreas de labels (above + below).
+- `.roadmap__hoje-label` movido para `top: 4px` (antes 0) para não colidir com a área dos month labels.
+
+### Validation
+- Preview visual do projeto Playbook em 23/04: M0/M2/M4 labels acima da rail, M1/M3/M7 labels abaixo. Sem nenhuma sobreposição. Month labels (MAR/ABR/MAI/JUN/JUL) em faixa separada no topo.
+- Footer grudado na base (top = 1075px, body = 1123px, gap = 48px usado internamente entre zonas).
+- PDF cabe em A4 com compact mode mantido.
+
 ## [1.7.1] - 2026-04-23
 
 Polimentos de UX no OPR após release do framework 5-métricas. Três ajustes
