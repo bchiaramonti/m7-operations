@@ -72,6 +72,22 @@ def generate_mini_swimlane(roadmap_html: Path | None, tmp_dir: Path) -> str | No
         return None
 
 
+def pick_unhealthy_reasons(metric_zones: dict, reasons: list) -> list:
+    """Returns the status_reasons entries whose metric zone is yellow or red.
+
+    Relies on positional alignment: the first 4 reasons in `reasons` correspond to
+    the metrics in the fixed order emitted by collect_data.classify_zone (DG, SG,
+    SPI, MSI). Reasons at index ≥4 (EDR, gates, overrides) are ignored — they
+    don't participate in the worst-of classification directly.
+    """
+    keys = ["dg", "sg", "spi", "msi"]
+    out = []
+    for i, k in enumerate(keys):
+        if i < len(reasons) and metric_zones.get(k) in ("yellow", "red"):
+            out.append(reasons[i])
+    return out
+
+
 def pick_top_risks(risks: list[dict], limit: int = 3) -> list[dict]:
     """Top-N risks by severity (crit > high > med), excluding upsides."""
     actual = [r for r in risks if not r.get("is_upside")]
@@ -124,15 +140,19 @@ def render_html(
     next_marcos = pick_next_milestones(data.get("macro_milestones", []), limit=3)
 
     # Roadmap data
-    macro_milestones = data.get("macro_milestones", [])
-    total_marcos = len(macro_milestones)
-    done_marcos = sum(1 for m in macro_milestones if m.get("status") == "done")
-    active_phase = _infer_active_phase(macro_milestones)
+    all_macro_milestones = data.get("macro_milestones", [])
+    total_marcos = len(all_macro_milestones)
+    done_marcos = sum(1 for m in all_macro_milestones if m.get("status") == "done")
+    active_phase = _infer_active_phase(all_macro_milestones)
     roadmap_sentence = (
         f"{done_marcos} de {total_marcos} marcos atingidos · {active_phase}"
         if total_marcos > 0 else "Roadmap não disponível"
     )
-    roadmap_months, roadmap_months_range = _derive_roadmap_months(macro_milestones)
+    # For the OPR horizontal timeline, keep only major (gate) milestones to avoid
+    # label overlap when regulars cluster near the end (e.g., M5/M6/M7 all in Jul).
+    # The sentence above keeps the full count (e.g., "1 de 8 marcos").
+    macro_milestones = [m for m in all_macro_milestones if m.get("major")] or all_macro_milestones
+    roadmap_months, roadmap_months_range = _derive_roadmap_months(all_macro_milestones)
     roadmap_overlays = data.get("roadmap_overlays", {}) or {}
 
     # Matrix data
@@ -186,6 +206,10 @@ def render_html(
         incurred_count=len(incurred_risks),
         incurred_risks=incurred_risks,
         total_risks=total_risks,
+        status_reasons_unhealthy=pick_unhealthy_reasons(
+            status.get("metric_zones", {}) or {},
+            status.get("status_reasons", []) or [],
+        ),
         logo_url=logo_url,
         compact=compact,
     )

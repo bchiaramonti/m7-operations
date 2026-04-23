@@ -13,6 +13,30 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.7.1] - 2026-04-23
+
+Polimentos de UX no OPR após release do framework 5-métricas. Três ajustes
+disparados por feedback visual do usuário ao revisar o OPR gerado em produção.
+
+### Changed
+- [scripts/build_opr.py](skills/generating-status-materials/scripts/build_opr.py) · Timeline do Roadmap no OPR passa a filtrar `macro_milestones` para apenas gates `major=True` antes de posicioná-los horizontalmente. No projeto atual isso exclui M5 CONSOLIDAÇÃO e M6 HANDOFFS (classificados como `regular` no roadmap-marcos.html) — deixa 6 marcos (M0, M1, M2, M3, M4, M7) com gap mínimo de ~12pp entre `left_pct`, eliminando sobreposição visual de labels no cluster JUL. A contagem no título ("1 de 8 marcos atingidos") usa o conjunto total, só o visual filtra.
+- [templates/opr.tmpl.html](skills/generating-status-materials/templates/opr.tmpl.html) · Label do hero farol renomeado de `"STATUS"` para `"SAÚDE"` — alinha vocabulário com o conceito de saúde do projeto que o framework v1.7 mede.
+- Zona "Riscos Incorridos" renomeada para **"Riscos Mapeados e Saúde do Projeto"**. Título agora lê `"N riscos em monitoramento · N incorridos"` (era inverso). Combina em uma única zona as narrativas de "o que preocupa" (riscos) + "porque o farol não está verde" (saúde).
+
+### Added
+- `templates/opr.tmpl.html` · Novo bloco condicional `.saude.{yellow,red}` — aparece apenas quando `status.overall ∈ {yellow, red}`. Fundo tintado pela zona (`#FDEDED` para crítico, `#FDF3E0` para atenção), título em caps tracked ("Por que a saúde está Crítico"), lista das métricas que estão em zona ruim (apenas). Estados saudáveis (🔵/🟢) não mostram este bloco — sem ruído quando não há nada a explicar.
+- `scripts/build_opr.py` · Helper `pick_unhealthy_reasons(metric_zones, reasons)` — filtra `status.status_reasons` para retornar apenas as entradas correspondentes a métricas DG/SG/SPI/MSI em zona yellow ou red. EDR e gates (índices ≥4) não entram porque não participam da worst-of classificação.
+- Novo template variable `status_reasons_unhealthy` passada ao Jinja.
+
+### Validation
+- Smoke test projeto `Playbook de Processos` em 23/04:
+  - Hero: farol "SAÚDE · Crítico" ✓
+  - Timeline: apenas M0/M1/M2/M3/M4/M7 (6 marcos majors) ✓
+  - Zona: "RISCOS MAPEADOS E SAÚDE DO PROJETO · 13 em monitoramento · 0 incorridos" ✓
+  - Bloco explicativo red aparece: "Por que a saúde está Crítico" + SG (🔴) + SPI (🔴) — DG/MSI (🔵) omitidos como esperado ✓
+  - Placeholder "Sem riscos materializados" continua abaixo do bloco Saúde (0 incorridos) ✓
+  - PDF: 1061px (A4 = 1123px) — compact mode mantido ✓
+
 ## [1.7.0] - 2026-04-23
 
 Substitui a heurística legada de `status.overall` (que confundia riscos mapeados com projeto doente) por um framework PMI-flavored com 5 métricas determinísticas de schedule + 4 zonas (🔵 Entregas Avançadas / 🟢 No Prazo / 🟡 Atenção / 🔴 Crítico). Riscos mapeados **não penalizam mais** o status geral — aparecem no OPR apenas quando flag `is_incurred=True` (v1.6). O novo framework revela atrasos de **arranque** (Start Gap) que a heurística antiga não detectava — no projeto Playbook em 23/04, expôs 5 tasks de Fundação Transversal (2.1.1-2.1.5) como late_start (status=not_started com inicio_plan ≤ hoje).

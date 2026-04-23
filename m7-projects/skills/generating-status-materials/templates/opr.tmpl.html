@@ -252,6 +252,24 @@
   .progress__item .deadline--done { color: var(--status-ok); }
   .progress__item .deadline--next { color: var(--status-progress); }
 
+  /* ============ SAÚDE (bloco explicativo quando status yellow/red) ============ */
+  .saude {
+    padding: 10px 12px;
+    border-radius: 2px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .saude.yellow { background: var(--tag-bg-warning);  border: 1px solid var(--status-warning); }
+  .saude.red    { background: var(--tag-bg-critical); border: 1px solid var(--status-critical); }
+  .saude__title {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .saude.yellow .saude__title { color: var(--status-warning); }
+  .saude.red    .saude__title { color: var(--status-critical); }
+  .saude__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+  .saude__list li { font-size: 10px; color: var(--m7-text-muted); line-height: 1.35; }
+  body.compact .saude { padding: 7px 10px; gap: 2px; }
+
   /* ============ RISKS (condicional: incorridos) ============ */
   .risks__empty {
     display: flex; align-items: center; gap: 10px;
@@ -333,7 +351,7 @@
       <div class="metric metric--inline">
         <div class="metric__dot dot-{{ status.overall }}"></div>
         <div class="metric">
-          <div class="metric__label">STATUS</div>
+          <div class="metric__label">SAÚDE</div>
           <div class="metric__value">{{ status_label_short }}</div>
         </div>
       </div>
@@ -474,15 +492,27 @@
     </div>
   </div>
 
-  <!-- ============ RISKS (condicional: só se houver incorrido) ============ -->
+  <!-- ============ RISCOS MAPEADOS E SAÚDE DO PROJETO ============ -->
   <div class="zone">
     <div class="zone__head">
       <div>
-        <div class="section-label">RISCOS INCORRIDOS NO PERÍODO</div>
-        <div class="section-title">{{ incurred_count }} incorrido{{ '' if incurred_count == 1 else 's' }} · {{ total_risks }} mapeados em monitoramento</div>
+        <div class="section-label">RISCOS MAPEADOS E SAÚDE DO PROJETO</div>
+        <div class="section-title">{{ total_risks }} riscos em monitoramento · {{ incurred_count }} incorrido{{ '' if incurred_count == 1 else 's' }}</div>
       </div>
       <div class="right">fonte riscos.html</div>
     </div>
+
+    {% if status.overall in ("yellow", "red") %}
+      <div class="saude {{ status.overall }}">
+        <div class="saude__title">Por que a saúde está {{ status_label_short }}</div>
+        <ul class="saude__list">
+          {% for reason in status_reasons_unhealthy %}
+            <li>{{ reason }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
     {% if incurred_risks %}
       <div class="risks__grid">
         {% for r in incurred_risks[:3] %}
