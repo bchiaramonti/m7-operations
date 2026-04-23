@@ -13,6 +13,17 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.6.1] - 2026-04-23
+
+Fix crítico: o OPR estava sendo cortado em 2 páginas no PDF porque o conteúdo (1241px) estourava A4 portrait (1123px) e o "modo compact" do `render_pdf_playwright` detectava o overflow mas não surtia efeito — o `<body>` no template v1.6.0 não tinha a classe `compact` aplicada condicionalmente (foi perdida ao reescrever o template). Adicionadas regras CSS `body.compact` com reduções de padding cirúrgicas (sem mexer em font-size para preservar legibilidade).
+
+### Fixed
+- [templates/opr.tmpl.html](skills/generating-status-materials/templates/opr.tmpl.html) · `<body>` volta a receber `class="{{ 'compact' if compact else '' }}"` — sem isso o flag Jinja era calculado mas nunca aplicado.
+- Novas regras `body.compact` no CSS: `.hero` padding 24px→16px, `.zone` padding 20px→12px, `.matrix__row` padding 6px→3px, `.progress__item` padding 3px→1px, `.roadmap__track` padding reduzido, `.footer` padding ajustado, `.hero__title` 26px→22px, `.section-title` 16px→14px. Altura final do OPR com 11 processos × 6 fases: 991px (cabe em A4 1123px com folga de 132px).
+
+### Validation
+- Smoke test: OPR do projeto `Playbook de Processos` gera em **1 página A4 única** (991px), com classe `compact` aplicada, sem overflow.
+
 ## [1.6.0] - 2026-04-22
 
 OPR completamente redesenhado seguindo artboard Paper `OPR — Status Report` validado com o usuário. Deck PPTX tem slides 3 e 4 invertidos: **Roadmap agora vem antes da Visão Geral** — "onde estamos no tempo" ancora o leitor antes de mergulhar nos 66 quadradinhos da matriz de escopo. OPR ganha estrutura executiva de 6 zonas com densidade informativa mais adequada para impressão A4. Conceito de "risco incorrido" introduzido: cards detalhados de risco só aparecem quando algum risco sair de monitoramento para incidente ativo — estado default é um placeholder minimalista "Sem riscos materializados neste período".

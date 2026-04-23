@@ -37,6 +37,21 @@
     print-color-adjust: exact;
   }
 
+  /* Compact mode: aplicado quando o conteúdo estoura A4.
+     Reduz padding vertical sem mexer em font-size (legibilidade preservada). */
+  body.compact .hero { padding: 16px 32px; gap: 10px; }
+  body.compact .hero__title { font-size: 22px; }
+  body.compact .zone { padding: 12px 32px 6px 32px; gap: 8px; }
+  body.compact .section-title { font-size: 14px; }
+  body.compact .roadmap__track { padding: 24px 0 14px 0; }
+  body.compact .roadmap__marker { top: 38px; }
+  body.compact .matrix__colhdr { padding: 5px 0; }
+  body.compact .matrix__row { padding: 3px 0; }
+  body.compact .progress__cols { padding-top: 8px; }
+  body.compact .progress__item { padding: 1px 0; }
+  body.compact .risks__empty { padding: 10px 12px; }
+  body.compact .footer { padding: 10px 32px 12px 32px; margin-top: 6px; }
+
   .section-label {
     font-size: 9px;
     letter-spacing: 0.18em;
@@ -301,7 +316,7 @@
   .footer a { color: var(--m7-text-muted); text-decoration: none; }
 </style>
 </head>
-<body>
+<body class="{{ 'compact' if compact else '' }}">
 
   <!-- ============ HERO ============ -->
   <div class="hero">
