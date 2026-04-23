@@ -98,6 +98,52 @@ PRESETS: dict[str, dict] = {
           body { background: #fffdef !important; padding: 10px !important; font-size: 11px !important; }
         """,
     },
+    "roadmap-full-with-status-overlays": {
+        # Same as roadmap-full but with CSS for status-colored bars and the HOJE vertical line.
+        # The chamador must pass `extra_js` (built via build_roadmap_overlay_js) to apply dynamic data.
+        "selector": ".roadmap",
+        "viewport": (2400, 1300),
+        "device_scale": 2.0,
+        "inject_css": """
+          .topbar, .roadmap-controls, .site-footer { display: none !important; }
+          .lane-toggle, .phase-toggle { pointer-events: none; }
+          .lane.collapsed .bars, .lane.collapsed .track { display: block !important; }
+          .lane.collapsed { max-height: none !important; }
+          body { background: #fffdef !important; padding: 20px !important; }
+          .roadmap { min-width: 2300px !important; }
+
+          /* Status-based bar coloring (applied by build_roadmap_overlay_js at runtime) */
+          .bar.bar-status-done      { background: #00B050 !important; }
+          .bar.bar-status-active    { background: #3B82F6 !important; }
+          .bar.bar-status-overdue   { background: #E46962 !important; }
+          .bar.bar-status-future    { opacity: 0.50 !important; }
+
+          /* HOJE vertical line inside each .track (aligned across all lanes by left%) */
+          .hoje-line {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 2px;
+            background: #E46962;
+            z-index: 100;
+            pointer-events: none;
+          }
+          .hoje-line[data-label]::before {
+            content: attr(data-label);
+            position: absolute;
+            top: -22px;
+            left: -30px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #E46962;
+            letter-spacing: 0.08em;
+            white-space: nowrap;
+            background: #fffdef;
+            padding: 2px 6px;
+            border: 1px solid #E46962;
+            border-radius: 2px;
+          }
+        """,
+    },
     "risks-heatmap": {
         # For PPTX or OPR: riscos.html heat-map 3x3 matrix only.
         "selector": ".heat-map, .matrix-container",
@@ -118,6 +164,7 @@ def render(
     viewport: tuple[int, int] = (1600, 1000),
     device_scale: float = 2.0,
     inject_css: str = "",
+    extra_js: str = "",
     wait_ms: int = 600,
 ) -> None:
     try:
@@ -146,6 +193,11 @@ def render(
         if inject_css:
             page.add_style_tag(content=inject_css)
 
+        # Inject JS for dynamic DOM modifications (e.g., HOJE line, bar coloring).
+        # Runs after CSS injection so classes added here pick up the new styles.
+        if extra_js:
+            page.evaluate(extra_js)
+
         # Wait for custom fonts + any post-load layout shifts
         try:
             page.evaluate("document.fonts.ready")
@@ -171,6 +223,53 @@ def render(
             page.screenshot(path=str(output_path), full_page=True, omit_background=False)
 
         browser.close()
+
+
+def build_roadmap_overlay_js(today_pct: float | None, today_label: str, bar_status_map: dict) -> str:
+    """Composes a self-contained JS string that, when executed via playwright's
+    page.evaluate(), performs two DOM modifications on the roadmap-marcos.html:
+
+      1. Colors each `.bar` by adding class `.bar-status-{done|active|overdue|future}`
+         based on a lookup by its `.title` text in `bar_status_map`.
+      2. Appends a vertical `.hoje-line` to each `.track` element at horizontal
+         position `today_pct%` (so the line is visible across every lane).
+
+    The CSS for these classes is assumed to be injected via `inject_css` (see the
+    `roadmap-full-with-status-overlays` preset below). Safe to call even when
+    today_pct is None (it'll simply skip the HOJE line).
+    """
+    import json as _json
+    today_pct_js = "null" if today_pct is None else f"{today_pct:.4f}"
+    return f"""
+    (function() {{
+        const TODAY_PCT = {today_pct_js};
+        const TODAY_LABEL = {_json.dumps(today_label)};
+        const BAR_STATUS_MAP = {_json.dumps(bar_status_map, ensure_ascii=True)};
+
+        // 1. Color each .bar by its title
+        document.querySelectorAll('.bar').forEach(function(bar) {{
+            const titleEl = bar.querySelector('.title');
+            if (!titleEl) return;
+            const title = titleEl.textContent.trim();
+            const status = BAR_STATUS_MAP[title];
+            if (status) bar.classList.add('bar-status-' + status);
+        }});
+
+        // 2. Add HOJE vertical line inside each track (aligned by left% across all lanes)
+        if (TODAY_PCT !== null) {{
+            document.querySelectorAll('.track').forEach(function(track, idx) {{
+                const cs = window.getComputedStyle(track);
+                if (cs.position === 'static') track.style.position = 'relative';
+                const line = document.createElement('div');
+                line.className = 'hoje-line';
+                line.style.left = TODAY_PCT + '%';
+                // Only the first track gets the text label (avoid repetition down the column)
+                if (idx === 0) line.setAttribute('data-label', TODAY_LABEL);
+                track.appendChild(line);
+            }});
+        }}
+    }})();
+    """
 
 
 def main():

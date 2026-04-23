@@ -79,6 +79,7 @@ class CollectResult:
     sprint_actions: list = field(default_factory=list)
     risks: list = field(default_factory=list)
     changelog_entries: list = field(default_factory=list)
+    roadmap_overlays: dict = field(default_factory=dict)
     warnings: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -96,6 +97,7 @@ class CollectResult:
             "sprint_actions": self.sprint_actions,
             "risks": self.risks,
             "changelog_entries": self.changelog_entries,
+            "roadmap_overlays": self.roadmap_overlays,
             "warnings": self.warnings,
         }
 
@@ -413,6 +415,16 @@ def parse_milestones(path: Path, warnings: list, default_year: int, report_date:
         classes = tick.get("class", [])
         is_gate = "gate" in classes
 
+        # Inline style: "left:15.79%;" — authoritative anchor for date→pct calibration
+        left_pct = None
+        style = tick.get("style", "")
+        m_left = re.search(r"left\s*:\s*([\d.]+)\s*%", style)
+        if m_left:
+            try:
+                left_pct = float(m_left.group(1))
+            except ValueError:
+                left_pct = None
+
         if dt is None:
             status = "not_started"
         else:
@@ -434,6 +446,7 @@ def parse_milestones(path: Path, warnings: list, default_year: int, report_date:
             "status": status,
             "is_critical": is_gate,
             "major": is_gate,
+            "left_pct": left_pct,
         })
 
     # Fallback: generic .milestone lookup (legacy HTML structure)
@@ -464,6 +477,128 @@ def parse_milestones(path: Path, warnings: list, default_year: int, report_date:
             })
 
     return milestones
+
+
+def _collect_bar_titles(roadmap_html_path: Path) -> list[str]:
+    """Extracts unique `.bar .title` texts from the swim-lane roadmap HTML.
+    Returns the list preserving document order (useful for debugging)."""
+    if not roadmap_html_path.exists():
+        return []
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+    soup = BeautifulSoup(roadmap_html_path.read_text(encoding="utf-8"), "html.parser")
+    titles = []
+    seen = set()
+    for title_el in soup.select(".bar .title"):
+        txt = title_el.get_text(" ", strip=True)
+        if txt and txt not in seen:
+            seen.add(txt)
+            titles.append(txt)
+    return titles
+
+
+def _normalize_match(s: str) -> str:
+    """Normalization for fuzzy title↔etapa matching: lowercase + strip accents + collapse whitespace."""
+    import unicodedata
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return re.sub(r"\s+", " ", s.lower().strip())
+
+
+def aggregate_bar_status(bar_title: str, entries: list[dict], report_date: datetime) -> str:
+    """Aggregates execution status for a roadmap bar by matching its title against
+    the `etapa` field of tasks in Cronograma.xlsx.
+
+    Returns one of: "done", "active", "overdue", "future".
+
+    Matching strategy (cascades from strict to lenient):
+      1. Full normalized title as substring of etapa (e.g., "investment banking" in "…Investment Banking")
+      2. If no matches and title has separators (·, •, —, –, +, &, /), split into tokens and
+         try each token. Any token with ≥2 chars that matches contributes to the pool.
+
+    This handles compound bar titles like "TAP · WBS · OKRs · Riscos" where individual
+    tokens (TAP, WBS, OKRs, Riscos) each correspond to separate tasks in the xlsx.
+    """
+    bar_norm = _normalize_match(bar_title)
+    if not bar_norm:
+        return "future"
+
+    acoes = [e for e in entries if str(e.get("tipo", "")).lower() in ("ação", "acao")]
+
+    # Strategy 1: full title match
+    matches = [e for e in acoes if bar_norm in _normalize_match(str(e.get("etapa", "")))]
+
+    # Strategy 2: split on separators and try tokens (only if no full match).
+    # Use min length 3 and a stopword filter to avoid false positives like "TE", "de", "da".
+    _STOP = {"de", "da", "do", "das", "dos", "e", "a", "o", "as", "os", "na", "no", "em"}
+    if not matches:
+        tokens = [
+            tok.strip() for tok in re.split(r"[·•\-–—+&/|]| e |,", bar_title)
+            if tok.strip()
+        ]
+        seen_ids = set()
+        for tok in tokens:
+            tok_norm = _normalize_match(tok)
+            if not tok_norm or len(tok_norm) < 3 or tok_norm in _STOP:
+                continue
+            for e in acoes:
+                eid = id(e)
+                if eid in seen_ids:
+                    continue
+                if tok_norm in _normalize_match(str(e.get("etapa", ""))):
+                    matches.append(e)
+                    seen_ids.add(eid)
+
+    if not matches:
+        return "future"
+
+    done_count = sum(1 for e in matches if e.get("status") == "done")
+    any_in_progress = any(e.get("status") in ("in_progress", "blocked") for e in matches)
+    total = len(matches)
+
+    latest_fim = None
+    for e in matches:
+        fp = e.get("fim_plan")
+        if isinstance(fp, datetime) and (latest_fim is None or fp > latest_fim):
+            latest_fim = fp
+
+    if done_count == total:
+        return "done"
+    if any_in_progress or done_count > 0:
+        return "active"
+    if latest_fim is not None and latest_fim < report_date:
+        return "overdue"
+    return "future"
+
+
+def compute_today_pct(milestones: list[dict], report_date: datetime) -> float | None:
+    """Interpolates today's x-axis position (%) on the roadmap timeline using two
+    milestone anchors (earliest and latest with known `date` + `left_pct`).
+
+    Returns None if there are fewer than 2 usable anchor milestones.
+    Clamps to [0.0, 100.0].
+    """
+    anchors = []
+    for m in milestones:
+        if m.get("date") and m.get("left_pct") is not None:
+            try:
+                dt = datetime.strptime(m["date"], "%Y-%m-%d")
+                anchors.append((dt, float(m["left_pct"])))
+            except (ValueError, TypeError):
+                continue
+    if len(anchors) < 2:
+        return None
+    anchors.sort(key=lambda a: a[0])
+    first_dt, first_pct = anchors[0]
+    last_dt, last_pct = anchors[-1]
+    total_days = (last_dt - first_dt).days
+    if total_days <= 0:
+        return None
+    delta = (report_date - first_dt).days
+    pct = first_pct + (delta / total_days) * (last_pct - first_pct)
+    return max(0.0, min(100.0, pct))
 
 
 def parse_briefing(path: Path, warnings: list) -> dict:
@@ -808,12 +943,34 @@ def collect(project_dir: Path, report_date_str: str) -> dict:
     briefing = parse_briefing(project_dir / "BRIEFING.md", warnings)
     claude_data = parse_claude_md(project_dir / "CLAUDE.md", warnings)
     risks = parse_risks(project_dir / "1-planning" / "artefatos" / "riscos.html", warnings)
+    roadmap_html_path = project_dir / "1-planning" / "artefatos" / "roadmap-marcos.html"
     milestones = parse_milestones(
-        project_dir / "1-planning" / "artefatos" / "roadmap-marcos.html",
+        roadmap_html_path,
         warnings,
         default_year=report_date.year,
         report_date=report_date,
     )
+
+    # Roadmap overlays — inputs for build_pptx to inject into the HTML screenshot:
+    #   - today_pct: where to draw the vertical "HOJE" line (interpolated from M0↔M7 anchors)
+    #   - bar_status_by_title: per-bar status derived from matching title ↔ Cronograma.xlsx etapa
+    bar_titles = _collect_bar_titles(roadmap_html_path)
+    today_pct = compute_today_pct(milestones, report_date)
+    bar_status_map = {
+        title: aggregate_bar_status(title, entries, report_date)
+        for title in bar_titles
+    }
+    matched_count = sum(1 for s in bar_status_map.values() if s != "future")
+    if bar_titles and matched_count == 0:
+        warnings.append(
+            f"Coloração de bars: 0 de {len(bar_titles)} títulos casaram com etapas do Cronograma.xlsx. "
+            "Bars ficarão todas cinza. Confira consistência entre títulos do roadmap e nomes das ações."
+        )
+    roadmap_overlays = {
+        "today_pct": today_pct,
+        "today_label": f"HOJE · {report_date.strftime('%d/%m')}",
+        "bar_status_by_title": bar_status_map,
+    }
 
     synth = synthesize(entries, risks, changelog, milestones, report_date, warnings)
 
@@ -858,6 +1015,7 @@ def collect(project_dir: Path, report_date_str: str) -> dict:
         ],
         risks=risks,
         changelog_entries=[{k: v for k, v in e.items() if k != "raw"} for e in changelog[:30]],
+        roadmap_overlays=roadmap_overlays,
         warnings=warnings,
     )
     return result.to_dict()

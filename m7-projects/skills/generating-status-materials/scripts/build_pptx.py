@@ -33,12 +33,18 @@ except ImportError:
     print("✗ python-pptx ausente. Instale: pip install python-pptx", file=sys.stderr)
     sys.exit(2)
 
-# Import sibling render helper for HTML screenshot embedding (slides 3, 4)
+# Import sibling render helpers for HTML screenshot embedding (slide Roadmap)
 sys.path.insert(0, str(Path(__file__).parent))
 try:
-    from render_html_section import render as render_html_screenshot
+    from render_html_section import (
+        render as render_html_screenshot,
+        build_roadmap_overlay_js,
+        PRESETS as RENDER_PRESETS,
+    )
 except ImportError:
     render_html_screenshot = None
+    build_roadmap_overlay_js = None
+    RENDER_PRESETS = {}
 
 
 # ---- Tokens (mirrored from references/design-tokens.md) ----
@@ -304,12 +310,12 @@ def slide_02_agenda(prs, data, assets_dir):
              size=48, color=COL_BG_LIGHT)
     # Divider
     add_rect(slide, 80, 220, 1120, 1, COL_BG_LIGHT)
-    # Items
+    # Items — deck de 6 slides (Cover · Agenda · Roadmap · Mapa Status · Riscos · Closing)
     items = [
-        ("01", "Visão Geral do Roadmap", "Slides 03–04"),
-        ("02", "Sprint Ativo — Status Executivo", "Slides 05–06"),
-        ("03", "Riscos e Pontos de Atenção", "Slide 07"),
-        ("04", "Próximos Passos", "Slide 08"),
+        ("01", "Roadmap Completo", "Slide 03"),
+        ("02", "Mapa de Status Executivo", "Slide 04"),
+        ("03", "Riscos Ativos", "Slide 05"),
+        ("04", "Próximos Passos", "Slide 06"),
     ]
     y = 246
     for num, title, rng in items:
@@ -324,17 +330,34 @@ def slide_02_agenda(prs, data, assets_dir):
         y += 30
 
 
-def _render_roadmap_screenshot(roadmap_html: Path | None, preset: str, tmp_dir: Path) -> Path | None:
-    """Helper: render roadmap-marcos.html section as PNG. Returns path or None on failure."""
+def _render_roadmap_screenshot(
+    roadmap_html: Path | None,
+    preset: str,
+    tmp_dir: Path,
+    overlays: dict | None = None,
+) -> Path | None:
+    """Renders a section of the roadmap-marcos.html as a PNG via playwright.
+
+    When `overlays` is provided (with keys today_pct, today_label, bar_status_by_title),
+    the preset `roadmap-full-with-status-overlays` gets extra_js composed from that
+    data to dynamically color bars by status and draw the HOJE vertical line.
+
+    Returns the output path or None on failure.
+    """
     if render_html_screenshot is None or roadmap_html is None or not roadmap_html.exists():
         return None
     try:
         out = tmp_dir / f"roadmap-{preset}.png"
-        # Use the render function with a preset dict (mirrors CLI --preset behavior)
-        from render_html_section import PRESETS
-        p = PRESETS.get(preset)
+        p = RENDER_PRESETS.get(preset)
         if not p:
             return None
+        extra_js = ""
+        if overlays and build_roadmap_overlay_js and preset.endswith("with-status-overlays"):
+            extra_js = build_roadmap_overlay_js(
+                today_pct=overlays.get("today_pct"),
+                today_label=overlays.get("today_label", ""),
+                bar_status_map=overlays.get("bar_status_by_title", {}),
+            )
         render_html_screenshot(
             input_path=roadmap_html,
             output_path=out,
@@ -342,6 +365,7 @@ def _render_roadmap_screenshot(roadmap_html: Path | None, preset: str, tmp_dir: 
             viewport=p["viewport"],
             device_scale=p["device_scale"],
             inject_css=p["inject_css"],
+            extra_js=extra_js,
         )
         return out if out.exists() else None
     except Exception as e:
@@ -349,90 +373,34 @@ def _render_roadmap_screenshot(roadmap_html: Path | None, preset: str, tmp_dir: 
         return None
 
 
-def slide_03_roadmap_overview(prs, data, assets_dir, ctx):
-    """Slide 3 — Marcos do Projeto: horizontal timeline with M0-M7 gates.
+def slide_03_roadmap(prs, data, assets_dir, ctx):
+    """Slide 3 — Roadmap: full swim-lane screenshot from roadmap-marcos.html
+    with status-based bar coloring and the HOJE vertical reference line.
 
-    Screenshots the .lane.milestones strip from roadmap-marcos.html (source of truth from
-    building-project-plan) so visual is pixel-fiel to the approved plan.
+    Visual source of truth is the same HTML approved when building the plan.
+    Bar colors reflect task execution status aggregated from Cronograma.xlsx LIVE
+    (see collect_data.py::aggregate_bar_status). The HOJE line is computed by
+    interpolating between M0 and M7 anchor milestones.
     """
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_BG_LIGHT)
 
     # Header
-    add_text(slide, 80, 56, 400, 16, "03 · MARCOS",
-             size=12, bold=True, color=COL_PRIMARY, tracking=0.2)
-    add_logo(slide, 1180, 48, 60, assets_dir, "dark")
-    add_text(slide, 80, 80, 900, 40, "Marcos do Projeto",
-             size=32, color=COL_PRIMARY)
-    mm = data.get("macro_milestones", [])
-    total = len(mm)
-    done = sum(1 for m in mm if m.get("status") == "done")
-    add_text(slide, 80, 128, 1120, 24,
-             f"{done} de {total} marcos atingidos · posição atual no projeto",
-             size=14, color=COL_TEXT_SUBTLE)
-
-    # Screenshot of milestones lane
-    marcos_png = _render_roadmap_screenshot(
-        ctx.get("roadmap_html"), "marcos-lane", ctx["tmp_dir"],
-    )
-    if marcos_png:
-        slide.shapes.add_picture(
-            str(marcos_png),
-            emu(40), emu(180),
-            width=emu(1200), height=emu(400),
-        )
-    else:
-        # Fallback: simple horizontal diamonds timeline using macro_milestones data
-        strip_x, strip_y, strip_w, strip_h = 120, 260, 1040, 180
-        add_rect(slide, strip_x - 20, strip_y - 20, strip_w + 40, strip_h + 40, COL_TAG_BG_NEUTRAL)
-        n = len(mm) or 1
-        spacing = strip_w // max(n - 1, 1) if n > 1 else 0
-        for i, m in enumerate(mm):
-            cx = strip_x + i * spacing
-            status = m.get("status", "not_started")
-            color = {
-                "done": COL_STATUS_OK, "in_progress": COL_STATUS_PROG,
-                "overdue": COL_STATUS_CRIT, "not_started": COL_STATUS_NEUTRAL,
-            }.get(status, COL_STATUS_NEUTRAL)
-            outlined = status == "not_started"
-            size = 20 if not outlined else 16
-            add_diamond(slide, cx - size // 2, strip_y + strip_h // 2 - size // 2, size, color, outlined)
-            add_text(slide, cx - 80, strip_y + strip_h // 2 + 24, 160, 30,
-                     m.get("label", ""), size=11, color=COL_TEXT_MUTED, align="center")
-            if i < n - 1:
-                add_rect(slide, cx + size // 2, strip_y + strip_h // 2 - 1, spacing - size, 2, color)
-
-    # Legend
-    add_text(slide, 80, 660, 900, 14,
-             "◆ Atingido   ◆ Em andamento   ◇ Futuro   ●●● gates críticos",
-             size=10, color=COL_TEXT_MUTED)
-    add_text(slide, 900, 660, 300, 14,
-             f"Fonte: roadmap-marcos.html · {data.get('report_date','')}",
-             size=10, color=COL_TEXT_CAPTION, align="right")
-
-
-def slide_04_roadmap_detail(prs, data, assets_dir, ctx):
-    """Slide 4 — Roadmap Completo: full swim-lane screenshot from roadmap-marcos.html.
-
-    This is the authoritative operational view — all lanes expanded, all bars visible.
-    Source of visual truth is the same HTML approved when building the plan.
-    """
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_BG_LIGHT)
-
-    # Header
-    add_text(slide, 80, 40, 400, 16, "04 · ROADMAP",
+    add_text(slide, 80, 40, 400, 16, "03 · ROADMAP",
              size=12, bold=True, color=COL_PRIMARY, tracking=0.2)
     add_logo(slide, 1180, 36, 60, assets_dir, "dark")
     add_text(slide, 80, 58, 900, 36, "Roadmap Completo",
              size=28, color=COL_PRIMARY)
     add_text(slide, 80, 94, 900, 20,
-             "Fases · frentes · marcos · status de execução por sprint.",
+             "Fases · frentes · marcos · status de execução por flotilha (HOJE em destaque).",
              size=12, color=COL_TEXT_SUBTLE)
 
-    # Screenshot of full swim-lane roadmap
+    # Screenshot of full swim-lane roadmap with status overlays (bar coloring + HOJE line)
     roadmap_png = _render_roadmap_screenshot(
-        ctx.get("roadmap_html"), "roadmap-full", ctx["tmp_dir"],
+        ctx.get("roadmap_html"),
+        "roadmap-full-with-status-overlays",
+        ctx["tmp_dir"],
+        overlays=data.get("roadmap_overlays"),
     )
     if roadmap_png:
         # Embed image filling most of the slide (leave room for header & footer)
@@ -446,66 +414,35 @@ def slide_04_roadmap_detail(prs, data, assets_dir, ctx):
                  "— Screenshot do roadmap indisponível (playwright/chromium ausente) —",
                  size=14, color=COL_TEXT_CAPTION, align="center")
 
-    # Footer
-    add_text(slide, 80, 678, 800, 14,
+    # Footer: legend + source
+    add_text(slide, 80, 670, 700, 14,
+             "■ Concluída   ■ Em andamento   ■ Atrasada   ■ Futura   │ HOJE",
+             size=9, color=COL_TEXT_MUTED)
+    add_text(slide, 80, 688, 1120, 14,
              f"Fonte: 1-planning/artefatos/roadmap-marcos.html · atualizado em {data.get('report_date','')}",
-             size=10, color=COL_TEXT_CAPTION)
+             size=9, color=COL_TEXT_CAPTION)
 
 
-def slide_05_section_divider(prs, data, assets_dir):
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_PRIMARY)
-    active = data.get("status", {}).get("active_sprint") or {}
-    idx = data.get("status", {}).get("active_sprint_index", 1)
-    total = data.get("status", {}).get("total_sprints", 1)
-    # Eyebrow
-    add_text(slide, 80, 64, 400, 20,
-             f"SPRINT ATIVO · {idx:02d} DE {total:02d}",
-             size=13, bold=True, color=COL_ACCENT_LIME, tracking=0.2)
-    add_logo(slide, 1180, 50, 60, assets_dir, "offwhite")
-    # Hero numeral (S0, S1, etc.)
-    add_text(slide, 120, 260, 300, 200,
-             active.get("code", "S0"),
-             size=160, color=COL_ACCENT_LIME, align="left", bold=False)
-    # Divider vertical line
-    add_rect(slide, 440, 280, 1, 180, COL_BG_LIGHT)
-    # Eyebrow above title — derive category from first part before dash/colon.
-    # Skip entirely if eyebrow would duplicate the title (single-word phase names).
-    title_full = active.get("title") or "Sprint ativa"
-    eyebrow_text = ""
-    title_text = title_full
-    for sep in (" — ", ": ", " - "):
-        if sep in title_full:
-            parts = title_full.split(sep, 1)
-            eyebrow_text = parts[0].strip().upper()
-            title_text = parts[1].strip()
-            break
-    if eyebrow_text and eyebrow_text.lower() != title_text.lower():
-        add_text(slide, 480, 280, 600, 20,
-                 eyebrow_text, size=13, bold=True, color=COL_BG_LIGHT, tracking=0.2)
-    add_text(slide, 480, 310, 700, 140,
-             title_text, size=48, color=COL_BG_LIGHT)
-    # Period
-    add_text(slide, 480, 460, 700, 24,
-             (active.get("period_label") or "") + "  ·  Sprint atual",
-             size=14, color=COL_BG_LIGHT)
-    # Slide number
-    add_text(slide, 1160, 660, 80, 18, "05",
-             size=12, color=COL_BG_LIGHT, align="right")
+def slide_04_mapa_status_executivo(prs, data, assets_dir, ctx):
+    """Slide 4 — Mapa de Status Executivo (Paper artboard `06 — Executive Status`).
 
-
-def slide_06_executive_status(prs, data, assets_dir, ctx):
+    Layout replicando o Paper:
+      - Header: eyebrow "04 · STATUS EXECUTIVO" + título evocativo + hero sentence (X/Y tarefas)
+      - Zone 1: Cronograma Macro com marcos M0-M7 + linha HOJE vertical
+      - Zones 2-3: 2 colunas (STATUS EXECUTIVO + PRÓXIMAS ATIVIDADES)
+      - Zone 4: PONTOS DE ATENÇÃO
+    """
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_BG_LIGHT)
-    active = data.get("status", {}).get("active_sprint") or {}
 
-    # Eyebrow + Hero
-    add_text(slide, 40, 40, 800, 16,
-             active.get("eyebrow", "SPRINT ATIVA"),
+    # Header — eyebrow numerado + título explícito + hero sentence
+    add_text(slide, 40, 28, 800, 14, "04 · STATUS EXECUTIVO",
              size=11, bold=True, color=COL_PRIMARY, tracking=0.2)
-    add_text(slide, 40, 60, 900, 40,
+    add_text(slide, 40, 44, 900, 32, "Mapa de Status Executivo",
+             size=24, color=COL_PRIMARY)
+    add_text(slide, 40, 78, 900, 24,
              data.get("status", {}).get("hero_sentence", ""),
-             size=30, color=COL_PRIMARY)
+             size=14, color=COL_TEXT_SUBTLE)
     add_logo(slide, 1200, 36, 44, assets_dir, "dark")
 
     # Zone 1: Cronograma Macro — M0-M7 gates from roadmap-marcos.html (canonical).
@@ -621,8 +558,8 @@ def slide_06_executive_status(prs, data, assets_dir, ctx):
              size=10, color=COL_TEXT_CAPTION)
 
 
-def slide_07_risks(prs, data, assets_dir):
-    """Slide 7 — Riscos Ativos: top-N por severidade (crit + high), em 2 colunas.
+def slide_05_risks(prs, data, assets_dir):
+    """Slide 5 — Riscos Ativos: top-N por severidade (crit + high), em 2 colunas.
 
     Design fiel ao artboard Paper `07 — Risks`:
       - Accent bar vertical colorida à esquerda (pela severidade)
@@ -635,7 +572,7 @@ def slide_07_risks(prs, data, assets_dir):
     add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_BG_LIGHT)
 
     # Header
-    add_text(slide, 80, 56, 400, 16, "07 · RISCOS",
+    add_text(slide, 80, 56, 400, 16, "05 · RISCOS",
              size=12, bold=True, color=COL_PRIMARY, tracking=0.2)
     add_logo(slide, 1180, 48, 60, assets_dir, "dark")
     add_text(slide, 80, 80, 900, 40,
@@ -724,7 +661,7 @@ def truncate(s, max_len):
     return s if len(s) <= max_len else s[: max_len - 1].rstrip() + "…"
 
 
-def slide_08_closing(prs, data, assets_dir):
+def slide_06_closing(prs, data, assets_dir):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_PRIMARY)
     add_text(slide, 80, 64, 400, 20, "PRÓXIMOS PASSOS",
@@ -762,18 +699,19 @@ def slide_08_closing(prs, data, assets_dir):
 # ---- Main ----
 
 def build(data: dict, out_path: Path, assets_dir: Path, ctx: dict):
+    """Builds the 6-slide status presentation. Ordering reflects the v1.4 redesign:
+    Cover · Agenda · Roadmap · Mapa de Status Executivo · Riscos · Closing.
+    """
     prs = Presentation()
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
 
     slide_01_cover(prs, data, assets_dir)
     slide_02_agenda(prs, data, assets_dir)
-    slide_03_roadmap_overview(prs, data, assets_dir, ctx)
-    slide_04_roadmap_detail(prs, data, assets_dir, ctx)
-    slide_05_section_divider(prs, data, assets_dir)
-    slide_06_executive_status(prs, data, assets_dir, ctx)
-    slide_07_risks(prs, data, assets_dir)
-    slide_08_closing(prs, data, assets_dir)
+    slide_03_roadmap(prs, data, assets_dir, ctx)
+    slide_04_mapa_status_executivo(prs, data, assets_dir, ctx)
+    slide_05_risks(prs, data, assets_dir)
+    slide_06_closing(prs, data, assets_dir)
 
     prs.save(str(out_path))
 

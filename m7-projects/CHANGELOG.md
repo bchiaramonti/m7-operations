@@ -13,6 +13,48 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.4.0] - 2026-04-22
+
+Refinamento visual do deck de status após validação da v1.3.0 em produção. Três mudanças principais:
+(1) enxuga o deck de 8 para 6 slides, removendo o redundante "Marcos do Projeto" (info já presente no roadmap)
+e o "Section Divider" (que criava pausa desnecessária); (2) adiciona overlays dinâmicos no Slide Roadmap —
+coloração das flotilhas por status real agregado do `Cronograma.xlsx LIVE` (verde/azul/vermelho/fade) +
+linha vertical HOJE interpolada entre os marcos âncora M0↔M7; (3) torna o slide "Mapa de Status Executivo"
+visualmente identificável com título explícito (antes era só implícito pelo conteúdo).
+
+### Added
+- [scripts/render_html_section.py](skills/generating-status-materials/scripts/render_html_section.py) — novo preset `roadmap-full-with-status-overlays` com CSS para classes `.bar-status-{done|active|overdue|future}` e `.hoje-line`; novo parâmetro `extra_js` em `render()` permite injeção de JS dinâmico antes do screenshot.
+- [scripts/render_html_section.py](skills/generating-status-materials/scripts/render_html_section.py) · `build_roadmap_overlay_js(today_pct, today_label, bar_status_map)` — compõe o JS auto-contido que, executado via `page.evaluate()`, itera as `.bar`s do roadmap aplicando classes de status por lookup de título no mapa, e insere `.hoje-line` em cada `.track` na posição % informada.
+- [scripts/collect_data.py](skills/generating-status-materials/scripts/collect_data.py) · `_collect_bar_titles(roadmap_html_path)` — extrai títulos únicos de `.bar .title`.
+- `collect_data.py` · `aggregate_bar_status(bar_title, entries, report_date)` — agregação de status de execução por bar via matching fuzzy (normalização NFD + case-fold + estratégia cascata: substring direto → token split em separadores com min-len 3 + stopwords PT filtradas). Retorna um de `done|active|overdue|future`.
+- `collect_data.py` · `compute_today_pct(milestones, report_date)` — interpolação da posição HOJE% via pares âncora de marcos com `left_pct` + data. Retorna float clamped [0, 100] ou None se <2 âncoras.
+- `collect_data.py` · novo campo `left_pct` em cada milestone extraído (parseado de `style="left:X.XX%"`).
+- `collect_data.py` · novo campo `roadmap_overlays` na saída JSON com `today_pct`, `today_label`, `bar_status_by_title` — consumidos por `build_pptx.py`.
+- [scripts/build_pptx.py](skills/generating-status-materials/scripts/build_pptx.py) · `slide_04_mapa_status_executivo` agora tem título explícito "Mapa de Status Executivo" em 24px cor primária abaixo do eyebrow "04 · STATUS EXECUTIVO".
+
+### Changed
+- **Deck de 8 slides → 6 slides**: Cover · Agenda · Roadmap · Mapa de Status Executivo · Riscos · Closing.
+- `build_pptx.py` · Slide Roadmap (agora slide 3) usa preset `roadmap-full-with-status-overlays` em vez de `roadmap-full`. Imagem resultante tem bars coloridas por status real e linha HOJE vertical vermelha atravessando todas as lanes na posição interpolada.
+- `build_pptx.py` · footer do Slide Roadmap agora tem legenda de cores das bars ("■ Concluída ■ Em andamento ■ Atrasada ■ Futura │ HOJE") + source.
+- `build_pptx.py` · Agenda (slide 2) atualizada para refletir os 4 slides de conteúdo (Roadmap, Mapa de Status Executivo, Riscos Ativos, Próximos Passos) — antes mencionava "Sprint Ativo" e range "Slides 03-04".
+- `build_pptx.py` · Renumeração de eyebrows: "04 · ROADMAP" → "03 · ROADMAP", novo "04 · STATUS EXECUTIVO", "07 · RISCOS" → "05 · RISCOS".
+- Funções renomeadas: `slide_04_roadmap_detail` → `slide_03_roadmap`, `slide_06_executive_status` → `slide_04_mapa_status_executivo`, `slide_07_risks` → `slide_05_risks`, `slide_08_closing` → `slide_06_closing`.
+- [SKILL.md](skills/generating-status-materials/SKILL.md) — mapeamento Paper → PPTX reescrito para refletir os 6 slides, nova seção "Overlays dinâmicos no Slide Roadmap (v1.4)" explicando a arquitetura de coloração por matching + linha HOJE.
+
+### Removed
+- `build_pptx.py` · `slide_03_roadmap_overview()` — o slide "Marcos do Projeto" (timeline horizontal isolada com M0-M7) era redundante porque os mesmos marcos já aparecem no topo do roadmap swim-lane (Slide 3) e também no cronograma macro do Slide 4 (Executive Status).
+- `build_pptx.py` · `slide_05_section_divider()` — o "divisor de sprint ativa" (numeral gigante S0/S1 sobre fundo caqui) criava pausa visual entre roadmap e executive status desnecessária num deck de 6 slides. Agora executive status vem logo após roadmap.
+
+### Fixed
+- Falso-positivo no matching fuzzy em bars com títulos compostos — token "TE" de "Encerramento + TE" antes casava erroneamente com palavras em várias etapas. Min-length 3 + stopwords PT (`de, da, do, e, em, a, o, no, na`...) filtradas.
+
+### Validation
+- Smoke test no projeto `H1-02 Playbook de Processos` com report_date 2026-04-22:
+  - HOJE% calculado em 22.81 (interpolado entre M0 14/abr@15.79% e M7 18/jul@99.12%)
+  - Bar status map: F1 "TAP · WBS · OKRs · Riscos" → `done` (4 tasks individuais concluídas), demais 14 bars → `future` (projeto em fase inicial, tasks começam em maio+)
+  - 6 slides gerados no PPTX, agenda atualizada, slide 4 mostra "Mapa de Status Executivo" como título visível
+  - Bars no screenshot: F1 Planejamento verde, demais com opacity 50% (fade), linha vertical vermelha "HOJE · 22/04" atravessando todas as 6 lanes
+
 ## [1.3.0] - 2026-04-22
 
 Refactor completo da skill `generating-status-materials` para consumir os artefatos visuais produzidos por `building-project-plan` como fonte única de verdade, em vez de reinventá-los. Resultado: slides 3/4 passam a ser screenshots fiéis do `roadmap-marcos.html` aprovado no plano (todas lanes expandidas), Slide 6 exibe a timeline M0-M7 real com linha "HOJE" computada pela data do reporte, Slide 7 renderiza até 6 cards de risco baseados no `severity_class` autoritativo do HTML (antes retornava "Nenhum risco mapeado" apesar de 16 riscos existirem), e a Cover ganha fundo com foto hero M7 + overlay. Granularidade deixa de ser decisão arbitrária da skill e passa a espelhar a granularidade já aprovada no roadmap-marcos.html (se PLANEJAMENTO é 1 bar no plano, é 1 bloco no status; se EXECUÇÃO tem 8+4 bars, o status detalha no mesmo nível).

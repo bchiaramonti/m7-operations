@@ -120,7 +120,7 @@ python3 scripts/build_pptx.py \
   --roadmap-html <proj>/1-planning/artefatos/roadmap-marcos.html
 ```
 
-Emite `status-presentation.pptx` com 8 slides construídos programaticamente (sem master template). Slides 3 e 4 embedam screenshots headless do `roadmap-marcos.html`; Slide 6 renderiza a timeline M0-M7 via python-pptx com linha "HOJE" computada pela data do reporte; Slide 7 renderiza cards de risco fiéis ao Paper (até 6, severidade crit+high por padrão). Detalhes em [`presentation-structure.md`](references/presentation-structure.md).
+Emite `status-presentation.pptx` com **6 slides** construídos programaticamente (sem master template). Slide 3 (Roadmap) embeda screenshot headless do `roadmap-marcos.html` com overlays dinâmicos: bars coloridas por status real do Cronograma.xlsx LIVE + linha vertical HOJE. Slide 4 (Mapa de Status Executivo) renderiza a timeline M0-M7 em python-pptx com HOJE overlay, 2 colunas e atenções. Slide 5 (Riscos) renderiza até 6 cards fiéis ao Paper (severidade crit+high por padrão). Detalhes em [`presentation-structure.md`](references/presentation-structure.md).
 
 ### 5. Reportar ao usuário
 
@@ -150,20 +150,36 @@ Executado em `collect_data.py` (não em LLM). Regras em [`narrative-synthesis.md
 
 ## Mapeamento Paper → PPTX
 
-O canvas Paper `status-report` contém **8 artboards 1280×720** que mapeiam 1:1 para os slides PPTX:
+O deck produzido tem **6 slides** executivos (v1.4 simplificou de 8 para 6 removendo
+o "Marcos do Projeto" redundante e o Section Divider):
 
-| # | Paper artboard | Slide PPTX | Fonte de conteúdo |
-|---|---|---|---|
-| 1 | `01 — Cover` | Capa (foto M7 + dark overlay) | `assets/m7-hero-dark.png` + `project.name`, `period_label` |
-| 2 | `02 — Agenda` | Sumário de seções | lista fixa |
-| 3 | `03 — Marcos` | Timeline horizontal dos marcos M0-M7 | **screenshot** `roadmap-marcos.html > .lane.milestones` |
-| 4 | `04 — Roadmap Completo` | Swim-lane completa do plano | **screenshot** `roadmap-marcos.html > .roadmap` (todas lanes expandidas) |
-| 5 | `05 — Section Divider` | Divisor da sprint ativa | `status.active_sprint` (eyebrow + título separados automaticamente por "—") |
-| 6 | `06 — Cronograma Macro` | Timeline M0-M7 python-pptx + HOJE overlay + highlights + próximos + atenções | `macro_milestones` (8 gates do roadmap-marcos) + `highlights`, `next_steps`, `attentions` |
-| 7 | `07 — Riscos` | Até 6 cards de risco (crit+high) em 2 colunas | `risks` filtrado por `severity_class` |
-| 8 | `08 — Closing` | Próxima ação prioritária + contato | `next_steps[0]`, `project.pm_email` |
+| # | Slide | Fonte de conteúdo |
+|---|---|---|
+| 1 | Cover (foto M7 + dark overlay) | `assets/m7-hero-dark.png` + `project.name`, `period_label` |
+| 2 | Agenda (4 itens) | lista fixa refletindo slides 3-6 |
+| 3 | **Roadmap Completo** | **screenshot** `roadmap-marcos.html > .roadmap` com **overlays dinâmicos**: bars coloridas por status de execução (verde=done, azul=active, vermelho=overdue, fade=future) + linha vertical HOJE interpolada |
+| 4 | **Mapa de Status Executivo** | Timeline M0-M7 python-pptx + HOJE overlay + 2 colunas (Status Executivo + Próximas Atividades) + Pontos de Atenção. Título visível "Mapa de Status Executivo" |
+| 5 | Riscos Ativos | Até 6 cards (crit+high) em 2 colunas, de `risks` filtrado por `severity_class` |
+| 6 | Closing | Próxima ação prioritária + contato |
 
-Slides 3 e 4 são screenshots fiéis ao `roadmap-marcos.html` aprovado no plano — garantem fidelidade visual sem reinvenção. Slide 6 é renderizado via python-pptx para permitir o overlay "HOJE" dinâmico por data do reporte. Detalhes em [`presentation-structure.md`](references/presentation-structure.md).
+### Overlays dinâmicos no Slide Roadmap (v1.4)
+
+Antes do screenshot do `roadmap-marcos.html`, o playwright executa JS que:
+
+1. **Colore cada `.bar`** com classe `.bar-status-{done|active|overdue|future}` baseada no
+   resultado de `aggregate_bar_status(bar.title, xlsx_entries, report_date)`:
+   - `done` se todas as tasks matched estão concluídas
+   - `active` se há tasks in_progress ou parcialmente concluídas
+   - `overdue` se nenhuma task concluída E `max(fim_plan) < report_date`
+   - `future` caso contrário (ou sem matches)
+
+2. **Insere linha vertical HOJE** em cada `.track` na posição % interpolada entre os
+   marcos âncora M0 e M7 do roadmap (via `compute_today_pct`). O primeiro track
+   também recebe a label "HOJE · DD/MM" destacada em vermelho.
+
+Matching de bar título ↔ etapa é fuzzy: normalização NFD + case-fold, com estratégia
+cascata (substring direto → token split em separadores `·•-–—+&/|` com min-length 3 e
+stopwords PT filtradas). Bars sem matches ficam em `future` (fade 50%).
 
 ## Anti-patterns a evitar
 
