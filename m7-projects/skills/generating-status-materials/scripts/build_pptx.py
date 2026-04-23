@@ -310,10 +310,10 @@ def slide_02_agenda(prs, data, assets_dir):
              size=48, color=COL_BG_LIGHT)
     # Divider
     add_rect(slide, 80, 220, 1120, 1, COL_BG_LIGHT)
-    # Items — deck de 7 slides (Cover · Agenda · Visão Geral · Roadmap · Mapa Status · Riscos · Closing)
+    # Items — deck de 7 slides (v1.6): Cover · Agenda · Roadmap · Visão Geral · Mapa Status · Riscos · Closing
     items = [
-        ("01", "Visão Geral do Roadmap", "Slide 03"),
-        ("02", "Roadmap Completo", "Slide 04"),
+        ("01", "Roadmap Completo", "Slide 03"),
+        ("02", "Visão Geral do Roadmap", "Slide 04"),
         ("03", "Mapa de Status Executivo", "Slide 05"),
         ("04", "Riscos Ativos", "Slide 06"),
         ("05", "Próximos Passos", "Slide 07"),
@@ -374,7 +374,7 @@ def _render_roadmap_screenshot(
         return None
 
 
-def slide_03_visao_geral_roadmap(prs, data, assets_dir, ctx):
+def slide_04_visao_geral_roadmap(prs, data, assets_dir, ctx):
     """Slide 3 — Visão Geral do Roadmap (Paper artboard `03 — Visão Geral`).
 
     Renders a processos × fases matrix:
@@ -397,7 +397,7 @@ def slide_03_visao_geral_roadmap(prs, data, assets_dir, ctx):
     source = structure.get("source", "inferred")
 
     # Header
-    add_text(slide, 80, 40, 400, 16, "03 · VISÃO GERAL",
+    add_text(slide, 80, 40, 400, 16, "04 · VISÃO GERAL",
              size=12, bold=True, color=COL_PRIMARY, tracking=0.2)
     add_logo(slide, 1180, 36, 60, assets_dir, "dark")
 
@@ -511,7 +511,7 @@ def slide_03_visao_geral_roadmap(prs, data, assets_dir, ctx):
              size=9, color=COL_TEXT_CAPTION)
 
 
-def slide_04_roadmap(prs, data, assets_dir, ctx):
+def slide_03_roadmap(prs, data, assets_dir, ctx):
     """Slide 4 — Roadmap Completo: full swim-lane screenshot from roadmap-marcos.html
     with status-based bar coloring and the HOJE vertical reference line.
 
@@ -524,7 +524,7 @@ def slide_04_roadmap(prs, data, assets_dir, ctx):
     add_bg_rect(slide, prs.slide_width, prs.slide_height, COL_BG_LIGHT)
 
     # Header
-    add_text(slide, 80, 40, 400, 16, "04 · ROADMAP",
+    add_text(slide, 80, 40, 400, 16, "03 · ROADMAP",
              size=12, bold=True, color=COL_PRIMARY, tracking=0.2)
     add_logo(slide, 1180, 36, 60, assets_dir, "dark")
     add_text(slide, 80, 58, 900, 36, "Roadmap Completo",
@@ -837,8 +837,11 @@ def slide_07_closing(prs, data, assets_dir):
 # ---- Main ----
 
 def build(data: dict, out_path: Path, assets_dir: Path, ctx: dict):
-    """Builds the 7-slide status presentation. Ordering (v1.5):
-    Cover · Agenda · Visão Geral · Roadmap · Mapa de Status Executivo · Riscos · Closing.
+    """Builds the 7-slide status presentation. Ordering (v1.6):
+    Cover · Agenda · Roadmap · Visão Geral · Mapa de Status Executivo · Riscos · Closing.
+
+    (v1.6 swap: Roadmap comes BEFORE Visão Geral — "where we are in time" anchors
+    the reader before diving into the "where we are in scope" 11×6 matrix.)
     """
     prs = Presentation()
     prs.slide_width = Inches(13.333)
@@ -846,8 +849,8 @@ def build(data: dict, out_path: Path, assets_dir: Path, ctx: dict):
 
     slide_01_cover(prs, data, assets_dir)
     slide_02_agenda(prs, data, assets_dir)
-    slide_03_visao_geral_roadmap(prs, data, assets_dir, ctx)
-    slide_04_roadmap(prs, data, assets_dir, ctx)
+    slide_03_roadmap(prs, data, assets_dir, ctx)
+    slide_04_visao_geral_roadmap(prs, data, assets_dir, ctx)
     slide_05_mapa_status_executivo(prs, data, assets_dir, ctx)
     slide_06_risks(prs, data, assets_dir)
     slide_07_closing(prs, data, assets_dir)

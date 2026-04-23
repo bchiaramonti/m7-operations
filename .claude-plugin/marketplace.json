@@ -111,7 +111,7 @@
     {
       "name": "m7-projects",
       "description": "Gestão completa do ciclo de vida de projetos: scaffolding WBS/EAP, plano de projeto, plano de ação sincronizado com ClickUp como SSOT (CRUD + follow-up), OPR e apresentações executivas com Design System M7-2026.",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "author": {
         "name": "Bruno Chiaramonti"
       },

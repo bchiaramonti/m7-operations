@@ -71,6 +71,8 @@ class CollectResult:
     status: dict = field(default_factory=dict)
     highlights: list = field(default_factory=list)
     next_steps: list = field(default_factory=list)
+    progress_concluidas: list = field(default_factory=list)
+    progress_proximas: list = field(default_factory=list)
     attentions: list = field(default_factory=list)
     milestones: list = field(default_factory=list)
     macro_milestones: list = field(default_factory=list)
@@ -90,6 +92,8 @@ class CollectResult:
             "status": self.status,
             "highlights": self.highlights,
             "next_steps": self.next_steps,
+            "progress_concluidas": self.progress_concluidas,
+            "progress_proximas": self.progress_proximas,
             "attentions": self.attentions,
             "milestones": self.milestones,
             "macro_milestones": self.macro_milestones,
@@ -317,6 +321,13 @@ def parse_risks(path: Path, warnings: list) -> list[dict]:
 
         is_upside = code.upper().startswith("O")
 
+        # Incurred = risco que saiu de "monitoramento" para "incidente ativo".
+        # Opt-in explícito via `data-incurred="true"` no .risk-item do HTML de planejamento
+        # (building-project-plan pode expor isso no futuro). Hoje o default é False — o OPR
+        # exibe placeholder minimalista quando não há risco incorrido.
+        incurred_attr = (card.get("data-incurred") or "").strip().lower()
+        is_incurred = incurred_attr in ("true", "1", "yes", "sim")
+
         risks.append({
             "code": code,
             "title": title,
@@ -327,6 +338,7 @@ def parse_risks(path: Path, warnings: list) -> list[dict]:
             "description": description,
             "mitigation": mitigation,
             "is_upside": is_upside,
+            "is_incurred": is_incurred,
         })
 
     if not risks:
@@ -1017,6 +1029,31 @@ def synthesize(
     candidates.sort(key=lambda c: (-c["priority"], -c["date"].timestamp()))
     highlights = [c["text"] for c in candidates[:5]]
 
+    # Progress — structured list of concluded tasks in period (for OPR v1.6 layout)
+    window_days_progress = 14
+    cutoff_progress = report_date - timedelta(days=window_days_progress)
+    progress_concluidas = []
+    for action in actions:
+        if action.get("status") == "done" and isinstance(action.get("fim_real"), datetime) and action["fim_real"] >= cutoff_progress:
+            progress_concluidas.append({
+                "wbs": str(action.get("no", "")),
+                "text": truncate(action.get("etapa", ""), 60),
+                "date": action["fim_real"].strftime("%d/%m"),
+                "_date": action["fim_real"],
+            })
+    for phase in phases:
+        if isinstance(phase.get("fim_real"), datetime) and phase["fim_real"] >= cutoff_progress:
+            progress_concluidas.append({
+                "wbs": str(phase.get("no", "")),
+                "text": f"✓ {truncate(phase.get('etapa', ''), 55)}",
+                "date": phase["fim_real"].strftime("%d/%m"),
+                "_date": phase["fim_real"],
+            })
+    progress_concluidas.sort(key=lambda c: c.get("_date") or datetime.min, reverse=True)
+    for item in progress_concluidas:
+        item.pop("_date", None)
+    progress_concluidas = progress_concluidas[:5]
+
     # Next steps
     lookahead = report_date + timedelta(days=14)
     next_candidates = []
@@ -1053,6 +1090,44 @@ def synthesize(
         key=lambda c: (-c["priority"], c.get("deadline_full") or "9999")
     )
     next_steps = next_candidates[:5]
+
+    # Progress — structured list of upcoming tasks (for OPR v1.6 layout).
+    # Uses the same candidates as next_steps but with {wbs, text, date} schema.
+    progress_proximas = []
+    for phase in phases:
+        ip = phase.get("inicio_plan")
+        if isinstance(ip, datetime) and report_date <= ip <= lookahead:
+            progress_proximas.append({
+                "wbs": str(phase.get("no", "")),
+                "text": f"Iniciar {truncate(phase.get('etapa', ''), 55)}",
+                "date": ip.strftime("%d/%m"),
+                "_date": ip,
+                "_priority": 15,
+            })
+    for action in actions:
+        status = action.get("status")
+        fp = action.get("fim_plan")
+        if status == "blocked":
+            progress_proximas.append({
+                "wbs": str(action.get("no", "")),
+                "text": f"⚠ Desbloquear: {truncate(action.get('etapa', ''), 50)}",
+                "date": fp.strftime("%d/%m") if isinstance(fp, datetime) else "—",
+                "_date": fp if isinstance(fp, datetime) else datetime.max,
+                "_priority": 20,
+            })
+        elif status != "done" and isinstance(fp, datetime) and report_date <= fp <= lookahead:
+            progress_proximas.append({
+                "wbs": str(action.get("no", "")),
+                "text": truncate(action.get("etapa", ""), 60),
+                "date": fp.strftime("%d/%m"),
+                "_date": fp,
+                "_priority": 10,
+            })
+    progress_proximas.sort(key=lambda c: (-c.get("_priority", 0), c.get("_date") or datetime.max))
+    for item in progress_proximas:
+        item.pop("_date", None)
+        item.pop("_priority", None)
+    progress_proximas = progress_proximas[:5]
 
     # Attentions — prefer authoritative severity_class from riscos.html;
     # skip upsides (codes starting with O = Oportunidade, not risk to watch).
@@ -1111,6 +1186,7 @@ def synthesize(
                 "description": m.get("description", ""),
                 "code": m.get("code", ""),
                 "major": m.get("major", False),
+                "left_pct": m.get("left_pct"),
             }
             for m in chosen[:8]
         ]
@@ -1191,6 +1267,8 @@ def synthesize(
         "risks_sentence": risks_sentence,
         "_highlights": highlights,
         "_next_steps": next_steps,
+        "_progress_concluidas": progress_concluidas,
+        "_progress_proximas": progress_proximas,
         "_attentions": attentions,
         "_macro_milestones": macro_milestones,
         "_sprints": sprints,
@@ -1315,6 +1393,8 @@ def collect(project_dir: Path, report_date_str: str) -> dict:
         },
         highlights=synth["_highlights"],
         next_steps=synth["_next_steps"],
+        progress_concluidas=synth["_progress_concluidas"],
+        progress_proximas=synth["_progress_proximas"],
         attentions=synth["_attentions"],
         milestones=milestones,
         macro_milestones=synth["_macro_milestones"],

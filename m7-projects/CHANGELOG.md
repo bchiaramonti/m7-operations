@@ -13,6 +13,35 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.6.0] - 2026-04-22
+
+OPR completamente redesenhado seguindo artboard Paper `OPR — Status Report` validado com o usuário. Deck PPTX tem slides 3 e 4 invertidos: **Roadmap agora vem antes da Visão Geral** — "onde estamos no tempo" ancora o leitor antes de mergulhar nos 66 quadradinhos da matriz de escopo. OPR ganha estrutura executiva de 6 zonas com densidade informativa mais adequada para impressão A4. Conceito de "risco incorrido" introduzido: cards detalhados de risco só aparecem quando algum risco sair de monitoramento para incidente ativo — estado default é um placeholder minimalista "Sem riscos materializados neste período".
+
+### Added
+- **Artboard Paper `opr-status-report`** — referência visual canônica com 6 zonas (Hero · Roadmap · Matriz · Progresso · Riscos · Footer) usada como design contract para o template HTML.
+- [templates/opr.tmpl.html](skills/generating-status-materials/templates/opr.tmpl.html) reescrito completo (~450 linhas) com CSS do Design System M7-2026:
+  - Hero dark com 4 métricas inline (status dot + label, conclusão X/Y+%, próximo gate M1, riscos críticos count)
+  - Zona Roadmap com timeline horizontal de marcos absolutely-positioned por `left_pct`, HOJE line vertical, rail de meses MAR-JUL
+  - Zona Matriz N×6 processos × fases com dados de `roadmap_structure` + células coloridas por status
+  - Zona Progresso com 2 colunas (Concluídas + Próximas) mostrando WBS + texto + deadline
+  - Zona Riscos condicional: `if incurred_count > 0` renderiza cards; senão placeholder dashed
+  - Footer com ClickUp + PM + assinatura
+- [scripts/collect_data.py](skills/generating-status-materials/scripts/collect_data.py) · novo campo `is_incurred` em cada risco parseado do `.risk-item`. Lê `data-incurred="true"` do HTML (opt-in explícito do plano). Default False.
+- `collect_data.py` · novos outputs `progress_concluidas` e `progress_proximas` — listas estruturadas `{wbs, text, date}` para alimentar o novo layout de 2 colunas do OPR (substitui highlights/next_steps texto-solto para este uso).
+- `collect_data.py` · campo `left_pct` propagado de `milestones` para `macro_milestones` — permite que Roadmap do OPR posicione marcos por `left_pct` exato em vez de distribuição uniforme.
+- [scripts/build_opr.py](skills/generating-status-materials/scripts/build_opr.py) · helpers `_infer_active_phase(milestones)` e `_derive_roadmap_months(milestones)` para gerar sentence do roadmap ("1 de 8 marcos atingidos · Fundação em curso") e lista de meses MAR→JUL a partir das datas dos marcos.
+- `build_opr.py` · `render_html` reescrito para alimentar todas as novas variáveis do template: `status_label_short`, `next_marcos`, `risks_critical_count`, `risks_high_count`, `roadmap_sentence`, `roadmap_months`, `roadmap_months_range`, `matrix_sentence`, `progress_sentence`, `incurred_count`, `incurred_risks`, `total_risks`.
+
+### Changed
+- **Deck PPTX: slides 3 e 4 invertidos** — agora é Cover · Agenda · **Roadmap (03)** · **Visão Geral (04)** · Mapa Status Exec · Riscos · Closing. Funções `slide_03_roadmap` e `slide_04_visao_geral_roadmap` renomeadas para refletir a nova posição. Eyebrows atualizados ("03 · ROADMAP", "04 · VISÃO GERAL"). Agenda do slide 2 reflete nova ordem.
+- OPR completamente diferente visualmente — se saiu de um mini-card sparse para um documento executivo denso de A4, aplicando padrão editorial Swiss (contraste de escala, lanes verticais alinhadas, tipografia tracked em caps para section labels).
+
+### Validation
+- Smoke test completo no projeto `Playbook de Processos` em 22/04/2026:
+  - OPR gerado: Hero correto (status Atenção, 7/91, M1 28/abr, 4 críticos), Roadmap com 8 marcos distribuídos e HOJE em 22.8%, Matriz 11×6 com 66 células, Progresso com 5 concluídas (TAP, WBS/EAP, Matriz Riscos, RACI, OKRs) + 5 próximas, Riscos placeholder (0 incorridos de 13 mapeados), Footer com ClickUp + PM
+  - OPR compact mode ativado automaticamente por ter estourado A4 em altura (1241 > 1123) — CSS ajusta font-size e padding para caber
+  - PPTX com slides 3 (Roadmap Completo) e 4 (Visão Geral Matriz) na ordem correta + eyebrows validados via python-pptx
+
 ## [1.5.0] - 2026-04-22
 
 Reintroduz o slide "Visão Geral do Roadmap" (Paper artboard `03 — Visão Geral`) como

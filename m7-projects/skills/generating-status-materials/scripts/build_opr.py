@@ -81,6 +81,9 @@ def pick_next_milestones(milestones: list[dict], limit: int = 3) -> list[dict]:
     return upcoming[:limit]
 
 
+STATUS_SHORT = {"green": "OK", "yellow": "Atenção", "red": "Crítico"}
+
+
 def render_html(
     data: dict,
     template_path: Path,
@@ -88,6 +91,8 @@ def render_html(
     roadmap_html: Path | None,
     compact: bool = False,
 ) -> str:
+    """Renders the OPR v1.6 template with 6 zones matching the Paper artboard
+    `OPR — Status Report`: Hero · Roadmap · Matriz · Progresso · Riscos · Footer."""
     try:
         from jinja2 import Template
     except ImportError:
@@ -96,31 +101,146 @@ def render_html(
     template = Template(template_path.read_text(encoding="utf-8"))
     logo_url = encode_logo(assets_dir, "m7-logo-offwhite.png")
 
-    # Generate mini-swimlane screenshot once (shared across renders)
-    tmp_dir = Path(tempfile.mkdtemp(prefix="opr-swimlane-"))
-    mini_swimlane_url = generate_mini_swimlane(roadmap_html, tmp_dir)
-
+    # Risks + incurred split
     all_risks = data.get("risks", [])
-    total_risks = sum(1 for r in all_risks if not r.get("is_upside"))
-    top_risks = pick_top_risks(all_risks, limit=3)
+    actual_risks = [r for r in all_risks if not r.get("is_upside")]
+    total_risks = len(actual_risks)
+    incurred_risks = [r for r in actual_risks if r.get("is_incurred")]
+    # When counting "critical" and "high" for the hero pill, use severity_class regardless of incurred
+    risks_critical_count = sum(1 for r in actual_risks if r.get("severity_class") == "crit")
+    risks_high_count = sum(1 for r in actual_risks if r.get("severity_class") == "high")
+
+    # Next gate — first milestone that isn't done
     next_marcos = pick_next_milestones(data.get("macro_milestones", []), limit=3)
 
+    # Roadmap data
+    macro_milestones = data.get("macro_milestones", [])
+    total_marcos = len(macro_milestones)
+    done_marcos = sum(1 for m in macro_milestones if m.get("status") == "done")
+    active_phase = _infer_active_phase(macro_milestones)
+    roadmap_sentence = (
+        f"{done_marcos} de {total_marcos} marcos atingidos · {active_phase}"
+        if total_marcos > 0 else "Roadmap não disponível"
+    )
+    roadmap_months, roadmap_months_range = _derive_roadmap_months(macro_milestones)
+    roadmap_overlays = data.get("roadmap_overlays", {}) or {}
+
+    # Matrix data
+    matrix_structure = data.get("roadmap_structure", {}) or {}
+    meta = matrix_structure.get("meta", {}) or {}
+    matrix_total = meta.get("total_cells", 0)
+    matrix_done = meta.get("done_cells", 0)
+    matrix_active = meta.get("active_cells", 0)
+    matrix_pct = round(100 * matrix_done / matrix_total) if matrix_total else 0
+    matrix_sentence = (
+        f"{matrix_done + matrix_active} de {matrix_total} entregas em execução · {matrix_pct}% concluídas"
+        if matrix_total else "Matriz não disponível"
+    )
+
+    # Progress data
+    progress_concluidas = data.get("progress_concluidas", [])
+    progress_proximas = data.get("progress_proximas", [])
+    progress_sentence = (
+        f"{len(progress_concluidas)} task{'s' if len(progress_concluidas) != 1 else ''} concluída{'s' if len(progress_concluidas) != 1 else ''} na quinzena · "
+        f"{len(progress_proximas)} próxima{'s' if len(progress_proximas) != 1 else ''} nos próximos 14 dias"
+    )
+
+    # Project meta with shortened clickup url for display
+    project = dict(data.get("project", {}) or {})
+    if project.get("clickup_list_url"):
+        url = project["clickup_list_url"]
+        short = url.replace("https://", "").replace("http://", "")
+        project["clickup_list_url_short"] = short.split("/l/")[0] if "/l/" in short else short
+
+    status = data.get("status", {}) or {}
+
     return template.render(
-        project=data.get("project", {}),
+        project=project,
         report_date=data.get("report_date"),
-        status=data.get("status", {}),
-        status_label=STATUS_LABEL.get(data.get("status", {}).get("overall"), "🟢 OK"),
-        highlights=data.get("highlights", []),
-        next_steps=data.get("next_steps", []),
-        attentions=data.get("attentions", []),
-        macro_milestones=data.get("macro_milestones", []),
+        status=status,
+        status_label=STATUS_LABEL.get(status.get("overall"), "🟢 OK"),
+        status_label_short=STATUS_SHORT.get(status.get("overall"), "OK"),
         next_marcos=next_marcos,
-        top_risks=top_risks,
+        risks_critical_count=risks_critical_count,
+        risks_high_count=risks_high_count,
+        macro_milestones=macro_milestones,
+        roadmap_sentence=roadmap_sentence,
+        roadmap_months=roadmap_months,
+        roadmap_months_range=roadmap_months_range,
+        roadmap_overlays=roadmap_overlays,
+        matrix_structure=matrix_structure,
+        matrix_sentence=matrix_sentence,
+        progress_concluidas=progress_concluidas,
+        progress_proximas=progress_proximas,
+        progress_sentence=progress_sentence,
+        incurred_count=len(incurred_risks),
+        incurred_risks=incurred_risks,
         total_risks=total_risks,
         logo_url=logo_url,
-        mini_swimlane_url=mini_swimlane_url,
         compact=compact,
     )
+
+
+_PHASE_HINTS = {
+    "KICKOFF": "Kickoff em curso",
+    "FUNDAÇÃO": "Fundação em curso",
+    "FUNDACAO": "Fundação em curso",
+    "PRIMEIROS": "Execução inicial em curso",
+    "MID-POINT": "Execução em meio-caminho",
+    "COBERTURA": "Execução na reta final",
+    "CONSOLIDAÇÃO": "Consolidação em curso",
+    "CONSOLIDACAO": "Consolidação em curso",
+    "HANDOFFS": "Handoffs em curso",
+    "TE": "Encerramento em curso",
+}
+
+
+def _infer_active_phase(milestones: list[dict]) -> str:
+    """Finds the next not-yet-done milestone and maps its label to a short phase name."""
+    if not milestones:
+        return "sem marcos"
+    target = next((m for m in milestones if m.get("status") in ("in_progress", "active", "not_started")), None)
+    if not target:
+        return "todos marcos atingidos"
+    label_upper = (target.get("label") or "").upper()
+    for key, phrase in _PHASE_HINTS.items():
+        if key in label_upper:
+            return phrase
+    return f"próximo marco: {target.get('label', '')}"
+
+
+def _derive_roadmap_months(milestones: list[dict]) -> tuple[list[str], str]:
+    """Extracts month range (e.g., ['MAR', 'ABR', 'MAI', 'JUN', 'JUL'])
+    and a compact range label (e.g., 'mar — jul 2026') from milestone dates.
+    Falls back to ['MAR', 'ABR', 'MAI', 'JUN', 'JUL'] if dates are missing.
+    """
+    from datetime import datetime as _dt
+    months_pt = {1: "JAN", 2: "FEV", 3: "MAR", 4: "ABR", 5: "MAI", 6: "JUN",
+                 7: "JUL", 8: "AGO", 9: "SET", 10: "OUT", 11: "NOV", 12: "DEZ"}
+    dates = []
+    for m in milestones:
+        d = m.get("date")
+        if not d:
+            continue
+        try:
+            dates.append(_dt.strptime(d, "%Y-%m-%d"))
+        except (ValueError, TypeError):
+            continue
+    if not dates:
+        return ["MAR", "ABR", "MAI", "JUN", "JUL"], ""
+    dates.sort()
+    start, end = dates[0], dates[-1]
+    # Build month list from start month through end month (inclusive)
+    months = []
+    year, month = start.year, start.month
+    while (year, month) <= (end.year, end.month):
+        months.append(months_pt.get(month, str(month)))
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
+    range_label = f"{months[0].lower()} — {months[-1].lower()} {end.year}"
+    return months, range_label
 
 
 def render_pdf_playwright(html: str, pdf_path: Path) -> bool:

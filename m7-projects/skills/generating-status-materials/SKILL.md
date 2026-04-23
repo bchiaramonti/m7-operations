@@ -150,18 +150,40 @@ Executado em `collect_data.py` (não em LLM). Regras em [`narrative-synthesis.md
 
 ## Mapeamento Paper → PPTX
 
-O deck produzido tem **7 slides** executivos (v1.5 reintroduziu "Visão Geral" como
-matriz processos × fases):
+O deck produzido tem **7 slides** executivos (v1.6 inverteu Roadmap ↔ Visão Geral —
+"tempo" ancora o leitor antes de mergulhar no escopo):
 
 | # | Slide | Fonte de conteúdo |
 |---|---|---|
 | 1 | Cover (foto M7 + dark overlay) | `assets/m7-hero-dark.png` + `project.name`, `period_label` |
 | 2 | Agenda (5 itens) | lista fixa refletindo slides 3-7 |
-| 3 | **Visão Geral do Roadmap** | Matriz **processos × fases** renderizada em python-pptx. Linhas = processos do plano; colunas = fases uniformes do trabalho; células = status da task intersectada. Fonte: `matrix-structure.json` + `Cronograma.xlsx` LIVE |
-| 4 | **Roadmap Completo** | **screenshot** `roadmap-marcos.html > .roadmap` com **overlays dinâmicos**: bars coloridas por status de execução (verde=done, azul=active, vermelho=overdue, fade=future) + linha vertical HOJE interpolada |
-| 5 | **Mapa de Status Executivo** | Timeline M0-M7 python-pptx + HOJE overlay + 2 colunas (Status Executivo + Próximas Atividades) + Pontos de Atenção. Título visível "Mapa de Status Executivo" |
+| 3 | **Roadmap Completo** | **screenshot** `roadmap-marcos.html > .roadmap` com **overlays dinâmicos**: bars coloridas por status de execução (verde=done, azul=active, vermelho=overdue, fade=future) + linha vertical HOJE interpolada |
+| 4 | **Visão Geral do Roadmap** | Matriz **processos × fases** renderizada em python-pptx. Linhas = processos; colunas = fases uniformes do trabalho; células = status da task intersectada. Fonte: `matrix-structure.json` + `Cronograma.xlsx` LIVE |
+| 5 | **Mapa de Status Executivo** | Timeline M0-M7 python-pptx + HOJE overlay + 2 colunas (Status Executivo + Próximas Atividades) + Pontos de Atenção |
 | 6 | Riscos Ativos | Até 6 cards (crit+high) em 2 colunas, de `risks` filtrado por `severity_class` |
 | 7 | Closing | Próxima ação prioritária + contato |
+
+## OPR — 6 zonas (v1.6)
+
+O OPR é um A4 portrait denso, fiel ao artboard Paper `OPR — Status Report`:
+
+| Zona | Conteúdo | Fonte |
+|---|---|---|
+| **Hero** (dark) | Project name + 4 métricas (status, conclusão, próximo gate, riscos) | `project`, `status`, `next_marcos[0]`, `risks_critical_count` |
+| **Roadmap** | Timeline horizontal com marcos M0-M7 + HOJE line interpolada | `macro_milestones` com `left_pct` + `roadmap_overlays.today_pct` |
+| **Matriz** | Processos × fases (mesma estrutura do slide 4 do deck) | `roadmap_structure` |
+| **Progresso** | 2 colunas: Concluídas (últimos 14 dias) + Próximas (próximos 14 dias) | `progress_concluidas`, `progress_proximas` (campos novos em v1.6) |
+| **Riscos** | Condicional: placeholder "0 incorridos" OU cards detalhados se houver | `is_incurred=True` em `risks[]` |
+| **Footer** | ClickUp LIVE + PM + assinatura | `project.clickup_list_url`, `project.pm`, `project.pm_email` |
+
+### Riscos condicionais
+
+Um risco só aparece como card no OPR quando `is_incurred == True`. Default: `False` —
+o placeholder minimalista ("Sem riscos materializados neste período") é exibido.
+
+Para marcar um risco como incorrido, adicione `data-incurred="true"` no `.risk-item`
+correspondente do `1-planning/artefatos/riscos.html` (requer suporte upstream pela
+`building-project-plan`, hoje ainda não expõe esse atributo — será v1.7+).
 
 ### Matriz Processos × Fases no Slide Visão Geral (v1.5)
 
