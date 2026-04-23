@@ -1090,6 +1090,104 @@ def metric_edr(actions: list[dict]) -> float:
     return early / len(done)
 
 
+def compute_metrics_breakdown(
+    actions: list[dict], milestones: list[dict], report_date: datetime
+) -> dict:
+    """Returns raw counters + task references for each metric, enabling the OPR
+    narrative builder (build_opr.build_health_narrative) to render executive-friendly
+    sentences like "5 das 12 tarefas que já deveriam ter começado ainda não foram
+    iniciadas (ex: 2.1.1 CMMI, 2.1.2 self-assessment)".
+
+    Kept separate from metric_* functions (which return floats) so the narrative
+    layer is fully decoupled from the scoring layer.
+    """
+    devido = _filter_devido_hoje(actions, report_date)
+    iniciavel = _filter_iniciavel_hoje(actions, report_date)
+
+    devido_done = [a for a in devido if a.get("status") == "done"]
+    devido_pending = [a for a in devido if a.get("status") != "done"]
+
+    late_start_tasks = [
+        a for a in iniciavel
+        if not isinstance(a.get("inicio_real"), datetime) and a.get("status") == "not_started"
+    ]
+
+    # SPI: walk actions again to compute EV and PV in days for display
+    ev_days = 0.0
+    pv_days = 0.0
+    for a in actions:
+        ip, fp = a.get("inicio_plan"), a.get("fim_plan")
+        if not (isinstance(ip, datetime) and isinstance(fp, datetime)):
+            continue
+        dur = _task_duration_days(a)
+        if a.get("status") == "done":
+            ev_days += dur
+        if report_date >= fp:
+            pv_days += dur
+        elif ip < report_date < fp:
+            elapsed = (report_date - ip).days
+            pv_days += dur * (elapsed / dur) if dur > 0 else 0.0
+
+    # MSI: find the worst slipping major milestone
+    msi_milestone_label = None
+    msi_days = 0
+    for m in milestones:
+        if not m.get("major"):
+            continue
+        date_str = m.get("date")
+        if not date_str:
+            continue
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            continue
+        if m.get("status") == "overdue" or (dt < report_date and m.get("status") != "done"):
+            slip = (report_date - dt).days
+            if slip > msi_days:
+                msi_days = slip
+                msi_milestone_label = m.get("label")
+
+    # EDR: count early deliveries among completed
+    done_total = [a for a in actions if a.get("status") == "done"]
+    done_early = [
+        a for a in done_total
+        if isinstance(a.get("fim_real"), datetime) and isinstance(a.get("fim_plan"), datetime)
+        and a["fim_real"] < a["fim_plan"]
+    ]
+
+    return {
+        "devido": {
+            "total": len(devido),
+            "done": len(devido_done),
+            "pending": len(devido_pending),
+            "pending_tasks": [
+                {"no": str(a.get("no", "")), "etapa": truncate(str(a.get("etapa", "")), 70)}
+                for a in devido_pending[:5]
+            ],
+        },
+        "iniciavel": {
+            "total": len(iniciavel),
+            "late": len(late_start_tasks),
+            "late_tasks": [
+                {"no": str(a.get("no", "")), "etapa": truncate(str(a.get("etapa", "")), 70)}
+                for a in late_start_tasks[:5]
+            ],
+        },
+        "spi": {
+            "ev_days": round(ev_days, 1),
+            "pv_days": round(pv_days, 1),
+        },
+        "msi": {
+            "max_slip_days": msi_days,
+            "milestone_label": msi_milestone_label,
+        },
+        "edr": {
+            "total_done": len(done_total),
+            "early": len(done_early),
+        },
+    }
+
+
 def metric_ahead_ratio(actions: list[dict], report_date: datetime) -> float:
     """Ahead ratio = done_early / total_due_so_far.
 
@@ -1267,6 +1365,7 @@ def synthesize(
         "edr": metric_edr(actions),
         "ahead_ratio": metric_ahead_ratio(actions, report_date),
     }
+    metrics_breakdown = compute_metrics_breakdown(actions, milestones, report_date)
     classification = classify_zone(metrics, milestones, report_date)
     overall = classification["zone"]  # "blue" | "green" | "yellow" | "red"
 
@@ -1525,6 +1624,7 @@ def synthesize(
     return {
         "overall": overall,
         "metrics": metrics,
+        "metrics_breakdown": metrics_breakdown,
         "metric_zones": classification["metric_zones"],
         "status_reasons": classification["reasons"],
         "gates_fired": classification["gates_fired"],

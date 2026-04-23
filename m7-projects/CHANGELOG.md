@@ -13,6 +13,29 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.7.3] - 2026-04-23
+
+Substitui a lista técnica de métricas PMBOK no bloco "Saúde do Projeto" por
+narrativas executivas quantificadas. Antes: `SG = 41.7% (🔴)` — lê como
+dashboard de engenheiro. Agora: *"ARRANQUE — 5 das 12 tarefas que já
+deveriam ter iniciado permanecem como 'não iniciadas' (42% do pipeline
+ativo). Sem arranque, o cronograma dessas frentes começa a escorregar
+mesmo antes da primeira entrega vencer."* + exemplos das 3 primeiras
+tasks afetadas com WBS code.
+
+### Added
+- [scripts/collect_data.py](skills/generating-status-materials/scripts/collect_data.py) · `compute_metrics_breakdown(actions, milestones, report_date)` — retorna contadores brutos de cada métrica (numerador/denominador/task references) sem mudar a assinatura das funções `metric_*` existentes. Estrutura: `{devido, iniciavel, spi, msi, edr}` com total/counts/listas de até 5 tasks exemplares para narrar.
+- `status.metrics_breakdown` no output JSON — novo campo consumido pelo builder de narrativa.
+- [scripts/build_opr.py](skills/generating-status-materials/scripts/build_opr.py) · `build_health_narrative(metric_zones, breakdown)` — gera lista de `{title, body, examples}` para cada métrica em zona yellow/red. Title é uma tag curta executiva (ENTREGAS, ARRANQUE, RITMO, MARCOS). Body é prose com contadores absolutos + contexto operacional PMI. Examples lista até 3 tasks-referência com WBS + etapa.
+- Nova variável `health_narrative` passada ao Jinja template.
+
+### Changed
+- [templates/opr.tmpl.html](skills/generating-status-materials/templates/opr.tmpl.html) · Bloco `.saude` reformulado: de lista `ul` simples de strings para estrutura `.saude__item` com tag categoria + body narrativo + examples list com WBS code em destaque. CSS inclui borda lateral esquerda colorida por severidade que funciona como acento editorial.
+- Layout do bloco Saúde expande verticalmente para comportar as narrativas; body do OPR chega a ~1220px em modo compact no projeto atual. Compact mode existente ainda ativo mas o conteúdo rico pode fazer o PDF ocupar 2 páginas dependendo do projeto. Decisão do usuário se aceita ou se ajusta narrativas/exemplos.
+
+### Validation
+- Preview visual do projeto Playbook em 23/04: bloco Saúde mostra 2 items (ARRANQUE + RITMO), ambos em red. ARRANQUE exibe "5 das 12 tarefas..." + 3 exemplos WBS (2.1.1 Instrumento CMMI, 2.1.2 Aplicação self-assessment, 2.1.3 Mapeamento AS-IS) + "…e mais 2 tasks". RITMO exibe "Foram executados 32 dias-trabalho dos 65 planejados... (SPI = 0.49)". Nenhuma string PMBOK crua — tudo quantificado em unidades operacionais (tasks, dias-trabalho).
+
 ## [1.7.2] - 2026-04-23
 
 Dois polimentos visuais do OPR após feedback de render no PDF:

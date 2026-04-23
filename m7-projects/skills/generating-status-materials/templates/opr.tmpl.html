@@ -291,21 +291,50 @@
 
   /* ============ SAÚDE (bloco explicativo quando status yellow/red) ============ */
   .saude {
-    padding: 10px 12px;
+    padding: 12px 14px;
     border-radius: 2px;
-    display: flex; flex-direction: column; gap: 4px;
+    display: flex; flex-direction: column; gap: 10px;
   }
   .saude.yellow { background: var(--tag-bg-warning);  border: 1px solid var(--status-warning); }
   .saude.red    { background: var(--tag-bg-critical); border: 1px solid var(--status-critical); }
-  .saude__title {
+  .saude__header {
     font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
     text-transform: uppercase;
   }
-  .saude.yellow .saude__title { color: var(--status-warning); }
-  .saude.red    .saude__title { color: var(--status-critical); }
-  .saude__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
-  .saude__list li { font-size: 10px; color: var(--m7-text-muted); line-height: 1.35; }
-  body.compact .saude { padding: 7px 10px; gap: 2px; }
+  .saude.yellow .saude__header { color: var(--status-warning); }
+  .saude.red    .saude__header { color: var(--status-critical); }
+  .saude__item {
+    display: flex; flex-direction: column; gap: 3px;
+    padding-left: 10px;
+    border-left: 2px solid transparent;
+  }
+  .saude.yellow .saude__item { border-left-color: var(--status-warning); }
+  .saude.red    .saude__item { border-left-color: var(--status-critical); }
+  .saude__title-line {
+    display: flex; gap: 8px; align-items: baseline;
+  }
+  .saude__title-line .tag {
+    font-size: 8px; font-weight: 700; letter-spacing: 0.14em;
+    color: var(--m7-text-subtle); text-transform: uppercase;
+  }
+  .saude__body {
+    font-size: 10px; color: var(--m7-text-muted); line-height: 1.45;
+  }
+  .saude__examples {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 4px 0 0 0;
+  }
+  .saude__examples .ex {
+    font-size: 9px; color: var(--m7-text-subtle); line-height: 1.3;
+  }
+  .saude__examples .ex .wbs {
+    font-weight: 700; color: var(--m7-primary);
+    display: inline-block; min-width: 40px;
+  }
+  body.compact .saude { padding: 8px 10px; gap: 7px; }
+  body.compact .saude__item { padding-left: 8px; }
+  body.compact .saude__body { font-size: 9px; }
+  body.compact .saude__examples .ex { font-size: 8px; }
 
   /* ============ RISKS (condicional: incorridos) ============ */
   .risks__empty {
@@ -542,14 +571,27 @@
       <div class="right">fonte riscos.html</div>
     </div>
 
-    {% if status.overall in ("yellow", "red") %}
+    {% if status.overall in ("yellow", "red") and health_narrative %}
       <div class="saude {{ status.overall }}">
-        <div class="saude__title">Por que a saúde está {{ status_label_short }}</div>
-        <ul class="saude__list">
-          {% for reason in status_reasons_unhealthy %}
-            <li>{{ reason }}</li>
-          {% endfor %}
-        </ul>
+        <div class="saude__header">Por que a saúde está {{ status_label_short }}</div>
+        {% for item in health_narrative %}
+          <div class="saude__item">
+            <div class="saude__title-line">
+              <div class="tag">{{ item.title }}</div>
+            </div>
+            <div class="saude__body">{{ item.body }}</div>
+            {% if item.examples %}
+              <div class="saude__examples">
+                {% for ex in item.examples[:3] %}
+                  <div class="ex"><span class="wbs">{{ ex.no }}</span>{{ ex.etapa }}</div>
+                {% endfor %}
+                {% if item.examples|length > 3 %}
+                  <div class="ex" style="color: var(--m7-text-caption);">…e mais {{ item.examples|length - 3 }} task{{ 's' if item.examples|length - 3 != 1 else '' }}</div>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
       </div>
     {% endif %}
 

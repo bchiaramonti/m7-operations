@@ -73,19 +73,99 @@ def generate_mini_swimlane(roadmap_html: Path | None, tmp_dir: Path) -> str | No
 
 
 def pick_unhealthy_reasons(metric_zones: dict, reasons: list) -> list:
-    """Returns the status_reasons entries whose metric zone is yellow or red.
-
-    Relies on positional alignment: the first 4 reasons in `reasons` correspond to
-    the metrics in the fixed order emitted by collect_data.classify_zone (DG, SG,
-    SPI, MSI). Reasons at index ≥4 (EDR, gates, overrides) are ignored — they
-    don't participate in the worst-of classification directly.
-    """
+    """Legacy helper (kept for backwards-compat). Prefer build_health_narrative()."""
     keys = ["dg", "sg", "spi", "msi"]
     out = []
     for i, k in enumerate(keys):
         if i < len(reasons) and metric_zones.get(k) in ("yellow", "red"):
             out.append(reasons[i])
     return out
+
+
+def build_health_narrative(metric_zones: dict, breakdown: dict) -> list[dict]:
+    """Builds executive-friendly narratives for metrics in yellow/red zones.
+
+    Each narrative is {title, body, examples}:
+      - title: short metric label (e.g., "ARRANQUE") — bold, scannable
+      - body: prose sentence with absolute counters and operational context
+      - examples: up to 3 task references (list of {no, etapa}), empty list if N/A
+
+    Falls back silently if breakdown keys are missing (old collect_data versions).
+    """
+    narratives = []
+
+    # DG — Delivery Gap
+    if metric_zones.get("dg") in ("yellow", "red"):
+        d = breakdown.get("devido", {})
+        total, pending = d.get("total", 0), d.get("pending", 0)
+        if total and pending:
+            pct = pending / total * 100
+            narratives.append({
+                "title": "ENTREGAS",
+                "body": (
+                    f"{pending} das {total} entregas previstas para até hoje "
+                    f"ainda não foram concluídas ({pct:.0f}% do pipeline devido). "
+                    "Tarefas concluídas no prazo não foram o suficiente para compensar o gap."
+                ),
+                "examples": d.get("pending_tasks", []),
+            })
+
+    # SG — Start Gap
+    if metric_zones.get("sg") in ("yellow", "red"):
+        i = breakdown.get("iniciavel", {})
+        total, late = i.get("total", 0), i.get("late", 0)
+        if total and late:
+            pct = late / total * 100
+            narratives.append({
+                "title": "ARRANQUE",
+                "body": (
+                    f"{late} das {total} tarefas que já deveriam ter iniciado "
+                    f"permanecem como 'não iniciadas' ({pct:.0f}% do pipeline ativo). "
+                    "Sem arranque, o cronograma dessas frentes começa a escorregar "
+                    "mesmo antes da primeira entrega vencer."
+                ),
+                "examples": i.get("late_tasks", []),
+            })
+
+    # SPI — Schedule Performance Index
+    if metric_zones.get("spi") in ("yellow", "red"):
+        spi = breakdown.get("spi", {})
+        ev = spi.get("ev_days", 0.0)
+        pv = spi.get("pv_days", 0.0)
+        if pv > 0:
+            ratio = ev / pv
+            narratives.append({
+                "title": "RITMO (SPI)",
+                "body": (
+                    f"Foram executados {ev:g} dias-trabalho dos {pv:g} planejados para até hoje "
+                    f"(SPI = {ratio:.2f}). PMI considera projeto saudável com SPI ≥ 0.95; "
+                    "abaixo de 0.85 o atraso vira estrutural e precisa replanejamento."
+                ),
+                "examples": [],
+            })
+
+    # MSI — Milestone Slip Index
+    if metric_zones.get("msi") in ("yellow", "red"):
+        msi = breakdown.get("msi", {})
+        slip = msi.get("max_slip_days", 0)
+        label = msi.get("milestone_label") or "marco crítico"
+        if slip > 0:
+            if slip <= 7:
+                severity = "atenção"
+                gravity = "ainda recuperável se agir nesta quinzena"
+            else:
+                severity = "crítico"
+                gravity = "escalação ao sponsor obrigatória"
+            narratives.append({
+                "title": "MARCOS",
+                "body": (
+                    f"{label} está atrasado {slip} dia{'s' if slip != 1 else ''} "
+                    f"({severity}): {gravity}."
+                ),
+                "examples": [],
+            })
+
+    return narratives
 
 
 def pick_top_risks(risks: list[dict], limit: int = 3) -> list[dict]:
@@ -209,6 +289,10 @@ def render_html(
         status_reasons_unhealthy=pick_unhealthy_reasons(
             status.get("metric_zones", {}) or {},
             status.get("status_reasons", []) or [],
+        ),
+        health_narrative=build_health_narrative(
+            status.get("metric_zones", {}) or {},
+            status.get("metrics_breakdown", {}) or {},
         ),
         logo_url=logo_url,
         compact=compact,
