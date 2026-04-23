@@ -942,6 +942,297 @@ def parse_claude_md(path: Path, warnings: list) -> dict:
 
 # ---------- Synthesis (deterministic heuristics) ----------
 
+# =============================================================================
+# Status classification framework (v1.7) — PMI-flavored
+# =============================================================================
+# Replaces the legacy 3-zone heuristic that conflated risk-mapping with
+# project-health. Now: 5 deterministic metrics from Cronograma.xlsx + 4 zones
+# (🔵 Entregas Avançadas / 🟢 No Prazo / 🟡 Atenção / 🔴 Crítico) + gates.
+# =============================================================================
+
+def _filter_devido_hoje(actions: list[dict], report_date: datetime) -> list[dict]:
+    """Tasks whose planned end is ≤ report_date (should have been delivered by now)."""
+    return [
+        a for a in actions
+        if isinstance(a.get("fim_plan"), datetime) and a["fim_plan"] <= report_date
+    ]
+
+
+def _filter_iniciavel_hoje(actions: list[dict], report_date: datetime) -> list[dict]:
+    """Tasks whose planned start is ≤ report_date (should be started by now)."""
+    return [
+        a for a in actions
+        if isinstance(a.get("inicio_plan"), datetime) and a["inicio_plan"] <= report_date
+    ]
+
+
+def _filter_scope_ativo(actions: list[dict], report_date: datetime) -> list[dict]:
+    """Tasks already in the radar (planned to start within 14 days)."""
+    cutoff = report_date + timedelta(days=14)
+    return [
+        a for a in actions
+        if isinstance(a.get("inicio_plan"), datetime) and a["inicio_plan"] <= cutoff
+    ]
+
+
+def _task_duration_days(a: dict) -> float:
+    """Nominal duration of a task in calendar days. Returns 0 if endpoints missing.
+    Min 1 day to avoid division-by-zero for same-day tasks."""
+    ip, fp = a.get("inicio_plan"), a.get("fim_plan")
+    if not (isinstance(ip, datetime) and isinstance(fp, datetime)):
+        return 0.0
+    return max(1.0, (fp - ip).days)
+
+
+def metric_delivery_gap(actions: list[dict], report_date: datetime) -> float:
+    """DG = (devido_hoje − done_até_hoje) / devido_hoje.
+
+    Fraction of tasks that were due and not yet completed. Returns 0 when no
+    task was due (early project) — a healthy signal, not a null.
+    """
+    devido = _filter_devido_hoje(actions, report_date)
+    if not devido:
+        return 0.0
+    done = sum(1 for a in devido if a.get("status") == "done")
+    return (len(devido) - done) / len(devido)
+
+
+def metric_start_gap(actions: list[dict], report_date: datetime) -> float:
+    """SG = late_start_count / iniciavel_hoje.
+
+    Fraction of tasks that should have started but have no actual start date.
+    """
+    iniciaveis = _filter_iniciavel_hoje(actions, report_date)
+    if not iniciaveis:
+        return 0.0
+    late = sum(
+        1 for a in iniciaveis
+        if not isinstance(a.get("inicio_real"), datetime) and a.get("status") == "not_started"
+    )
+    return late / len(iniciaveis)
+
+
+def metric_spi(actions: list[dict], report_date: datetime) -> float:
+    """SPI = EV / PV (PMI/PMBOK Schedule Performance Index).
+
+    EV (Earned Value) = Σ duration of tasks already done
+    PV (Planned Value) = Σ planned duration that should have been completed by now
+      - For done tasks fully in past: full duration counts
+      - For in-progress tasks whose end date has passed: full duration expected
+      - For in-progress tasks whose end date is in the future: proportional
+        (elapsed fraction of planned duration)
+
+    SPI = 1.0 means on schedule. > 1.0 means ahead. < 1.0 means behind.
+    """
+    ev = 0.0
+    pv = 0.0
+    for a in actions:
+        ip, fp = a.get("inicio_plan"), a.get("fim_plan")
+        if not (isinstance(ip, datetime) and isinstance(fp, datetime)):
+            continue
+        dur = _task_duration_days(a)
+        # EV: contribution if done
+        if a.get("status") == "done":
+            ev += dur
+        # PV: how much of this task was supposed to be done by report_date
+        if report_date >= fp:
+            pv += dur  # full duration was supposed to be earned
+        elif report_date <= ip:
+            pv += 0.0  # task shouldn't have started yet
+        else:
+            elapsed = (report_date - ip).days
+            pv += dur * (elapsed / dur) if dur > 0 else 0.0
+    if pv == 0.0:
+        # No work was supposed to be done yet — healthy neutral state
+        return 1.0
+    return ev / pv
+
+
+def metric_msi(milestones: list[dict], report_date: datetime) -> int:
+    """MSI = max slip days among MAJOR (gate) milestones that are overdue.
+
+    Only counts milestones with `major=True`. Returns 0 when no major is
+    overdue. A single 10-day slip on a critical gate is more signal than
+    a diluted SPI, hence a separate metric.
+    """
+    max_slip = 0
+    for m in milestones:
+        if not m.get("major"):
+            continue
+        date_str = m.get("date")
+        if not date_str:
+            continue
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            continue
+        if m.get("status") == "overdue" or (dt < report_date and m.get("status") != "done"):
+            slip = (report_date - dt).days
+            if slip > max_slip:
+                max_slip = slip
+    return max_slip
+
+
+def metric_edr(actions: list[dict]) -> float:
+    """EDR = done_before_fim_plan / total_done.
+
+    Among completed tasks, fraction delivered strictly before the planned end date.
+    """
+    done = [a for a in actions if a.get("status") == "done"]
+    if not done:
+        return 0.0
+    early = 0
+    for a in done:
+        fr = a.get("fim_real")
+        fp = a.get("fim_plan")
+        if isinstance(fr, datetime) and isinstance(fp, datetime) and fr < fp:
+            early += 1
+    return early / len(done)
+
+
+def metric_ahead_ratio(actions: list[dict], report_date: datetime) -> float:
+    """Ahead ratio = done_early / total_due_so_far.
+
+    Distinct from EDR because it uses TOTAL_DUE as denominator (not total done).
+    Gate threshold for celebratory 🔵 override: ≥ 25% means project is genuinely
+    running ahead, not just lucky with a small sample.
+    """
+    due = _filter_devido_hoje(actions, report_date)
+    if not due:
+        return 0.0
+    early = 0
+    for a in due:
+        fr = a.get("fim_real")
+        fp = a.get("fim_plan")
+        if isinstance(fr, datetime) and isinstance(fp, datetime) and fr < fp:
+            early += 1
+    return early / len(due)
+
+
+# ----- Zone classification -----
+
+_ZONE_ORDER = {"blue": 0, "green": 1, "yellow": 2, "red": 3}
+
+
+def _worst(zones: list[str]) -> str:
+    """Returns the worst (highest rank) zone among inputs."""
+    if not zones:
+        return "green"
+    return max(zones, key=lambda z: _ZONE_ORDER.get(z, 0))
+
+
+def _zone_of_dg(dg: float) -> str:
+    if dg <= 0.001: return "blue"
+    if dg <= 0.05:  return "green"
+    if dg <= 0.15:  return "yellow"
+    return "red"
+
+
+def _zone_of_sg(sg: float) -> str:
+    if sg <= 0.001: return "blue"
+    if sg <= 0.10:  return "green"
+    if sg <= 0.25:  return "yellow"
+    return "red"
+
+
+def _zone_of_spi(spi: float) -> str:
+    if spi >= 1.05: return "blue"
+    if spi >= 0.95: return "green"
+    if spi >= 0.85: return "yellow"
+    return "red"
+
+
+def _zone_of_msi(msi_days: int) -> str:
+    if msi_days == 0: return "blue"
+    if msi_days <= 7: return "yellow"
+    return "red"
+
+
+def classify_zone(metrics: dict, milestones: list[dict], report_date: datetime) -> dict:
+    """Applies the worst-of rule across metric zones + gate overrides.
+
+    Returns:
+        {
+            "zone": "blue|green|yellow|red",
+            "metric_zones": {"dg": "blue", "sg": "blue", "spi": "green", ...},
+            "reasons": ["DG = 0.0% (🔵)", "SG = 0.0% (🔵)", ...],
+            "gates_fired": ["ahead_ratio override (≥25%)"],
+        }
+    """
+    dg, sg, spi = metrics["dg"], metrics["sg"], metrics["spi"]
+    msi, edr = metrics["msi"], metrics["edr"]
+    ahead = metrics.get("ahead_ratio", 0.0)
+
+    metric_zones = {
+        "dg": _zone_of_dg(dg),
+        "sg": _zone_of_sg(sg),
+        "spi": _zone_of_spi(spi),
+        "msi": _zone_of_msi(msi),
+    }
+    base_zone = _worst(list(metric_zones.values()))
+
+    reasons = [
+        f"DG = {dg*100:.1f}% ({_emoji(metric_zones['dg'])})",
+        f"SG = {sg*100:.1f}% ({_emoji(metric_zones['sg'])})",
+        f"SPI = {spi:.2f} ({_emoji(metric_zones['spi'])})",
+        f"MSI = {msi}d ({_emoji(metric_zones['msi'])})",
+        f"EDR = {edr*100:.0f}%",
+    ]
+    gates_fired = []
+
+    # Gate RED: terminal milestone overdue
+    if milestones:
+        major_dated = [
+            m for m in milestones
+            if m.get("major") and m.get("date")
+        ]
+        if major_dated:
+            # Terminal = last major by date
+            def _key(m):
+                try:
+                    return datetime.strptime(m["date"], "%Y-%m-%d")
+                except (ValueError, TypeError):
+                    return datetime.min
+            terminal = max(major_dated, key=_key)
+            terminal_dt = _key(terminal)
+            if terminal_dt < report_date and terminal.get("status") != "done":
+                gates_fired.append(f"Gate RED: marco terminal {terminal.get('label')} atrasado")
+                reasons.append(f"🔴 Gate: marco terminal {terminal.get('label')} em atraso")
+                return {
+                    "zone": "red",
+                    "metric_zones": metric_zones,
+                    "reasons": reasons,
+                    "gates_fired": gates_fired,
+                }
+
+    # Gate BLUE (celebratory): ahead_ratio ≥ 25%
+    if ahead >= 0.25 and base_zone in ("blue", "green"):
+        gates_fired.append(f"Gate BLUE: ahead_ratio = {ahead*100:.0f}% ≥ 25%")
+        reasons.append(f"🔵 Override: ahead_ratio {ahead*100:.0f}% (≥ 25%)")
+        return {
+            "zone": "blue",
+            "metric_zones": metric_zones,
+            "reasons": reasons,
+            "gates_fired": gates_fired,
+        }
+
+    return {
+        "zone": base_zone,
+        "metric_zones": metric_zones,
+        "reasons": reasons,
+        "gates_fired": gates_fired,
+    }
+
+
+def _emoji(zone: str) -> str:
+    return {"blue": "🔵", "green": "🟢", "yellow": "🟡", "red": "🔴"}.get(zone, "⚪")
+
+
+# =============================================================================
+# End of v1.7 status framework
+# =============================================================================
+
+
 def synthesize(
     entries: list[dict],
     risks: list[dict],
@@ -964,32 +1255,20 @@ def synthesize(
     )
     pct_done = round(100 * done / total) if total else 0
 
-    # Status overall
-    overall = "green"
-    if total and overdue / total > 0.20:
-        overall = "red"
-    else:
-        for m in milestones:
-            if m.get("status") == "overdue" and m.get("is_critical"):
-                overall = "red"
-                break
-        if overall != "red":
-            for r in risks:
-                if r["probability"] == "alta" and r["impact"] in ("critico", "alto") and not r.get("mitigation"):
-                    overall = "red"
-                    break
-        if overall != "red" and total and overdue / total > 0.10:
-            overall = "yellow"
-        if overall == "green":
-            for m in milestones:
-                if m.get("status") == "overdue":
-                    overall = "yellow"
-                    break
-        if overall == "green":
-            for r in risks:
-                if r["probability"] == "alta" or r["impact"] in ("critico", "alto"):
-                    overall = "yellow"
-                    break
+    # Status overall — v1.7 PMI-flavored framework (5 metrics + 4 zones + gates).
+    # Risks are NO LONGER considered here: a mapped risk is not a materialized
+    # health issue. Risks show up in the dedicated OPR risks zone (v1.6) when
+    # flagged as `is_incurred=True`.
+    metrics = {
+        "dg": metric_delivery_gap(actions, report_date),
+        "sg": metric_start_gap(actions, report_date),
+        "spi": metric_spi(actions, report_date),
+        "msi": metric_msi(milestones, report_date),
+        "edr": metric_edr(actions),
+        "ahead_ratio": metric_ahead_ratio(actions, report_date),
+    }
+    classification = classify_zone(metrics, milestones, report_date)
+    overall = classification["zone"]  # "blue" | "green" | "yellow" | "red"
 
     # Active sprint = first Fase not done with Fim Planejado >= report_date (ou a mais antiga em andamento)
     active_sprint = None
@@ -1245,6 +1524,10 @@ def synthesize(
 
     return {
         "overall": overall,
+        "metrics": metrics,
+        "metric_zones": classification["metric_zones"],
+        "status_reasons": classification["reasons"],
+        "gates_fired": classification["gates_fired"],
         "percent_done": pct_done,
         "total_actions": total,
         "done_actions": done,

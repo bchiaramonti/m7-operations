@@ -28,7 +28,12 @@ import tempfile
 from pathlib import Path
 
 
-STATUS_LABEL = {"green": "🟢 OK", "yellow": "🟡 Atenção", "red": "🔴 Crítico"}
+STATUS_LABEL = {
+    "blue": "🔵 Entregas Avançadas",
+    "green": "🟢 No Prazo",
+    "yellow": "🟡 Atenção",
+    "red": "🔴 Crítico",
+}
 
 
 def encode_image_b64(path: Path, mime: str = "image/png") -> str | None:
@@ -81,7 +86,12 @@ def pick_next_milestones(milestones: list[dict], limit: int = 3) -> list[dict]:
     return upcoming[:limit]
 
 
-STATUS_SHORT = {"green": "OK", "yellow": "Atenção", "red": "Crítico"}
+STATUS_SHORT = {
+    "blue": "Avançado",
+    "green": "No Prazo",
+    "yellow": "Atenção",
+    "red": "Crítico",
+}
 
 
 def render_html(

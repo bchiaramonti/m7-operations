@@ -126,7 +126,7 @@ Emite `status-presentation.pptx` com **6 slides** construídos programaticamente
 
 Imprimir:
 - Caminhos dos 3 arquivos gerados
-- Status overall (🟢/🟡/🔴) + % concluído
+- Status overall (🔵/🟢/🟡/🔴) + % concluído + razões das métricas que dispararam
 - Warnings (staleness do sync, fontes ausentes, campos faltando)
 - Snapshot textual dos highlights + next steps (para o usuário validar antes de enviar)
 
@@ -140,13 +140,55 @@ Imprimir:
 | `--project-dir <path>` | cwd | Diretório raiz do projeto |
 | `--force` | off | Sobrescreve arquivos se `YYYY-MM-DD/` já existe |
 
-## Cálculo de status overall (heurística)
+## Framework de classificação de status (v1.7)
 
-Executado em `collect_data.py` (não em LLM). Regras em [`narrative-synthesis.md`](references/narrative-synthesis.md):
+Substituição da heurística legada (que confundia risco mapeado com projeto doente)
+por um framework PMI-flavored com 5 métricas determinísticas do `Cronograma.xlsx` +
+4 zonas + gates de override. **Riscos mapeados NÃO penalizam mais** o status geral —
+eles aparecem apenas no OPR quando flag `is_incurred=True` (v1.6).
 
-- **🔴 red** se `overdue > 20% do total` OU marco crítico atrasado > 7 dias OU risco prob=high ∧ impact=high sem contramedida
-- **🟡 yellow** se `overdue > 10% do total` OU qualquer marco atrasado OU algum risco prob=high OU impact=high
-- **🟢 green** caso contrário
+### 5 métricas base (todas em `scripts/collect_data.py`)
+
+| Métrica | Fórmula | O que mede |
+|---|---|---|
+| **DG** · Delivery Gap | `(devido_hoje − done_até_hoje) / devido_hoje` | Fração de entregas prometidas e não concluídas |
+| **SG** · Start Gap | `late_start_count / len(iniciavel_hoje)` | Fração de tarefas que deviam começar e não começaram |
+| **SPI** · Schedule Performance Index | `EV / PV` (duração em dias) | Métrica PMI/PMBOK — saúde agregada do cronograma |
+| **MSI** · Milestone Slip Index | `max(dias_atraso)` entre gates `major=True` overdue | Atraso do marco crítico mais atrasado |
+| **EDR** · Early Delivery Rate | `done_before_fim_plan / total_done` | Taxa de entregas antecipadas |
+
+### Thresholds (zona por métrica)
+
+| Zona | DG | SG | SPI | MSI |
+|---|---|---|---|---|
+| 🔵 Entregas Avançadas | = 0 | = 0 | ≥ 1.05 | = 0 |
+| 🟢 No Prazo | ≤ 5% | ≤ 10% | 0.95–1.05 | 0 |
+| 🟡 Atenção | 5–15% | 10–25% | 0.85–0.95 | 1–7 dias |
+| 🔴 Crítico | > 15% | > 25% | < 0.85 | > 7 dias |
+
+### Regra final
+
+`status = worst({dg_zone, sg_zone, spi_zone, msi_zone})` — a métrica **pior** define a zona.
+
+### Gates de override (Tier 1)
+
+- **Gate RED**: marco terminal atrasado (último `major=True` por data, com `status == overdue`) → força 🔴 independente das métricas.
+- **Gate BLUE celebratory**: `ahead_ratio ≥ 25%` (mais de 1/4 das entregas devidas concluídas antecipadamente) → eleva 🟢/🔵 base para 🔵.
+
+### Outputs no JSON
+
+```json
+"status": {
+  "overall": "blue|green|yellow|red",
+  "metrics": {"dg": 0.0, "sg": 0.417, "spi": 0.49, "msi": 0, "edr": 0.0, "ahead_ratio": 0.0},
+  "metric_zones": {"dg": "blue", "sg": "red", "spi": "red", "msi": "blue"},
+  "status_reasons": ["DG = 0.0% (🔵)", "SG = 41.7% (🔴)", ...],
+  "gates_fired": []
+}
+```
+
+Tier 2 (futuros — requer extensão de schema): gate "cadeia serial comprometida",
+gate "recurso-chave indisponível".
 
 ## Mapeamento Paper → PPTX
 

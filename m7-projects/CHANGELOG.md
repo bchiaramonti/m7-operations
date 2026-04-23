@@ -13,6 +13,45 @@ Regras de manutencao (Keep a Changelog 1.1.0):
 - Agrupar por tipo — `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`
 - Entries imutaveis apos publicadas — correcoes ao historico viram nova entry, nao edicao da antiga
 
+## [1.7.0] - 2026-04-23
+
+Substitui a heurística legada de `status.overall` (que confundia riscos mapeados com projeto doente) por um framework PMI-flavored com 5 métricas determinísticas de schedule + 4 zonas (🔵 Entregas Avançadas / 🟢 No Prazo / 🟡 Atenção / 🔴 Crítico). Riscos mapeados **não penalizam mais** o status geral — aparecem no OPR apenas quando flag `is_incurred=True` (v1.6). O novo framework revela atrasos de **arranque** (Start Gap) que a heurística antiga não detectava — no projeto Playbook em 23/04, expôs 5 tasks de Fundação Transversal (2.1.1-2.1.5) como late_start (status=not_started com inicio_plan ≤ hoje).
+
+### Added
+- [scripts/collect_data.py](skills/generating-status-materials/scripts/collect_data.py) · **novo framework de classificação v1.7**:
+  - Filtros de universo: `_filter_devido_hoje`, `_filter_iniciavel_hoje`, `_filter_scope_ativo`
+  - 6 métricas determinísticas: `metric_delivery_gap` (DG), `metric_start_gap` (SG), `metric_spi` (EV/PV PMBOK), `metric_msi` (max slip entre gates críticos), `metric_edr` (Early Delivery Rate), `metric_ahead_ratio` (para override 🔵)
+  - `classify_zone(metrics, milestones, report_date)` — aplica worst-of rule + gates de override (marco terminal atrasado → 🔴; ahead_ratio ≥ 25% → 🔵)
+- Novos campos no output JSON: `status.metrics` (dict com dg/sg/spi/msi/edr/ahead_ratio), `status.metric_zones` (cada métrica → zona), `status.status_reasons` (lista texto-legível com emoji), `status.gates_fired` (gates que dispararam)
+- [scripts/build_opr.py](skills/generating-status-materials/scripts/build_opr.py) · `STATUS_LABEL` e `STATUS_SHORT` ganham entrada `"blue"` com labels "🔵 Entregas Avançadas" e "Avançado"
+- [templates/opr.tmpl.html](skills/generating-status-materials/templates/opr.tmpl.html) · CSS `.dot-blue { background: #1E40AF }` — azul petróleo deep, distinto do `#3B82F6` usado para "active" em células da matriz
+- [scripts/build_pptx.py](skills/generating-status-materials/scripts/build_pptx.py) · token `COL_STATUS_BLUE = RGBColor(0x1E, 0x40, 0xAF)` pronto para usar no hero do Slide Cover quando `status.overall == "blue"`
+
+### Changed
+- Removido do `synthesize()` todo o bloco legado (linhas 967-993) que colocava o projeto em `yellow` por ter "alguma risco com prob alta OU impact alto". Riscos agora são visualizados separadamente no OPR (seção condicional de v1.6) e no Slide 6 Riscos do deck.
+
+### Thresholds (zonas vs métricas)
+
+| Zona | DG | SG | SPI | MSI |
+|---|---|---|---|---|
+| 🔵 Entregas Avançadas | = 0 | = 0 | ≥ 1.05 | = 0 |
+| 🟢 No Prazo | ≤ 5% | ≤ 10% | 0.95–1.05 | 0 |
+| 🟡 Atenção | 5–15% | 10–25% | 0.85–0.95 | 1–7 dias |
+| 🔴 Crítico | > 15% | > 25% | < 0.85 | > 7 dias |
+
+Regra final: `status = worst({dg_zone, sg_zone, spi_zone, msi_zone})`. Gates RED (marco terminal atrasado) forçam 🔴. Gate BLUE (ahead_ratio ≥ 25%) eleva status base 🟢/🔵 para 🔵.
+
+### Validation
+- Smoke test projeto `Playbook de Processos` em 23/04/2026 (D+9 do kickoff):
+  - DG = 0% (🔵 — nenhuma entrega atrasada)
+  - **SG = 41.7% (🔴)** — 5 de 12 tasks iniciáveis não iniciadas (Fundação Transversal 2.1.1–2.1.5)
+  - **SPI = 0.49 (🔴)** — EV baixo porque o trabalho da Fundação não foi earned
+  - MSI = 0d (🔵 — nenhum gate crítico overdue)
+  - EDR = 0% — nenhuma entrega antecipada (todas baselines F1 fecharam on-schedule)
+  - **Status final: 🔴 Crítico** (worst-of rule)
+  - Gates disparados: nenhum
+- Comparação com v1.6.1: antes status saía `yellow` por "riscos altos mapeados"; agora saí `red` por atrasos reais de execução, revelando que a Fundação Transversal precisa ser acionada.
+
 ## [1.6.1] - 2026-04-23
 
 Fix crítico: o OPR estava sendo cortado em 2 páginas no PDF porque o conteúdo (1241px) estourava A4 portrait (1123px) e o "modo compact" do `render_pdf_playwright` detectava o overflow mas não surtia efeito — o `<body>` no template v1.6.0 não tinha a classe `compact` aplicada condicionalmente (foi perdida ao reescrever o template). Adicionadas regras CSS `body.compact` com reduções de padding cirúrgicas (sem mexer em font-size para preservar legibilidade).
