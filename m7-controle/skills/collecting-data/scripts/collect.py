@@ -17,6 +17,7 @@ v5.0.0 — YAML-driven projection, timeout 300s, parallel execution, staleness c
 """
 
 import argparse
+import pathlib
 import concurrent.futures
 import datetime
 import hashlib
@@ -50,31 +51,102 @@ def load_yaml(path: str) -> dict:
         return {}
 
 
-def find_indicator_yaml(indicators_dir: str, indicator_id: str, index: dict) -> str | None:
+def _normalize_nivel_lib(nivel: str | None) -> str | None:
+    """Normaliza nivel para o nome do folder da Biblioteca ('N1'..'N5').
+
+    Retorna None se ausente/invalido. Ex: 'N2'->'N2', 'n3'->'N3', '2'->'N2'.
+    """
+    if not nivel:
+        return None
+    n = str(nivel).strip().upper().replace("-", "")
+    if n.startswith("N") and len(n) >= 2 and n[1].isdigit():
+        return n[:2]
+    if n.isdigit() and len(n) == 1:
+        return f"N{n}"
+    return None
+
+
+def find_indicator_yaml(indicators_dir: str, indicator_id: str, index: dict,
+                        nivel: str | None = None) -> str | None:
     """Locate the YAML file for an indicator_id.
 
-    Strategy:
-    1. Use _index.yaml domain to build path (lowercase and titlecase)
-    2. Fallback: walk all subdirectories searching by filename
+    Estrategia (level-scoped — D5/Frente 7):
+    0. Se `nivel` (do Card) e dado E existe Biblioteca/N{N}/: procurar PRIMEIRO
+       dentro desse nivel. Resolve a colisao de id quando o mesmo indicator_id
+       existe em N2/ e N3/ (composicao/agregacao diferem por nivel). Se nao achar
+       sob o nivel, cai nos passos 1-2 (transicao: Biblioteca parcialmente migrada).
+    1. (flat/legado) _index.yaml vertical_folder/domain para montar o path.
+    2. (flat/legado) walk global por filename.
+
+    Backward-safe: Biblioteca ainda flat (sem N{N}/) -> passo 0 e no-op, comportamento
+    identico ao anterior.
     """
     fname_target = f"{indicator_id}.yaml"
 
-    # Try index-based lookup with domain
-    for entry in index.get("indicators", []):
-        if entry.get("id") == indicator_id:
-            domain = entry.get("domain", "")
-            # Try multiple casing: lowercase, titlecase, uppercase
-            for variant in [domain, domain.title(), domain.capitalize(), domain.upper()]:
-                candidate = os.path.join(indicators_dir, variant, fname_target)
-                if os.path.isfile(candidate):
-                    return candidate
+    def _exact_from_index(root: str) -> str | None:
+        for entry in index.get("indicators", []):
+            if entry.get("id") == indicator_id:
+                # vertical_folder e o folder real (ex: 'Consorcios'); domain e
+                # 'comercial'/'receita' (geralmente nao casa, mantido por compat).
+                for key in ("vertical_folder", "domain"):
+                    sub = entry.get(key, "")
+                    if not sub:
+                        continue
+                    for variant in [sub, sub.title(), sub.capitalize(), sub.upper()]:
+                        candidate = os.path.join(root, variant, fname_target)
+                        if os.path.isfile(candidate):
+                            return candidate
+        return None
 
-    # Fallback: walk all subdirs (handles any directory naming)
-    for root, _, files in os.walk(indicators_dir):
-        for fname in files:
-            if fname == fname_target:
-                return os.path.join(root, fname)
-    return None
+    def _walk(root: str) -> str | None:
+        # Coleta TODAS as copias e ordena (deterministico). os.walk tem ordem
+        # dependente do FS -> antes, duplicatas resolviam p/ uma copia aleatoria
+        # SILENCIOSAMENTE (metas erradas). 2026-06-18: warn em duplicata + escolha
+        # estavel (1a alfabetica).
+        matches = []
+        for r, _, files in os.walk(root):
+            if fname_target in files:
+                matches.append(os.path.join(r, fname_target))
+        if not matches:
+            return None
+        matches.sort()
+        if len(matches) > 1:
+            print(f"WARN: '{indicator_id}' tem {len(matches)} copias sob {root} -> usando "
+                  f"{matches[0]} (deterministico). Duplicatas: {matches[1:]}", file=sys.stderr)
+        return matches[0]
+
+    # 0. Level-scoped (prioritario quando nivel do Card conhecido + Biblioteca por nivel)
+    nivel_norm = _normalize_nivel_lib(nivel)
+    level_attempted = False
+    if nivel_norm:
+        nivel_root = os.path.join(indicators_dir, nivel_norm)
+        if os.path.isdir(nivel_root):
+            level_attempted = True
+            hit = _exact_from_index(nivel_root) or _walk(nivel_root)
+            if hit:
+                return hit
+            # nao achou sob o nivel -> fall-through (transicao). NAO retorna None
+            # aqui para nao quebrar indicadores ainda nao migrados.
+
+    def _warn_flat_fallback(path: str) -> None:
+        # Resolveu via flat mesmo com Biblioteca/N{n}/ existindo = migracao
+        # incompleta (smell level-first). Visivel para nao publicar com a versao
+        # errada em silencio.
+        if level_attempted:
+            print(f"WARN: '{indicator_id}' nao esta sob {nivel_norm}/ — resolvido via flat "
+                  f"({path}). Migre para Biblioteca/{nivel_norm}/ (level-first).", file=sys.stderr)
+
+    # 1. (flat/legado) index vertical_folder/domain
+    hit = _exact_from_index(indicators_dir)
+    if hit:
+        _warn_flat_fallback(hit)
+        return hit
+
+    # 2. (flat/legado) walk global por filename
+    hit = _walk(indicators_dir)
+    if hit:
+        _warn_flat_fallback(hit)
+    return hit
 
 
 # ---------------------------------------------------------------------------
@@ -139,10 +211,19 @@ def collect_indicator_ids_from_card(card: dict) -> list[str]:
             ids.add(iid)
 
     # logica_de_analise.kpis_analisar_juntos
-    for grupo in logica.get("kpis_analisar_juntos", []) or []:
-        for iid in grupo.get("grupo", []):
-            if iid:
-                ids.add(iid)
+    # Accept both Card shapes:
+    #   (a) list of group dicts  [{grupo: [...], ...}, ...]  (Seguros, PJ2)
+    #   (b) single group dict     {grupo: [...], ...}          (familia Investimentos)
+    juntos = logica.get("kpis_analisar_juntos", []) or []
+    if isinstance(juntos, dict):
+        juntos = [juntos]
+    for grupo in juntos:
+        if isinstance(grupo, dict):
+            for iid in grupo.get("grupo", []) or []:
+                if iid:
+                    ids.add(iid)
+        elif isinstance(grupo, str) and grupo:
+            ids.add(grupo)
 
     # logica_de_analise.kpis_analisar_separados
     for sep in logica.get("kpis_analisar_separados", []) or []:
@@ -241,6 +322,7 @@ def cmd_plan(args):
     # Read all active Cards
     card_ids = []
     all_indicator_ids = set()
+    card_niveis = set()
 
     for fname in sorted(os.listdir(cards_dir)):
         if not fname.endswith((".yaml", ".yml")):
@@ -252,8 +334,14 @@ def cmd_plan(args):
             print(f"SKIP: Card {fname} status={metadata.get('status')} (requer active)", file=sys.stderr)
             continue
         card_ids.append(metadata.get("id", fname))
+        if metadata.get("nivel"):
+            card_niveis.add(str(metadata.get("nivel")).strip())
         ids = collect_indicator_ids_from_card(card)
         all_indicator_ids.update(ids)
+
+    # Nivel do(s) Card(s) ativos -> lookup level-scoped na Biblioteca (D5/Frente 7).
+    # 1 nivel => usa-o; 0 ou multiplos => None (lookup flat/global, comportamento legado).
+    card_nivel = next(iter(card_niveis)) if len(card_niveis) == 1 else None
 
     if not card_ids:
         print(f"ERRO: Nenhum Card ativo encontrado em {cards_dir}", file=sys.stderr)
@@ -273,7 +361,7 @@ def cmd_plan(args):
     test_status_counts = {"passed": 0, "untested": 0, "failed": 0}
 
     for iid in sorted(all_indicator_ids):
-        yaml_path = find_indicator_yaml(indicators_dir, iid, index)
+        yaml_path = find_indicator_yaml(indicators_dir, iid, index, nivel=card_nivel)
         if not yaml_path:
             not_found.append(iid)
             continue
@@ -314,6 +402,7 @@ def cmd_plan(args):
         "schema_version": "2.0",
         "generated_at": datetime.datetime.now().strftime("%Y-%m-%dT%H:%M"),
         "card_ids": card_ids,
+        "nivel": card_nivel,
         "vertical": os.path.basename(cards_dir.rstrip("/")),
         "resolved_params": resolved_params,
         "indicators_dir": os.path.abspath(indicators_dir),
@@ -324,6 +413,7 @@ def cmd_plan(args):
         "test_status_summary": test_status_counts,
         "skipped_indicators": skipped,
         "not_found_indicators": not_found,
+        "has_missing_indicators": bool(not_found),
     }
 
     # Write output
@@ -344,18 +434,55 @@ def cmd_plan(args):
           f"failed={test_status_counts.get('failed',0)}")
     if skipped:
         print(f"  Indicadores ignorados (status): {[s['id'] for s in skipped]}")
+        # P2.6 (2026-06-18): um Card ATIVO referenciando indicador NAO-validated
+        # (draft/deprecated) faz aquele KPI sumir do WBR em SILENCIO (so era
+        # impresso baixinho acima). Card e Biblioteca em estados incoerentes ->
+        # ATENCAO visivel em stderr. Nao bloqueia (draft e estado transitorio
+        # conhecido), mas torna o gap rastreavel.
+        print("=" * 70, file=sys.stderr)
+        print(f"ATENCAO: {len(skipped)} indicador(es) de Card ativo com status NAO-validated "
+              f"(nao entram no WBR):", file=sys.stderr)
+        for s in skipped:
+            print(f"  - {s['id']} (status={s.get('status')})", file=sys.stderr)
+        print("  -> Promova o indicador para 'validated' na Biblioteca ou remova a "
+              "referencia do Card. Card e Biblioteca estao incoerentes.", file=sys.stderr)
+        print("=" * 70, file=sys.stderr)
     if not_found:
+        # Anti-mascaramento (2026-06-18): indicador de Card ativo ausente na
+        # Biblioteca e erro de config (referencia obsoleta ou path level-first
+        # quebrado), NAO um skip benigno. Emitir ALERTA visivel em stderr — o
+        # plano segue (nao quebra uso interativo), mas em unattended o gate
+        # --strict-indicators bloqueia (exit 3) para nao publicar WBR incompleto.
         print(f"  Indicadores nao encontrados: {not_found}")
+        print("=" * 70, file=sys.stderr)
+        print(f"ALERTA: {len(not_found)} indicador(es) de Card ativo NAO encontrado(s) "
+              f"na Biblioteca:", file=sys.stderr)
+        for iid in not_found:
+            print(f"  - {iid}", file=sys.stderr)
+        print("  -> Confira referencia obsoleta no Card ou path level-first "
+              "(Biblioteca/N{n}/). O WBR sairia SEM esse(s) indicador(es).", file=sys.stderr)
+        print("=" * 70, file=sys.stderr)
+        if getattr(args, "strict_indicators", False):
+            print("ERRO: --strict-indicators ativo e ha indicadores faltantes -> exit 3",
+                  file=sys.stderr)
+            sys.exit(3)
 
 
 # ---------------------------------------------------------------------------
 # Script execution (NEW in v4.0.0)
 # ---------------------------------------------------------------------------
 
-def run_script(step: dict, cycle_folder: str, timeout: int) -> dict:
+def run_script(step: dict, cycle_folder: str, timeout: int,
+               bib_scripts_dir: str | None = None) -> dict:
     """Execute a single indicator script via subprocess.
 
     Returns a result dict with status, timing, and output info.
+
+    bib_scripts_dir: absolute path to the Biblioteca root ``scripts/`` dir
+        (where ``m7_extract_utils.py`` lives). When provided, it is prepended
+        to the subprocess PYTHONPATH as a safety net so scripts resolve the
+        shared module even if their internal bootstrap path drifts (e.g. after
+        a folder remount like the 2026-06 level-first migration).
     """
     indicator_id = step["indicator_id"]
     script_path = step["script_path"]
@@ -422,13 +549,22 @@ def run_script(step: dict, cycle_folder: str, timeout: int) -> dict:
 
     # Execute
     start_time = time.monotonic()
+    # Safety net: prepend Biblioteca root scripts/ to PYTHONPATH so the shared
+    # m7_extract_utils module resolves regardless of each script's internal
+    # bootstrap path (robust to future folder remounts).
+    sub_env = os.environ.copy()
+    if bib_scripts_dir and os.path.isdir(bib_scripts_dir):
+        existing_pp = sub_env.get("PYTHONPATH", "")
+        sub_env["PYTHONPATH"] = (
+            bib_scripts_dir + (os.pathsep + existing_pp if existing_pp else "")
+        )
     try:
         proc = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=timeout,
-            env=os.environ.copy(),
+            env=sub_env,
         )
         elapsed = time.monotonic() - start_time
 
@@ -526,6 +662,12 @@ def cmd_run(args):
         print("ERRO: Plano sem steps para executar", file=sys.stderr)
         sys.exit(1)
 
+    # Safety-net PYTHONPATH: Biblioteca root scripts/ (shared m7_extract_utils)
+    plan_indicators_dir = plan.get("indicators_dir", "")
+    bib_scripts_dir = (
+        os.path.join(plan_indicators_dir, "scripts") if plan_indicators_dir else None
+    )
+
     results = []
     success_count = 0
     skip_count = 0
@@ -537,7 +679,7 @@ def cmd_run(args):
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_step = {
-                executor.submit(run_script, step, cycle_folder, timeout): step
+                executor.submit(run_script, step, cycle_folder, timeout, bib_scripts_dir): step
                 for step in steps
             }
             for future in concurrent.futures.as_completed(future_to_step):
@@ -580,7 +722,7 @@ def cmd_run(args):
 
             print(f"  [{step['step_id']}/{len(steps)}] {indicator_id}...", end=" ", flush=True)
 
-            result = run_script(step, cycle_folder, timeout)
+            result = run_script(step, cycle_folder, timeout, bib_scripts_dir)
             results.append(result)
 
             status = result["status"]
@@ -672,16 +814,49 @@ def validate_output_contract(data: list, contract: dict, indicator_id: str) -> l
 # Quality checks
 # ---------------------------------------------------------------------------
 
-def run_standard_quality_checks(data: list, indicator_id: str) -> list:
-    """Run standard quality checks (completude, duplicatas, volume)."""
+def run_standard_quality_checks(data: list, indicator_id: str,
+                                 quality_overrides: dict | None = None) -> list:
+    """Run standard quality checks (completude, duplicatas, volume).
+
+    quality_overrides: optional dict from indicator YAML's quality_checks_overrides
+                       block. Currently supports:
+                       - zero_rows_severity: 'warning' or 'info' to demote
+                         the default 'critical' severity for empty results
+                         (use case: cumulative counters in MTD checkpoint
+                         when zero is a real-world possibility).
+    """
     alerts = []
+    overrides = quality_overrides or {}
 
     if not data:
+        requested = overrides.get("zero_rows_severity", "critical")
+        # Anti-mascaramento + audit-log (2026-06-18): zero linhas pode ser gap real
+        # (timeout/outage ClickHouse), nao so um zero legitimo de MTD semana-1. O
+        # override pode REBAIXAR de 'critical' (para nao dar halt falso em zero
+        # esperado), MAS o piso e 'warning' — nunca 'info' silencioso. Assim o
+        # resultado vazio fica SEMPRE visivel no data-quality-report (sem bloquear,
+        # ja que so 'critical' dispara o gate). Quando o piso e aplicado, a mensagem
+        # registra o override pedido (trilha de auditoria).
+        _SEV_ORDER = {"info": 0, "warning": 1, "critical": 2}
+        _SEV_FLOOR = "warning"
+        zero_severity = requested
+        clamped = False
+        if _SEV_ORDER.get(requested, 2) < _SEV_ORDER[_SEV_FLOOR]:
+            zero_severity = _SEV_FLOOR
+            clamped = True
+        alert_msg = "Zero linhas retornadas"
+        if requested != "critical":
+            rationale = overrides.get("zero_rows_rationale", "")
+            if rationale:
+                alert_msg += f" (override: {rationale.strip().splitlines()[0]})"
+            if clamped:
+                alert_msg += (f" [piso WARN aplicado: override pediu '{requested}', "
+                              f"elevado p/ visibilidade — confirme se nao e gap de dado]")
         alerts.append({
             "indicator_id": indicator_id,
-            "severity": "critical",
+            "severity": zero_severity,
             "dimension": "volume",
-            "message": "Zero linhas retornadas",
+            "message": alert_msg,
         })
         return alerts
 
@@ -693,11 +868,15 @@ def run_standard_quality_checks(data: list, indicator_id: str) -> list:
                         "pct_atingimento", "dimensao", "nivel", "nome_funil", "funil",
                         "estagio", "nome_estagio", "data_snapshot", "sdr_nome",
                         "meta"}
+    # Per-indicator extension: detail-only fields declared in YAML output_contract
+    # (e.g., deal_id, nome_deal, dias_sem_atividade are NULL by design in aggregate
+    # rows). Indicator YAML opts-in via quality_checks_overrides.completude_excluded_fields.
+    extra_excluded = set(overrides.get("completude_excluded_fields", []))
     total_fields = 0
     null_fields = 0
     for row in data:
         for k, v in row.items():
-            if k in HIERARCHY_FIELDS:
+            if k in HIERARCHY_FIELDS or k in extra_excluded:
                 continue
             total_fields += 1
             if v is None:
@@ -858,6 +1037,9 @@ def cmd_consolidate(args):
     index_path = os.path.join(indicators_dir, "_index.yaml")
     index = load_yaml(index_path) if os.path.isfile(index_path) else {"indicators": []}
 
+    # Nivel do Card (gravado pelo cmd_plan) -> lookup level-scoped na Biblioteca (D5).
+    nivel = plan.get("nivel")
+
     indicators_results = []
     script_execution_log = []
     all_alerts = []
@@ -931,8 +1113,13 @@ def cmd_consolidate(args):
         contract_alerts = validate_output_contract(data, contract, indicator_id)
         all_alerts.extend(contract_alerts)
 
-        # Standard quality checks
-        quality_alerts = run_standard_quality_checks(data, indicator_id)
+        # Standard quality checks (with optional YAML-driven overrides)
+        quality_overrides = None
+        yaml_path_for_step = find_indicator_yaml(indicators_dir, indicator_id, index, nivel=nivel)
+        if yaml_path_for_step:
+            ind_yaml = load_yaml(yaml_path_for_step)
+            quality_overrides = ind_yaml.get("quality_checks_overrides")
+        quality_alerts = run_standard_quality_checks(data, indicator_id, quality_overrides)
         all_alerts.extend(quality_alerts)
 
         combined_alerts = contract_alerts + quality_alerts
@@ -963,7 +1150,7 @@ def cmd_consolidate(args):
     quality_checks_pending = []
     for ir in indicators_results:
         iid = ir["indicator_id"]
-        yaml_path = find_indicator_yaml(indicators_dir, iid, index)
+        yaml_path = find_indicator_yaml(indicators_dir, iid, index, nivel=nivel)
         if yaml_path:
             ind_yaml = load_yaml(yaml_path)
             checks = ind_yaml.get("quality_checks", [])
@@ -1048,9 +1235,147 @@ def cmd_consolidate(args):
 # CLI
 # ---------------------------------------------------------------------------
 
+def cmd_apply_scope_filter(args):
+    """Aplica filter composto scope_task_ids sobre clickup-tasks JSON.
+
+    Adicionado v6.4.1 (2026-05-12) — integra parse_ata_scope.py no flow do
+    collect.py. Memory: reference_g2_2_action_scope_filter.
+
+    Fluxo:
+      1. Le clickup-tasks-{vertical}.json (output do ClickUp MCP fetch — gerado upstream)
+      2. Localiza ata anterior via parse_ata_scope.py (level-first 03-Rituais/N{N}/{Vertical}[-{sub}]/{Cad}/ + legado)
+      3. Parsea bloco <!-- scope_task_ids --> da ata
+      4. Particiona tasks em 3 grupos: escopo_ritual_passado, ad_hoc_pos_ritual, metadata
+      5. Salva clickup-tasks-{vertical}-scoped.json
+
+    Comportamento fallback: se nenhuma ata anterior for encontrada, escopo_modo='primeiro_ciclo'
+    e escopo_ritual_passado recebe TODAS as tasks (compatibilidade com primeiro ciclo da vertical).
+    """
+    import importlib.util
+    # Importar parse_ata_scope (mesma pasta)
+    here = pathlib.Path(__file__).parent if "pathlib" in dir() else None
+    if not here:
+        import pathlib as _p
+        here = _p.Path(__file__).parent
+    spec = importlib.util.spec_from_file_location("parse_ata_scope", here / "parse_ata_scope.py")
+    pas = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(pas)
+
+    # Carregar tasks ClickUp
+    tasks_path = pathlib.Path(args.clickup_tasks_json)
+    if not tasks_path.exists():
+        print(f"ERRO: clickup-tasks JSON nao encontrado: {tasks_path}", file=sys.stderr)
+        sys.exit(2)
+    raw = json.loads(tasks_path.read_text(encoding="utf-8"))
+    # Schema legacy: {"data": [...]} ou lista direta
+    if isinstance(raw, dict) and "data" in raw:
+        all_tasks = raw["data"]
+    elif isinstance(raw, list):
+        all_tasks = raw
+    else:
+        print(f"ERRO: schema desconhecido em {tasks_path} (esperado list ou {{data: [...]}})", file=sys.stderr)
+        sys.exit(2)
+
+    print(f"[apply-scope-filter] {len(all_tasks)} tasks carregadas de {tasks_path.name}")
+
+    # Localizar ata anterior
+    rituais_base = pathlib.Path(args.rituais_base)
+    ata_path, ritual_date = pas.find_latest_ata(
+        rituais_base,
+        args.vertical,
+        args.nivel,
+        getattr(args, "subnivel", None),
+        excluir_data=getattr(args, "excluir_data", None),
+    )
+
+    if ata_path:
+        print(f"[apply-scope-filter] ata anterior: {ata_path.name} (date={ritual_date})")
+        scope = pas.parse_scope_block(ata_path)
+    else:
+        print(f"[apply-scope-filter] nenhuma ata anterior em {rituais_base}/{args.vertical}/{args.nivel}/{getattr(args, 'subnivel', None) or '-'}/")
+        scope = {"created_in_ritual": [], "preexisting_discussed": [], "ata_path": None}
+        ritual_date = None
+
+    # Aplicar filter
+    pending_statuses = ("open", "in_progress", "blocked")
+    result = pas.apply_scope_filter(all_tasks, scope, last_ritual_date=ritual_date, pending_statuses=pending_statuses)
+
+    print(f"[apply-scope-filter] escopo_modo={result['metadata']['escopo_modo']} "
+          f"escopo_ritual_passado={result['metadata']['count_escopo']} "
+          f"ad_hoc_pos_ritual={result['metadata']['count_ad_hoc']}")
+
+    # P2.5 (2026-06-18): flag tasks CONCLUIDAS com date_closed ANTERIOR ao ultimo
+    # ritual — sao "wins" que ja foram reportados no ciclo passado; incluir como
+    # recente engana o E4. Marca is_stale_concluida por task + conta no metadata +
+    # aviso visivel. Advisory (nao remove a task; so torna visivel).
+    def _parse_iso_date(s):
+        try:
+            return datetime.date.fromisoformat(str(s)[:10])
+        except (ValueError, TypeError):
+            return None
+    ritual_d = _parse_iso_date(ritual_date) if ritual_date else None
+    _CONCLUIDA = {"concluida", "concluída", "concluido", "concluído", "closed", "complete", "done"}
+    stale_count = 0
+    for grp in ("escopo_ritual_passado", "ad_hoc_pos_ritual"):
+        for t in result.get(grp, []) or []:
+            if not isinstance(t, dict):
+                continue
+            st = (t.get("status") or "").strip().lower()
+            dc = _parse_iso_date(t.get("date_closed"))
+            is_stale = bool(ritual_d and st in _CONCLUIDA and dc and dc < ritual_d)
+            t["is_stale_concluida"] = is_stale
+            stale_count += int(is_stale)
+    result.setdefault("metadata", {})["stale_concluida_count"] = stale_count
+    if stale_count:
+        print(f"[apply-scope-filter] ATENCAO: {stale_count} task(s) concluida(s) ANTES do ultimo "
+              f"ritual ({ritual_date}) ainda em escopo — possivel win ja reportado "
+              f"(flag is_stale_concluida=true por task).", file=sys.stderr)
+
+    # Salvar resultado
+    output_path = pathlib.Path(args.output_json)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"[apply-scope-filter] saved {output_path}")
+    return 0
+
+
+def cmd_extract_mapa_comercial(args):
+    """Fase 1.5b — Snapshot do mapa_comercial vigente no ClickHouse.
+
+    Adicionado v6.5 (2026-05-21) — Item 7 follow-up Seguros-WL 2026-05-20.
+    mapa_comercial estava embedded como CTE em scripts (volume/receita Cons),
+    lendo live. Drift entre PREV/CUR causava mudancas de mapping nao rastreaveis.
+
+    Este subcomando invoca extract_mapa_comercial.py (na Biblioteca de Indicadores)
+    via subprocess para gerar o CSV. Indicator scripts que dependem do mapping
+    podem opt-in via --param mapa_comercial_path=<csv> para reproducibilidade.
+
+    Reproducibilidade: re-runs de ciclos antigos devem usar o snapshot daquele
+    ciclo, NUNCA refazer query live.
+    """
+    output_path = pathlib.Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    indicators_dir = pathlib.Path(args.indicators_dir).resolve()
+    snapshot_script = indicators_dir / "scripts" / "extract_mapa_comercial.py"
+    if not snapshot_script.is_file():
+        print(f"ERRO: extract_mapa_comercial.py nao encontrado em {snapshot_script}", file=sys.stderr)
+        sys.exit(2)
+
+    print(f"[extract-mapa-comercial] -> {output_path}")
+    cmd = [sys.executable, str(snapshot_script), "--output", str(output_path)]
+    if getattr(args, "dry_run", False):
+        cmd.append("--dry-run")
+    rc = subprocess.call(cmd)
+    if rc != 0:
+        print(f"ERRO: extract_mapa_comercial.py exit code {rc}", file=sys.stderr)
+        sys.exit(rc)
+    print(f"[extract-mapa-comercial] OK")
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Motor deterministico de coleta de dados para m7-controle (v5.0.0)"
+        description="Motor deterministico de coleta de dados para m7-controle (v6.5)"
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1060,6 +1385,10 @@ def main():
     plan_parser.add_argument("--indicators-dir", required=True, help="Diretorio da Biblioteca de Indicadores")
     plan_parser.add_argument("--cycle-folder", required=True, help="Pasta do ciclo (output)")
     plan_parser.add_argument("--param", action="append", help="Parametro key=value (pode repetir)")
+    plan_parser.add_argument("--strict-indicators", action="store_true",
+                             help="Falha (exit 3) se algum indicator_id de Card ativo nao for "
+                                  "encontrado na Biblioteca. Use em execucao unattended para nao "
+                                  "publicar WBR com indicador faltante em silencio.")
 
     # Run subcommand (NEW in v4.0.0)
     run_parser = subparsers.add_parser("run", help="Executa scripts do plano via subprocess")
@@ -1076,6 +1405,35 @@ def main():
     cons_parser.add_argument("--cycle-folder", required=True, help="Pasta do ciclo")
     cons_parser.add_argument("--vertical", required=True, help="Nome da vertical")
 
+    # Apply scope filter subcommand (NEW v6.4.1 — 2026-05-12)
+    scope_parser = subparsers.add_parser(
+        "apply-scope-filter",
+        help="Aplica filter composto scope_task_ids sobre clickup-tasks JSON (Fase 1.5 step 7)"
+    )
+    scope_parser.add_argument("--clickup-tasks-json", required=True,
+                              help="Path do clickup-tasks-{vertical}.json (output do ClickUp MCP fetch)")
+    scope_parser.add_argument("--rituais-base", required=True,
+                              help="Path para 03-Rituais/")
+    scope_parser.add_argument("--vertical", required=True, help="Vertical (ex: PJ2, Consorcios, Seguros)")
+    scope_parser.add_argument("--nivel", required=True, help="N2, N3, etc")
+    scope_parser.add_argument("--subnivel", default=None, help="wl, re (opcional)")
+    scope_parser.add_argument("--excluir-data", default=None,
+                              help="YYYY-MM-DD a ignorar quando buscar ata anterior (ritual ATUAL)")
+    scope_parser.add_argument("--output-json", required=True,
+                              help="Path do output scoped JSON (3 chaves: escopo_ritual_passado, ad_hoc_pos_ritual, metadata)")
+
+    # Extract mapa_comercial snapshot subcommand (NEW v6.5 — 2026-05-21, Item 7 follow-up)
+    mc_parser = subparsers.add_parser(
+        "extract-mapa-comercial",
+        help="Fase 1.5b - Snapshot CSV do mapa_comercial vigente no ClickHouse"
+    )
+    mc_parser.add_argument("--indicators-dir", required=True,
+                           help="Diretorio raiz da Biblioteca de Indicadores (com scripts/extract_mapa_comercial.py)")
+    mc_parser.add_argument("--output", required=True,
+                           help="Path do CSV output (recomendado: {cycle}/dados/raw/mapa-comercial-snapshot.csv)")
+    mc_parser.add_argument("--dry-run", action="store_true",
+                           help="Apenas valida acesso, sem gravar arquivo")
+
     args = parser.parse_args()
 
     if args.command == "plan":
@@ -1084,6 +1442,10 @@ def main():
         cmd_run(args)
     elif args.command == "consolidate":
         cmd_consolidate(args)
+    elif args.command == "apply-scope-filter":
+        cmd_apply_scope_filter(args)
+    elif args.command == "extract-mapa-comercial":
+        cmd_extract_mapa_comercial(args)
 
 
 if __name__ == "__main__":

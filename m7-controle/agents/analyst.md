@@ -4,6 +4,9 @@ description: |
   Agente analitico do ciclo de controle de performance (G2.2 E3-E7).
   Recebe dados validados do data-collector e produz analise de desvios, causa-raiz,
   acompanhamento de acoes, projecoes e WBR consolidado. NUNCA acessa MCPs ou dados brutos.
+  Use PROACTIVELY quando uma das skills de E3-E7 (analyzing-deviations, summarizing-actions,
+  projecting-results, consolidating-wbr, recording-lessons) e invocada — o analyst e o
+  unico agente do plugin para todas as fases analiticas.
 
   <example>
   Context: E2 concluido, dados consolidados disponiveis
@@ -214,6 +217,16 @@ Os rates iniciais sao estimativas calibraveis; apos 2-3 ciclos serao ajustados c
 
 **Objetivo**: Consolidar E2-E5 em um WBR autocontido com narrativa executiva coerente.
 
+> **2 PASSADAS (NOVO v6.5.0 — 2026-06-12).** O main thread invoca o analyst **duas vezes** no E6,
+> com um passo deterministico (`inject_metas_ppi`, Fase 4.6) no meio:
+> - **Passada 1 (build-canonical):** voce escreve SOMENTE o canonical `wbr-*.data.json` (Fases 1–4.5).
+>   PARE — nao escreva Estruturado/Narrativo ainda.
+> - **Passada 2 (write-docs):** voce LE o canonical **ja injetado/normalizado** pelo main thread e escreve
+>   Estruturado + Narrativo + HTML (Fases 5–7). **NAO reescreva `indicadores.*`** — o canonical e a fonte
+>   de verdade; aqui so se LE para formatar. Reescrever desfaria as metas do SoT `m7Prata.ciclo_metas_ppi`.
+> Voce NAO tem Bash; quem roda `normalize_canonical`/`inject_metas_ppi`/`validate-painel`/`html-to-pdf` e
+> sempre o main thread. Detalhes: consolidating-wbr/SKILL.md secao "Modelo de Execucao".
+
 **Estrutura obrigatoria (6 secoes)**:
 
 1. **Resumo Executivo** (<=150 palavras):
@@ -274,7 +287,228 @@ node {plugin_path}/skills/consolidating-wbr/scripts/html-to-pdf.js \
   wbr/wbr-narrativo-{vertical}-{data}.pdf
 ```
 
-**Outputs E6**: 4 artefatos (WBR Estruturado .md, WBR Narrativo .md, WBR Narrativo .html, WBR Narrativo .pdf)
+**Outputs E6**: 4 artefatos (WBR Estruturado .md, WBR Narrativo .md, WBR Narrativo .html, WBR Narrativo .pdf) + **1 canonical JSON v1.1** (`wbr-{vertical}-{data}.data.json`, gerado na Fase 4.5 — SoT para os 4 artefatos).
+
+#### Schema v1.1 — campos OBRIGATORIOS no canonical JSON (2026-05-12)
+
+Atualizado para suportar PJ2 (decomposicao por canal) + indicators com `direction=menor_melhor` (tempo de ciclo, % estagnacao). Schema retro-compat com v1.0 — campos novos sao opcionais individualmente mas o agente DEVE emiti-los quando aplicavel.
+
+> ⚠️ **CONTRATO DE SHAPE — 4 campos que o downstream (build_deck/slack_send) consome e que
+> o analyst recorrentemente emite errado (hardening 2026-06-11).** Os consumidores agora
+> toleram desvios (fallbacks defensivos em `build_deck.py` e `slack_send.py`), mas EMITA
+> SEMPRE no formato correto para nao depender do safety-net:
+>
+> 1. **Top-level OBRIGATORIO** (alem de dentro de `meta`): `data_referencia` (YYYY-MM-DD),
+>    `checkpoint_label` (string) e `vertical` no **nivel raiz** do JSON. O build_deck deriva
+>    `meta.ciclo` desses (sem eles, `cycle_date_from_str('')` -> ValueError). Nao basta por so
+>    dentro de `meta`.
+> 2. **`meta.periodo` deve ser DICT** `{"competencia": "YYYY-MM", "range": "...", "label": "..."}`
+>    — NUNCA string. O build_deck faz `meta.periodo.get("competencia")` (string -> AttributeError).
+> 3. **Indicador derivado `{base}_pct_ativas`: `realizado` e `n2.{esp}.realizado` em ESCALA 0-100**
+>    (ex: `85.7`, `88.9`), NAO razao 0-1 (`0.857`). A Matriz do deck le esse valor direto; em 0-1
+>    ela renderiza "0,9% / 200% meta verde" em vez de "85,7% vermelho". (O `por_canal.{c}.pct_ativas`
+>    da letra C abaixo continua ratio 0-1 — sao campos diferentes.)
+> 4. **`semaforo_resumo` com chaves PLANAS** `verde`/`amarelo`/`vermelho`/`cinza_sem_meta` (int) no
+>    nivel do bloco — pode manter `total_*`/`kpis`/`ppis_com_meta` adicionais, mas as planas sao as
+>    que o `slack_send` le (sem elas o preview mostra `0|0|0`).
+
+**A. Bloco `meta` (NOVO em v1.1)** — replicar flags do CICLO.md no JSON canonical para builder do ritual nao precisar consultar CICLO.md:
+
+```json
+"meta": {
+  "is_first_ritual_of_month": true|false,    // copiado de CICLO.md
+  "vertical": "{vertical}",
+  "ciclo_label": "{ciclo}",
+  "snapshot_at": "{ISO timestamp UTC}",
+  "_schema": "wbr-canonical-data v1.1"        // bump de v1.0 → v1.1
+}
+```
+
+**B. `indicadores.{X}.direction`** (NOVO) — ler do YAML do indicator (campo schema v2.1 da skill `m7-metas/creating-indicators`):
+
+```json
+"indicadores": {
+  "<indicator_id>": {
+    ...campos existentes...,
+    "direction": "maior_melhor" | "menor_melhor"   // copiado do YAML; obrigatorio para unit=days
+  }
+}
+```
+
+Quando `direction=menor_melhor` (ex: `tempo_de_ciclo_funil_*`, `oportunidades_estagnadas_funil_*.pct_ativas`), a regra de semaforo inverte:
+- `realizado <= meta` → verde (dentro do limite)
+- `meta < realizado <= meta * 1.20` → amarelo (excedeu ate 20%)
+- `realizado > meta * 1.20` → vermelho
+
+**C. `indicadores.{X}.por_canal[c]`** (NOVO, opcional) — emitir quando o YAML do indicator declara `output_schema.por_canal`. Schema:
+
+```json
+"indicadores": {
+  "<indicator_id>": {
+    ...,
+    "por_canal": {
+      "investimentos": { "qty": N, "vol": N, "qty_won": N, "pct_ativas": N },
+      "credito":       { "qty": N, "vol": N, "qty_won": N, "pct_ativas": N },
+      "outros_m7":     { "qty": N, "vol": N, "qty_won": N, "pct_ativas": N }
+    }
+  }
+}
+```
+
+Campos opcionais dentro de cada canal:
+- `qty` (int): quantidade no canal
+- `vol` (float, BRL): volume agregado
+- `qty_won` (int): convertidos (WON) — separado de `qty` para ticket runtime (edit #26 do contrato PJ2)
+- `pct_ativas` (float, ratio): qty_estagnadas / qty_ativas (edit #29 — coerencia com matriz)
+
+Regras de aditividade (validadas por `validate-painel.py validate_wbr_schema_v1_1`):
+- `SUM(por_canal[c].qty) ≈ n1_value` (tolerancia 5% ou 1 unit)
+- `SUM(por_canal[c].vol) ≈ n1_value` quando `unit=BRL`
+- **Mesma CTE de canal** entre indicators correlacionados (ativas ↔ estagnadas) — caso contrario `pct_ativas` fica inconsistente
+
+Quando emitir `por_canal`:
+- PJ2 N2 multi-vertical (`Card.metadata.verticais = [cons, seg]`) → SIM, com canais `investimentos/credito/outros_m7`
+- N3 single-vert → NAO (decomposicao por especialista ja resolve)
+- Excecao: se YAML do indicator declarar `output_schema.por_canal` explicitamente, emitir mesmo em N3
+
+**D. `projecoes.{X}.M+1`** (NOVO, opt-in por vertical) — emitir apenas quando `Card.apresentacao.proj_periodos_por_vertical.{vert}` inclui `"M+1"`:
+
+```json
+"projecoes": {
+  "<indicator_id>": {
+    "M0":  { "meta_mes": N, "base": N, "pessimista": N, "otimista": N, "classificacao": "Provavel|Possivel|Improvavel" },
+    "M+1": { "meta_mes": N, "base": N, "pessimista": N, "otimista": N, "classificacao": "..." }
+  }
+}
+```
+
+Politica atual (edit #31 do contrato PJ2):
+- **Cons aceita M+1** — metodo `pipeline_conversion_extended_v2` calibrado
+- **Seg NAO aceita M+1** — metodo `installment_amortization` ainda em calibracao
+- Se Card nao declarar `proj_periodos_por_vertical`, default = apenas `M0` (backwards compat)
+
+**E. Backwards compat** — JSONs v1.0 sao aceitos sem mudancas. Builders aplicam fallbacks:
+- `meta.is_first_ritual_of_month` ausente → builder le de CICLO.md (legacy path)
+- `direction` ausente → assume `maior_melhor`
+- `por_canal` ausente → builder usa decomposicao por especialista (N3) ou agregado simples
+- `projecoes.{X}.M+1` ausente → builder so renderiza M0 nos slides Pipeline/Conclusao
+
+**F. Validacao** — sempre rodar `validate-painel.py --data wbr-*.data.json` antes de salvar; checa regras 34-39 do schema v2.1 (direction valido, aditividade por_canal, M+1 well-formed, pct_ativas companion check).
+
+#### Schema v1.3 — campos OBRIGATORIOS no canonical JSON (Item 3 follow-up Seguros-WL 2026-05-20, 2026-05-21)
+
+Bump `_schema: "wbr-canonical-data v1.3"`. Schema localizado em `claude-plugins/m7-operations/_schema/v1.3/wbr-canonical-data.schema.json`. Adiciona 3 blocos novos + 1 regra de output:
+
+**G. `acoes.atrasadas` e `acoes.metricas_agregadas.atrasadas_count` (REGRA DE OUTPUT)**
+
+`acoes.atrasadas` SEMPRE `list[task_item]`. Contagem (int) vai SEMPRE em `acoes.metricas_agregadas.atrasadas_count`. Bug do ciclo v2 (atrasadas=2 int) NUNCA mais.
+
+```json
+"acoes": {
+  "atrasadas": [ {<task_item>}, {<task_item>} ],
+  "metricas_agregadas": {
+    "atrasadas_count": 2,  // contagem dedicada
+    "total": 21,
+    "ativas": 14,
+    ...
+  }
+}
+```
+
+**H. `recomendacoes` (top-level, lista plana)**
+
+`recomendacoes` SEMPRE `list[dict]`. Cada item declara `categoria` (`contramedida` | `escalonamento` | `ajuste_meta`) e `prioridade` (`alta` | `media` | `baixa`). NUNCA dict de 3 categorias.
+
+```json
+"recomendacoes": [
+  {
+    "titulo": "Cleanup deals sem atividade",
+    "descricao": "...",
+    "responsavel": "Claudia Moraes + Tarcisio Catunda",
+    "prazo": "2026-05-30",
+    "prioridade": "alta",
+    "categoria": "contramedida"
+  },
+  { ..., "categoria": "escalonamento", "prioridade": "alta" },
+  { ..., "categoria": "ajuste_meta", "prioridade": "media" }
+]
+```
+
+**I. `analise_por_responsavel` (NOVO — OBRIGATORIO quando Card tem N2 ou e PJ2)**
+
+Bloco estruturado de riscos+alertas+acoes sugeridas por especialista (Cons/Seg) ou canal (PJ2). Prepara payload para bot Telegram (memory `project_telegram_bot_alertas`) enviar DMs instantaneos.
+
+Card declara dimensao via `apresentacao.dimensao_analise: "especialista" | "canal"` (default `especialista`).
+
+```json
+"analise_por_responsavel": {
+  "Emmanuel": {
+    "dimensao": "especialista",
+    "indicadores_vermelhos": ["oportunidades_estagnadas_funil_seg", "receita_seguros_mensal"],
+    "riscos": [
+      {
+        "tipo": "estagnadas_alto",
+        "descricao": "18 deals estagnados (50% das ativas) R$ 2.3M em aging >60d",
+        "indicador_origem": "oportunidades_estagnadas_funil_seg",
+        "valor_observado": 18,
+        "limite_referencia": "40% ativas",
+        "severidade": "alta",
+        "cross_indicators": [
+          {"indicador": "oportunidades_criadas_funil_seg", "valor": 4, "semaforo": "vermelho", "relacao": "causa_provavel"},
+          {"indicador": "oportunidades_ativas_funil_seg", "valor": 36, "semaforo": "amarelo", "relacao": "compensa"},
+          {"indicador": "taxa_conversao_funil_seg", "valor": 0.18, "semaforo": "vermelho", "relacao": "consequencia"}
+        ]
+      }
+    ],
+    "alertas": [
+      {
+        "tipo": "criadas_zero_no_mes",
+        "descricao": "0 oportunidades criadas no mes ate dia 20",
+        "indicador_origem": "oportunidades_criadas_funil_seg",
+        "acao_imediata": "Acionar prospeccao desta semana"
+      }
+    ],
+    "acoes_sugeridas": [
+      {
+        "descricao_curta": "Emmanuel: 18 deals estagnados R$ 2.3M. Revisar nominalmente ate sex e marcar WIN/LOSE.",
+        "descricao_completa": "Foco prioritario nos 3 deals com aging >90d. Cleanup em 5d uteis: Cotacao -> Proposta ou LOSE explicito. Reportar status na proxima reuniao.",
+        "indicador_origem": "oportunidades_estagnadas_funil_seg",
+        "prazo": "2026-05-25",
+        "prioridade": "alta"
+      },
+      {
+        "descricao_curta": "Emmanuel: 0 deals criados ate dia 20. Agendar 3 ligacoes prospect ainda esta semana.",
+        "indicador_origem": "oportunidades_criadas_funil_seg",
+        "prazo": "2026-05-23",
+        "prioridade": "alta"
+      }
+    ]
+  },
+  "Samuel": { ... }
+}
+```
+
+**Regras de emissao:**
+1. Para CADA especialista/canal com pelo menos 1 indicador `semaforo: vermelho` em `painel.indicadores[*].n2[esp]`, MUST emitir entrada em `analise_por_responsavel[esp]`.
+2. `indicadores_vermelhos: list[string]` enumera TODOS os `indicator_id`s com vermelho daquele esp/canal.
+3. **>=1 `risco`** por `indicador_origem` em `indicadores_vermelhos`. Risco sem `indicador_origem` ou sem citar numero observado eh PROIBIDO.
+4. **>=2 `cross_indicators`** quando `indicador_origem` eh PPI funil (criadas/ativas/estagnadas/conversao). Relacoes possiveis: `causa_provavel`, `consequencia`, `amplifica`, `compensa`. Exemplo padrao: estagnadas vermelho cita criadas (causa provavel se tambem vermelho) + ativas (amplifica se baixo) + conversao (consequencia).
+5. **>=1 `alerta`** quando o valor observado violou banda fixa do Card (ex: estagnadas_pct >40%, criadas qty <50% meta).
+6. **>=1 `acao_sugerida`** por indicador vermelho. `descricao_curta` <=200 chars (validate-painel Regra 52), DM-friendly, cita indicador + numero + acao concreta + responsavel implicito (o proprio esp/canal).
+7. Para PJ2: key = nome do canal (ver memory `project_pj2_n2_ritual`), `dimensao: "canal"`.
+
+**Validate-painel.py** aplica 3 regras adicionais:
+- **Regra 50** — completude analise_por_responsavel: cada esp/canal com vermelho em N2 deve ter entrada + >=1 risco + >=1 acao_sugerida citando `indicador_origem` daquele indicador vermelho. FALHA exit 2 se ausente.
+- **Regra 51** — cross-indicator obrigatorio: PPI funil red deve ter cross_indicators[] com >=2 entradas. WARN se ausente; FALHA se totalmente vazio.
+- **Regra 52** — DM-ready: `acoes_sugeridas[].descricao_curta` <=200 chars. WARN se ultrapassa.
+
+**J. `indicadores.{X}.escopo_kpi` (NOVO — opcional, Item 4 follow-up)**
+
+Carregar do `Card.apresentacao.escopo_kpi` quando declarado. Quando `n1_escritorio`, narrativa do WBR DEVE declarar explicitamente:
+
+> "Realizado N1 = R$ X (escritorio, inclui Outros M7); N2 lista apenas squad Card (Y% do N1)"
+
+Validate-painel.py Regra 38b downgrade automatico FALHA -> INFO quando flag = `n1_escritorio` (gap N1-n2 legitimo).
 
 ### E7 — Licoes Aprendidas (recording-lessons)
 
@@ -341,6 +575,27 @@ node {plugin_path}/skills/consolidating-wbr/scripts/html-to-pdf.js \
 - WBR deve ser **autocontido** (legivel sem consultar relatorios parciais)
 - Narrativa **coerente** — sem contradicoes entre secoes
 - Dados numericos **identicos** aos relatorios de origem
+
+### Sobre o SHAPE dos JSON canonicos (E3/E4/E5/E6) — CONTRATO DE SAIDA INVIOLAVEL
+
+> Estas 5 regras existem porque cada uma JA quebrou um ciclo real (2026-06). Violacao
+> ou e pega pelo `validate-painel.py` (retrabalho manual) ou quebra silenciosamente o
+> deck. O `normalize_canonical.py` conserta shape automaticamente, mas voce DEVE emitir
+> certo na origem — nao confie no normalizador como muleta.
+
+1. **`indicadores` e SEMPRE um DICT keyed by indicator_id — NUNCA uma lista.**
+   - E3 sidecar (`e3-causa-raiz-{v}.json`): `{"indicadores": {"<id>": {...}}}` — NAO `[{...}]`.
+   - E6 canonical (`wbr-{v}-{data}.data.json`): `indicadores` no TOP-LEVEL (irmao de `meta`, `projecoes`, `acoes`), NUNCA aninhado em `painel.indicadores` nem substituido por `desvios`. Espelhe a estrutura top-level do canonical do ciclo ANTERIOR da mesma vertical (leia-o com Read antes de gerar).
+
+2. **Use a chave `semaforo`** (`verde|amarelo|vermelho|cinza`) nos itens — no E3 sidecar cada indicador e cada `n2_breakdown[esp]` deve ter `semaforo`. (Pode duplicar em `status`, mas `semaforo` e obrigatorio.) `n2_breakdown` tambem e DICT keyed by especialista, nunca lista.
+
+3. **`acoes` e DICT com 4 chaves canonicas**: `criticas`, `atrasadas`, `em_dia_priorizadas` (NAO `em_dia` nem `em_dia_proximas`), `concluidas_eficazes` — cada uma `list[task_item]`. Contagens vao em `acoes.metricas_agregadas.*`, nunca substituindo a lista por um int.
+
+4. **`projecoes`: NAO emita `M+1` para indicador nao-projetavel.** So inclua o bloco `M+1` (dict bem-formado com `base`, `classificacao`, etc.) quando o Card declara aquele horizonte em `apresentacao.proj_periodos_por_indicador`. NUNCA emita `"M+1": null` nem `M+1` para indicadores com `[]` no Card.
+
+5. **Regra 50 (cobertura N2 vermelho):** para CADA especialista/canal que tem QUALQUER indicador `vermelho` no `n2`, `analise_por_responsavel.{esp}` DEVE conter >=1 `riscos[]` E >=1 `acoes_sugeridas[]` citando aquele `indicador_origem`. Inclui indicadores cujo N1 e verde mas o N2 do esp e vermelho (ex: taxa de conversao 0% por booking lag). Antes de finalizar, varra todos os `n2.{esp}.semaforo == "vermelho"` e confirme cobertura 1:1.
+
+> **Auto-verificacao obrigatoria antes de retornar:** apos gerar os JSON, releia mentalmente as 5 regras acima contra o que voce escreveu. O pipeline roda `normalize_canonical.py` + `validate-painel.py --e3` como gate — emitir certo na origem evita o ciclo de falha/retrabalho.
 
 ### Sobre o CICLO.md
 - **SEMPRE** registre decisoes analiticas relevantes na secao Decisoes com prefixo `AGENTE:analyst`

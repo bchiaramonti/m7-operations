@@ -1,0 +1,49 @@
+{
+  "_comment": "Exemplo de uma linha do distribuicao-log.csv decodificada como JSON. O arquivo real e CSV; este JSON serve apenas como referencia visual do schema. Fonte: scripts/slack_send.py::write_delivery_log",
+  "schema_version": "delivery-log v1.0",
+  "linha_pre_ritual_real_ok": {
+    "timestamp": "2026-05-19T08:08:43-03:00",
+    "vertical": "consorcios",
+    "nivel": "N3",
+    "subnivel": "",
+    "cycle_date": "2026-05-19",
+    "semana_iso": 21,
+    "tipo": "pre",
+    "dms_count": 4,
+    "on_time": "true",
+    "prazo_referencia": "D-1",
+    "confirmacoes_leitura_count": 0,
+    "escalacao_acionada": "false",
+    "dry_run": "false"
+  },
+  "linha_pos_ritual_com_escalacao": {
+    "timestamp": "2026-05-19T17:15:02-03:00",
+    "vertical": "consorcios",
+    "nivel": "N3",
+    "subnivel": "",
+    "cycle_date": "2026-05-19",
+    "semana_iso": 21,
+    "tipo": "pos",
+    "dms_count": 5,
+    "on_time": "true",
+    "prazo_referencia": "D-1",
+    "confirmacoes_leitura_count": 0,
+    "escalacao_acionada": "true",
+    "dry_run": "false"
+  },
+  "linha_dry_run_validacao": {
+    "timestamp": "2026-05-21T09:00:00-03:00",
+    "vertical": "seguros",
+    "nivel": "N3",
+    "subnivel": "wl",
+    "cycle_date": "2026-05-22",
+    "semana_iso": 21,
+    "tipo": "pre",
+    "dms_count": 3,
+    "on_time": "true",
+    "prazo_referencia": "D-1",
+    "confirmacoes_leitura_count": 0,
+    "escalacao_acionada": "false",
+    "dry_run": "true"
+  }
+}

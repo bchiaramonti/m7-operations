@@ -2,6 +2,25 @@
 
 > Gerado automaticamente por m7-controle (E4 — summarizing-actions)
 
+## Escopo do ciclo
+
+> Filter composto (v3.x — 2026-05-12, memory `reference_g2_2_action_scope_filter`).
+> Pipeline G2.2 puxa apenas tasks em escopo do ritual passado + ad-hoc pos-ritual.
+
+**{escopo_modo}**: {frase_escopo}
+
+| Origem | Total | %% do ciclo |
+|---|---|---|
+| Escopo do ritual {last_ritual_date} | {n_escopo_ritual} | {pct_escopo_ritual}%% |
+| Ad-hoc pos-ritual (criadas apos {last_ritual_date}) | {n_ad_hoc} | {pct_ad_hoc}%% |
+| **Total no ciclo** | **{total_ativas}** | **100%%** |
+
+> Tasks pendentes antigas que NAO foram discutidas no ultimo ritual ficam **fora deste escopo** (politica G2.2 desde 2026-05-12). Quando `escopo_modo: primeiro_ciclo`, escopo = todas as tasks ativas (sem filtro).
+
+Ata anterior consumida: `{ata_anterior_path}`
+
+---
+
 ## Metricas Gerais
 
 | Metrica | Valor |

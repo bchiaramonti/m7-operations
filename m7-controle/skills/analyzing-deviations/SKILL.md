@@ -53,7 +53,13 @@ Ler `periodo`, `granularidade` e `checkpoint_label` do CICLO.md. A analise tempo
 
 ### Fase 1 — Classificar Semaforo
 
-Para cada indicador nos dados consolidados, comparar `realizado` vs `meta`:
+> **OBRIGATORIO antes de classificar**: Ler **TODAS** as fontes de meta do Card de Performance da vertical. Metas podem estar em DOIS lugares diferentes do YAML:
+> 1. `kpi_references[].regras_meta` — metas de KPIs principais (geralmente Receita/Volume)
+> 2. `metas_ppi:` — bloco SEPARADO no top-level do Card com metas dos PPIs de funil (ex: `oportunidades_ativas_funil_seg.qty`, `oportunidades_criadas_funil_seg.qty`, `oportunidades_estagnadas_funil_seg.qty` etc.)
+>
+> NAO classifique nenhum PPI como "sem meta / cinza" antes de verificar AMBAS as fontes. Use `Grep('metas_ppi', card_path)` para confirmar existencia do bloco. Se `metas_ppi` existe, leia integralmente — cada chave declarada e uma meta formal a aplicar.
+
+**Para indicadores em `kpi_references[].regras_meta` ou sem direction explicito** (regra padrao):
 
 | Classificacao | Criterio | Acao |
 |---------------|----------|------|
@@ -61,12 +67,24 @@ Para cada indicador nos dados consolidados, comparar `realizado` vs `meta`:
 | **Amarelo** | 80-94% da meta | Analise simplificada (tendencia + contexto) |
 | **Vermelho** | < 80% da meta | Analise de fenomeno completa (5 dimensoes) |
 
+**Para PPIs em `metas_ppi:` do Card** (regra a documentada no Card):
+
+| Classificacao | Criterio (maior_melhor) | Criterio (menor_melhor) |
+|---------------|-------------------------|--------------------------|
+| **Verde** | pct >= 100% | pct >= 100% |
+| **Amarelo** | 70% <= pct < 100% | 70% <= pct < 100% |
+| **Vermelho** | pct < 70% | pct < 70% |
+
+Onde:
+- `maior_melhor`: `pct = (realizado / meta) × 100`
+- `menor_melhor`: `pct = (meta / max(realizado, 1)) × 100`, com cap em 200%
+
 > **REGRA CRITICA**: O semaforo classifica o INDICADOR AGREGADO (N1) contra sua META FORMAL. A performance INDIVIDUAL de um assessor NAO afeta o semaforo — mesmo que um assessor esteja a 0%, se o agregado esta a 105%, o indicador e Verde. Concentracao de resultado em poucos individuos e um RISCO OPERACIONAL reportado separadamente na dimensao QUEM/ONDE, nunca um fator de reclassificacao do semaforo.
 >
 > Exemplo correto: Volume N1 a 105% = Verde, mesmo que Tereza esta a 0% e Douglas a 175%.
 > Exemplo incorreto: Douglas "reclassificado" como Vermelho por "concentracao excessiva".
 
-**Output Fase 1:** Tabela-semaforo com todos os indicadores classificados.
+**Output Fase 1:** Tabela-semaforo com todos os indicadores classificados, separando KPIs (regra padrao 95/80) de PPIs em metas_ppi (regra a do Card 100/70). Registrar EXPLICITAMENTE quais indicadores nao tem meta (verdadeiramente cinza) e quais tem meta declarada no Card mas com `valor: pendente` (cinza com justificativa).
 
 ### Fase 2 — Analise de Fenomeno (Vermelhos)
 
@@ -146,14 +164,168 @@ Para indicadores **Verdes**:
 
 Gerar `analise/deviation-cause-report.md` (na pasta do ciclo) seguindo o [template](templates/deviation-report.tmpl.md).
 
+### Fase 6.5 — Emissão canonical: `causa_raiz_resumo` (sidecar JSON) — NOVO em v4.x (S2a B4.17, 2026-05-18)
+
+**Motivo:** O `deviation-cause-report.md` (Fase 6) e narrativo e detalhado. Downstream (E6 `consolidating-wbr` → build_deck do `m7-ritual-gestao:preparing-materials` Slide Riscos · Alertas) precisa de **1-2 frases sintetizando a causa-raiz por indicador** para renderizar no canonical WBR. Sintese fica em sidecar JSON estruturado consumido por E6.
+
+**Output:** `{cycle_folder}/analise/e3-causa-raiz-{vertical}.json`
+
+**Schema:**
+
+```json
+{
+  "_schema": "e3-causa-raiz v1.0",
+  "_generated_at": "2026-05-19T08:30:00",
+  "vertical": "consorcios",
+  "data_referencia": "2026-05-19",
+  "indicadores": {
+    "<indicator_id>": {
+      "causa_raiz_resumo": "1-2 frases sintetizando a hipotese de causa-raiz principal",
+      "semaforo": "vermelho|amarelo|verde",
+      "confianca": "alta|media|baixa",
+      "n2_breakdown": {
+        "<especialista>": {
+          "causa_raiz_resumo": "OPCIONAL — 1 frase especifica para este especialista quando o desvio e individual"
+        }
+      }
+    }
+  }
+}
+```
+
+**Regras de emissão:**
+
+1. **Emitir para TODOS os indicadores Vermelhos** — `causa_raiz_resumo` obrigatório (sintese da hipotese principal da Fase 3)
+2. **Emitir para indicadores Amarelos** — `causa_raiz_resumo` opcional; emitir apenas se Fase 4 identificou tendencia/contexto material (ex: "queda significativa vs M-1 por mix")
+3. **Verdes**: emitir SE havia desvio vermelho/amarelo no ciclo anterior — `causa_raiz_resumo` descreve a recuperacao
+4. **n2_breakdown.{especialista}.causa_raiz_resumo**: emitir APENAS quando a Fase 2 dimensão QUEM identificou concentracao individual (ex: "Douglas com 80% do gap")
+5. **Cinza/sem meta**: NAO emitir entrada (não tem desvio formal a explicar)
+6. **Tamanho**: 1-2 frases (max ~200 caracteres por `causa_raiz_resumo`). Quem precisa de detalhe le o MD narrativo
+7. **Tom**: factual, sem sugestao de acao (acao e responsabilidade de E4)
+
+### Checklist de qualidade — TODA `causa_raiz_resumo` DEVE ter:
+
+> **REFORÇO 2026-05-19 (S2a Sessao A parcial).** Feedback do usuario apos ritual Cons 2026-05-19: card Riscos · Atencao no 1º slide de cada especialista mostrou analises rasas. Esta checklist garante densidade analitica.
+
+Cada `causa_raiz_resumo` (1-2 frases, max ~200 chars) DEVE conter **3 elementos minimos**:
+
+1. **Número específico** (quanto): pct, valor BRL compact, qty absoluta, ou gap relativo
+   - Ex: "85% do gap", "R$ 5,2M concentrados", "47% (vs 28%)", "fator 24x meta"
+
+2. **Identificador de QUEM/ONDE/QUANDO** (a quebra que explica):
+   - QUEM: nome de pessoa (especialista, assessor) — ex: "Douglas", "Camila Quintino"
+   - ONDE: estágio, canal, produto, equipe — ex: "estágio Proposta", "canal Investimentos", "B2B Alta Renda"
+   - QUANDO: comparativo MoM/WoW, semana, dias — ex: "vs M-1", "WoW", "D+9", "ultimas 3 semanas"
+
+3. **Direção causal** (por que): conexão entre o número e a explicação. Verbo causal explicito
+   - Ex: "sinalizando retração", "indica gargalo de conducao", "puxa pct para cima", "antecipa queda em M+1"
+
+**Se faltar QUALQUER um dos 3 elementos**, a frase está rasa. Reescrever.
+
+### Exemplos RICOS (✅ aprovado) — variados por tipo de indicador
+
+**Volume / Receita / qty (KPI principal):**
+- ✅ "Douglas concentra 85% do gap (R$ 5,4M) de Volume. Funil de Investigacao caiu 40% MoM, sinalizando retracao de prospeccao."
+- ✅ "Receita MTD em R$ 12K vs meta R$ 36K (33%) por Humberto NAO converter R$ 28K em Cotas Alocadas (parados ha >21d)."
+- ✅ "Volume em fator 24x abaixo da meta. ICOFORT (R$ 60M) parado em Cotas Alocadas — sem decisao win/lose ha 3 semanas."
+- ✅ "qty_won caiu de 8 para 2 entre Abril e Maio MTD; concentrada em B2B Alta Renda (Squad Douglas)."
+
+**Estagnacao / Pct ativas:**
+- ✅ "Estagnacao subiu para 47% das ativas (vs 28% em M-1). Concentrada no estagio Proposta com tickets >R$500K."
+- ✅ "68,5% das ativas estagnadas (meta <=40%). Pareto: Pedro Ramos (Squad Douglas) responde por 8 deals, 4 sem atividade ha >21d."
+- ✅ "% Estagnadas dispara de 32% (M-1) para 51% (MTD). Causada por desaceleracao de WON nos estagios finais — pipeline retem volume sem converter."
+
+**Taxa de conversao:**
+- ✅ "Taxa de conversao caiu de 18% para 9% MoM. Concentrada na transicao Apresentacao → Proposta — leads chegam sem qualificacao adequada."
+- ✅ "Conversao zero em Maio MTD (0/5 deals fechados em B2B Mesa). Tickets medios subiram 60% — leads grandes exigem ciclo mais longo."
+
+**Oportunidades criadas (entrada de funil):**
+- ✅ "Criadas caem 35% MoM (de 47 para 30). Investimentos puxa para baixo (-50%); Credito estavel."
+- ✅ "Criacao MTD em 12 deals vs media historica 22-28. Sem campanha de captacao ativa em Maio (queda esperada)."
+
+**Tempo de ciclo / Sem atividade:**
+- ✅ "Tempo medio de ciclo subiu para 47d (meta 30d). 3 deals com >60d em Apresentacao — pendencia de documentacao com cliente."
+- ✅ "12 deals sem atividade planejada (vs 4 em M-1). Concentrados em Humberto e Pedro Araujo — sobrecarga de carteira."
+
+### n2_breakdown — quando emitir analise por especialista
+
+Emitir `n2_breakdown.{esp}.causa_raiz_resumo` APENAS quando a Fase 2 dimensão QUEM mostra **concentracao individual >50%** do gap, OU quando o desvio é binario (1 especialista vermelho, outros verdes).
+
+**Exemplos n2_breakdown:**
+- ✅ Douglas: "Concentra 85% do gap. Funil Investigacao caiu 40% MoM."
+- ✅ Tereza: "Verde — 105% da meta. Carteira B2C com ticket medio crescente."
+- ❌ NAO emitir n2_breakdown quando o desvio esta distribuido equilibradamente (sem concentracao)
+
+### Anti-patterns — recusar emitir essas frases
+
+- ❌ "Mercado dificil este mes" — generico, sem evidencia
+- ❌ "Volume caiu" — nao explica causa
+- ❌ "Revisar aging por canal" — sugestao de acao (acao e E4, nao E3)
+- ❌ "Indicador X vermelho — N% meta" — descricao do sintoma, nao causa
+- ❌ "Pipeline esta entupido" — adjetivo sem dado
+- ❌ "Queda significativa em relacao ao mes passado" — sem numero
+- ❌ "Provavel impacto de sazonalidade" — sem ancoragem em dado
+
+### Procedimento de geracao
+
+Para CADA indicador Vermelho (e Amarelos materiais), aplicar:
+
+1. Ler a Fase 2 (5 dimensoes) e Fase 3 (hipoteses) do relatorio MD que voce mesmo gerou
+2. Identificar a **hipotese de causa-raiz com confianca alta** (suportada por 2+ evidencias)
+3. Reescrever essa hipotese em formato `causa_raiz_resumo` aplicando o checklist (numero + quem/onde/quando + verbo causal)
+4. Validar contra anti-patterns — se cair em algum, voltar para passo 2 com hipotese mais forte
+5. Se NAO ha hipotese de confianca alta, emitir `causa_raiz_resumo` com confianca media + qualificador explicito ("Provavelmente ..., mas dados nao bate em N5")
+6. Tamanho final: 1-2 frases, max ~200 chars
+
+**Consumo downstream:**
+
+- E6 (`consolidating-wbr`) Fase 4.5.d le este sidecar e injeta em `indicadores.{id}.causa_raiz_resumo` no canonical WBR
+- build_deck.py Slide Riscos · Alertas consome do canonical (com fallback graceful da S1 mantido)
+
+**Validacao opcional contra JSON Schema (S2a B6.25):**
+
+Apos emitir o sidecar, agente PODE validar contra schema declarativo em `m7-operations/_schema/v1.2/e3-causa-raiz.schema.json`:
+
+```bash
+python3 -c "
+import json
+from jsonschema import validate, ValidationError
+try:
+    schema = json.load(open('m7-operations/_schema/v1.2/e3-causa-raiz.schema.json'))
+    data = json.load(open('{cycle_folder}/analise/e3-causa-raiz-{vertical}.json'))
+    validate(data, schema)
+    print('OK')
+except ValidationError as e:
+    print(f'SCHEMA VIOLATION: {e.message}')
+    raise SystemExit(1)
+"
+```
+
+Se schema violation, **NAO commitar e investigar**. Schema strict garante que E6 (Fase 4.5.d) consume sem erro.
+
+**Normalizacao deterministica (OBRIGATORIO 2026-06-11):** apos emitir o sidecar, rodar o
+normalizador para garantir o shape canonico (indicadores DICT keyed by indicator_id —
+NUNCA lista; `semaforo` presente; `n2_breakdown` DICT keyed by especialista). Pega o bug
+recorrente e SILENCIOSO em que o sidecar sai como lista e o E6 nao consegue injetar
+`causa_raiz_resumo` (deck cai em texto generico sem erro visivel). Idempotente.
+
+```bash
+python3 {plugin_root}/m7-controle/skills/consolidating-wbr/scripts/normalize_canonical.py \
+  --cycle-folder {cycle_folder} --vertical {vertical} [--subnivel {subnivel}]
+```
+
 ## Exit Criteria
 
 - [ ] Relatorio de Desvios e Causa-Raiz gerado em `analise/deviation-cause-report.md` (na pasta do ciclo)
-- [ ] 100% dos indicadores classificados no semaforo (Verde/Amarelo/Vermelho)
+- [ ] **`metas_ppi:` do Card foi lido e aplicado** (Grep no Card confirmou se bloco existe; cada chave virou linha do semaforo com regra a 100/70/menor_melhor)
+- [ ] 100% dos indicadores classificados no semaforo (Verde/Amarelo/Vermelho/Cinza-com-justificativa)
+- [ ] Indicadores cinza tem motivo explicito: "sem meta no Card" OU "meta marcada como `valor: pendente` no Card"
 - [ ] Analise de fenomeno completa (5 dimensoes) para cada Vermelho
 - [ ] Pelo menos 1 hipotese de causa-raiz com nivel de confianca para cada Vermelho
 - [ ] Hipoteses especificas e baseadas em dados (nao genericas)
 - [ ] PPIs de `kpis_analisar_como_contexto` do Card consultados e incorporados na analise (ou motivo de exclusao registrado)
+- [ ] **Sidecar JSON `analise/e3-causa-raiz-{vertical}.json` emitido** (Fase 6.5 — NOVO v4.x S2a B4.17) — todo indicador Vermelho tem `causa_raiz_resumo` 1-2 frases; Amarelos opcionais; n2_breakdown apenas quando ha concentracao individual
+- [ ] **Cada `causa_raiz_resumo` passa pelo checklist de qualidade** (Fase 6.5, reforco 2026-05-19): contem (a) numero especifico, (b) identificador de QUEM/ONDE/QUANDO, (c) verbo causal. Sem os 3, reescrever. Frases ancoradas em dados (nao genericas tipo "mercado dificil" ou "volume caiu"). Validacao explicita antes de emitir o sidecar.
 
 ## Anti-Patterns
 

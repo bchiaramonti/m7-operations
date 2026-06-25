@@ -34,6 +34,15 @@ Devem estar presentes em todo indicador, independente do status.
 | `owner` | string | nome.sobrenome | Responsavel pela manutencao |
 | `updated_at` | date | YYYY-MM-DD | Ultima atualizacao do arquivo |
 
+### Campos de nivel organizacional (D5/Frente 7 — recomendados)
+
+| Campo | Tipo | Formato/Valores | Descricao |
+|-------|------|-----------------|-----------|
+| `org_level` | enum | N1, N2, N3, N4, N5 | Nivel organizacional do indicador = pasta `N{org_level}/`. DISTINTO da coluna `nivel` do output (granularidade de decomposicao). |
+| `vertical_folder` | string | Consorcios, Seguros, Produtos, Investimentos... | Subpasta da vertical sob `N{org_level}/`. |
+
+> **Severidade:** ATENCAO (WARN) se ausentes — durante a transicao a Biblioteca ainda tem indicadores flat sem esses campos. Apos a migracao por nivel (Tempo 2), promovem a CRITICO (obrigatorios). A unicidade de `id` passa a ser composta `(org_level, id)`.
+
 ### Campos condicionais por source_type
 
 | Campo | sql | mcp | hybrid |
@@ -224,13 +233,14 @@ Transicoes inversas nao sao permitidas via skill (apenas edicao manual).
 ### Regras estruturais
 
 1. `id` snake_case, sem acentos, corresponde ao nome do arquivo
-2. `domain` corresponde ao subdiretorio
+2. `domain` corresponde ao subdiretorio `{Vertical}/` (no layout por nivel: `N{org_level}/{Vertical}/`)
 3. `source_type` valido: sql, mcp, hybrid
 4. `unit` valido: BRL, pct, count, ratio, days, score
 5. `updated_at` formato YYYY-MM-DD
 6. `description` presente e informativa (>= 20 caracteres)
 7. `parameters` referenciados na query/steps existem na lista
 8. `dependencies` listam todas as tabelas e tools usados
+9. (D5/Frente 7 — WARN) `org_level` ∈ {N1..N5} presente; unicidade de id composta `(org_level, id)`; path confere com `N{org_level}/{vertical_folder}/` quando migrado. Ausente na transicao = ATENCAO.
 
 ### Regras condicionais
 

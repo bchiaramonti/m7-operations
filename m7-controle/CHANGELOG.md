@@ -5,6 +5,339 @@ Todas as mudancas notaveis neste plugin serao documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [6.5.0] - 2026-06-12
+
+> **Minor release retrocompativel** — Religa as metas de PPI de funil ao SoT
+> ClickHouse `m7Prata.ciclo_metas_ppi` (substitui o hardcode `metas_ppi:` dos
+> Cards) e reestrutura o E6 em **2 passadas do analyst** para a injecao entrar
+> coerente em todos os artefatos. Offline ou sem opt-in `fonte:` = NO-OP (fluxo
+> legado intacto, sem regressao).
+
+### Added
+
+- **`scripts/inject_metas_ppi.py`** (E6 Fase 4.6) — injeta `meta`/`meta_volume`/`n2.{esp}.meta`
+  do SoT da tabela no canonical e recalcula `pct_atingimento`/`gap`/`status` (regra `cor_from_pct`).
+  Opt-in por indicador via `fonte: m7Prata.ciclo_metas_ppi` no Card. Escopo count/BRL
+  (`oportunidades_ativas`/`criadas`/`sem_atividade`); ratio/days nao injetados (constantes
+  com unidade inconsistente). Offline-safe (WARN + no-op), backup `.bak`, diff auditavel.
+- **`scripts/compare_metas_card_vs_tabela.py`** — auditoria de paridade Card x tabela (read-only)
+  por vertical/mes; rodar antes de declarar `fonte:` num Card.
+- **Modelo de Execucao E6 em 2 passadas** (SKILL.md): Passada 1 analyst (canonical) → main thread
+  roda `normalize_canonical` + `inject_metas_ppi` (Fase 4.6) → Passada 2 analyst (Estruturado/
+  Narrativo do canonical injetado) → gate `validate-painel`.
+
+### Changed
+
+- **`scripts/validate-painel.py`** — `extract_card_metas` reconhece `fonte_n2:` e
+  `validate_metas_ppi_sources` cobre tambem fontes `ciclo_metas_ppi` (alem da universal).
+- **`agents/analyst.md`** — documenta os 2 modos do E6 (build-canonical | write-docs; na 2a
+  passada o canonical e read-only para `indicadores.*`).
+- **`commands/next.md` + `run-weekly.md`** — nota de que E6 roda em 2 passadas com inject no meio.
+- **Dependencia externa:** `meta_resolver.py` vive na Biblioteca-de-Indicadores (pasta Desempenho,
+  fora do repo), reutilizado via PYTHONPATH (mesmo padrao do `m7_extract_utils`).
+
+### Notes
+
+- **PJ2 nao religado** (canonical por canal; `build_deck_pj2` precisa ler o resolver direto) — pendente.
+- Cards N3 (Cons v2.13.0, Seg WL v2.19.0, Seg RE v1.10.0) declaram `fonte:` nos PPIs count/BRL.
+
+## [6.4.0] - 2026-05-06
+
+> **Minor release retrocompativel** — Ativa `pipeline_conversion_extended_v2`
+> em producao para Consorcios e Seguros (WL/RE), introduz `close_mode` automatico
+> para 1o ritual do mes (snapshot duplo: mes anterior fechado + mes corrente),
+> adiciona Fase 6.6 consolidacao N1 no projection-by-especialista.json e flag
+> `criada_em_ritual_anterior` em E4 (acoes criadas no ultimo ritual).
+>
+> **Habilita** os tweaks de template C3, C7 e C8 do plano de ritual 2026-05-06
+> (preparing-materials do m7-ritual-gestao consome os novos campos).
+
+### Added
+
+- **`pipeline_conversion_extended_v2` ATIVO** em `volume_consorcio_mensal.yaml` e
+  `volume_seguros_mensal.yaml` (preferred: true). v1 vira fallback automatico
+  com flag `v2_fallback_to_v1: true` quando inputs indisponiveis. Pre-requisitos
+  atendidos: stage_metrics_vigentes YAMLs criados, scripts existentes,
+  oportunidades_criadas com `extras.historico_3m`, data_competencia em Cons.
+- **Indicadores YAML novos** para v2: `stage_metrics_vigentes.yaml` (Cons,
+  PIPELINE_ID=238) e `stage_metrics_vigentes_seg.yaml` (Seg, PIPELINE_ID=156
+  compartilhado WL+RE).
+- **Cards bumpados** com v2 ativado: `card_con_n3_001.yaml` v2.9.0,
+  `card_seg_wl_n3_001.yaml` v2.15.0, `card_seg_re_n3_001.yaml` v1.7.0.
+- **Step 1.2 do `run-weekly`**: deteccao automatica de 1o ritual do mes via
+  comparacao `mes(ciclo_anterior) < mes(ciclo_atual)`. Quando detectado,
+  dispara coleta DUPLA: 1 ciclo `close_mode` para mes anterior fechado
+  (`{vertical}/{YYYY-MM}-fechamento/`) + 1 ciclo normal do mes corrente.
+  Persiste `is_first_ritual_of_month` e `close_mode` no header CICLO.md.
+- **Fase 1.6 em `consolidating-wbr/SKILL.md`**: detecta `close_mode: true` e
+  substitui secao "Projecoes" por "Fechamento do mes" (totais finais, top/bottom
+  performers, licoes do mes). Marca projecoes como `is_retrospective: true`
+  no canonical data JSON (template oculta visualmente).
+- **Fase 6.6 em `projecting-results/SKILL.md`**: bloco `consolidado_n1` no
+  `projection-by-especialista.json` agregando `volume_consolidada_mensal` e
+  `receita_consolidada_mensal` da vertical inteira (regra de consolidacao
+  configurada via `projection.consolidation` do YAML; default `sum`).
+- **Fase 2.5 em `summarizing-actions/SKILL.md`**: flag `criada_em_ritual_anterior`
+  em todas as tasks do JSON ClickUp, derivada de
+  `[data_ultimo_ritual, data_ritual_atual)` lidos do CICLO.md.
+- **TODO Gap 1 Seguros** em `volume_seguros_mensal.py`: filtro `parcela_comissao=1`
+  preparado mas inativo ate coluna ser criada no schema
+  `m7Prata.seguro_comissao_assessor_fuzzy`.
+
+### Changed
+
+- **`volume_seguros_mensal.yaml` updated_at: 2026-05-06**, methods reorganizado
+  com v2 preferred + v1 fallback + run_rate_linear ultimate fallback.
+- **`volume_consorcio_mensal.yaml`** removido bloco `activation_pending` de v2;
+  v2 marcado preferred: true; v1 marcado preferred: false (fallback_for v2).
+- **CICLO.md template** estendido com 4 novos campos no header:
+  `is_first_ritual_of_month`, `close_mode`, `data_ultimo_ritual`,
+  `mes_ciclo_anterior`.
+- **Status do v2** em `projecting-results/SKILL.md`: de "DECLARADO MAS INATIVO"
+  para "ATIVO desde 2026-05-06" com pre-requisitos checados.
+
+### Compatibility
+
+- 100% retrocompativel: ciclos antigos sem `is_first_ritual_of_month` no
+  CICLO.md sao tratados como `false` (comportamento legado).
+- Cards sem v2 ativado caem em v1 normalmente (preferred: true mantido).
+- `projection-by-especialista.json` sem `consolidado_n1` sinaliza
+  `consolidated_unavailable: true` ao consumidor (m7-ritual-gestao).
+
+## [6.3.0] - 2026-05-06
+
+> **Minor release retrocompativel** — Implementa option (b) do roadmap M+1
+> Projection (decisao usuario 2026-05-05). Introduz `pipeline_conversion_extended_v2`
+> (cycle-time-aware + selector dia 15) como `preferred` futuro, mantendo v1
+> como fallback durante migracao gradual. Corrige formula `installment_amortization`
+> para evitar double-count de lagging vs componente funil (resolve ISSUE #3).
+
+### Added
+
+- **Metodo `pipeline_conversion_extended_v2`** documentado em
+  `projecting-results/SKILL.md` Fase 2 e em `references/projection-methodology.md`
+  secao 5.2:
+  - Cycle-time-aware: cada deal classificado em horizonte (M0, M+1, fora) baseado
+    em `tempo_estimado_fechamento` + `stage_probability` vigentes.
+  - Selector dia 15: antes do dia 15 usa medianas do mes anterior (estavel);
+    a partir do dia 15 usa medianas do mes atual (vigente).
+  - Output decomposto: `vol_lagging_competencia_M0/M+1`, `vol_componente_M0/M+1`,
+    `vol_entradas_novas_M+1` — separacao explicita evita double-count.
+- **ISSUE #5 (M+1 Volume Lagging gap)** adicionada em `KNOWN_ISSUES.md`:
+  documenta workaround interim (`Vol_proj_M+1 = realizado_competencia_M+1`)
+  vs solucao target (cycle-time-aware via v2).
+- **Novo helper `compute_stage_metrics_vigentes`** em `m7_extract_utils.py`:
+  calcula medianas reais por estagio×mes via Bitrix `crm.stagehistory.list`.
+  Output: `stage_probability` + `stage_duration_dias` por estagio.
+- **Novo helper `compute_historico_3m`** em `m7_extract_utils.py`: media movel
+  3 meses de oportunidades criadas para uso em `entradas_novas_M+1`.
+- **Parametro opcional `extras=None`** em `write_output`: scripts podem agora
+  passar campos auxiliares (ex: `historico_3m`) que sao merged no top-level
+  do JSON output. Backward compat: ausente = comportamento legado.
+- **Scripts standalone novos:**
+  - `01-Metas/Biblioteca-de-Indicadores/Consorcios/scripts/stage_metrics_vigentes.py`
+  - `01-Metas/Biblioteca-de-Indicadores/Seguros/scripts/stage_metrics_vigentes_seg.py`
+- **Helper `build_especialista_mapping(card_yaml_path)`** em `m7_extract_utils.py`:
+  resolve bridge SQL especialista ler Card YAML em runtime e gerar mapping
+  `nome_assessor -> especialista` dinamicamente. Card vira SoT do mapping.
+  Companion: `render_especialista_cte_sql(mapping)` produz CTE ClickHouse.
+- **Secao "Campos opcionais para integracao com m7-ritual-gestao"** adicionada
+  em `configuring-cards/SKILL.md` (em 2026-05-06 anterior) e formalizada em
+  `configuring-cards/references/esp-perf-002-resumo.md` v1.2 com tabela de
+  todos os campos opcionais consumidos pelo `build_deck.py`.
+
+### Changed
+
+- **Formula `installment_amortization`** corrigida em `projecting-results/SKILL.md`:
+  - **Antes (errada — double-count):** `novas_vendas_funil = Vol_proj × commission/installments`
+    onde `Vol_proj` incluia lagging volume.
+  - **Agora (correta):** M0 usa `stage_probability_M0`; M+1 usa
+    `componente_funil_M+1` (= 0 no metodo "a" interim). NUNCA `lagging_volume`
+    no componente funil. Exemplo numerico Consorcios + tabela inputs por
+    vertical (CON: 0.035 / SEG: 0.50) incluidos.
+- **`projection-methodology.md`** atualizado:
+  - Secao 5.1 `pipeline_conversion_extended` (v1 — current/interim) com
+    `deprecated_reason` documentado.
+  - Secao 5.2 `pipeline_conversion_extended_v2` (target) com algoritmo
+    dia-a-dia + exemplo concreto (deal Prospeccao dia 20 entra em M+1).
+- **`volume_consorcio_mensal.yaml`** declarado v2 como `preferred: true`
+  (high confidence) com v1 demoted para `preferred: false` + `confidence: medium`
+  + `deprecated_reason`. Migracao gradual (`applicable: true` em ambos).
+- **`volume_consorcio_mensal.py`** swap `data_venda` → `data_competencia`
+  em todas as queries SQL `m7Bronze.consorcio_contratos`. Validacao runtime
+  pendente (confirmar coluna existe no DESCRIBE TABLE).
+- **`oportunidades_criadas_funil.py` + `_seg.py`** geram extras `historico_3m`
+  no output JSON (3 meses agregados N1 para uso em projecao M+1).
+- **`receita_consorcio_mensal.py` + `volume_consorcio_mensal.py`** refatorados
+  para gerar CTE `mapa_especialista` dinamicamente do Card YAML em runtime
+  (bridge SQL especialista — fix 2026-05-06). Resolve gaps anteriormente
+  cobertos via `Card.apresentacao.overrides_ritual.n5_by_esp` (22 entradas
+  manuais). Card v2.8.0 declara 12 assessores Douglas + 10 assessores Tereza
+  + 9 aliases (acentos, typos) → CTE com 31 entradas. Adiciona Waleska
+  (rodada 7), Pedro Araújo (alias Pedro Ramos), Káryne Bênutten (alias
+  Karyne Beuttenmüller), Luís Eduardo (alias Luiz Eduardo), Gustav0 Melo
+  (typo), Amanda Amarante (correcao typo "Amanda Marante" anterior).
+  Fallback hardcoded mantido se Card nao encontrado.
+- **`card-template.yaml`** template ampliado com exemplos comentados de
+  `metadata.{total_label, responsaveis_n2, assessor_aliases,
+  responsavel_externo_aliases}`, `kpi_references[].matrix_views[]`,
+  `kpi_references[].projecao.componentes[]` formais com `inputs[]`, e bloco
+  completo `apresentacao.*` com 8 campos opcionais.
+
+### Tracking
+
+- ISSUE #5 (M+1 Volume Lagging gap) — ATIVO ate validacao runtime do swap
+  data_competencia + integracao stage_metrics_vigentes na skill projecting-results.
+- Algoritmo dia-a-dia metodo "b" documentado mas ainda nao implementado em
+  codigo da skill projecting-results — proxima sessao.
+
+## [6.2.1] - 2026-05-05
+
+### Added
+- **Special-case `meta=0` + `direction: menor_melhor` (zero-target)** documentado em `consolidating-wbr/SKILL.md` Fase montagem do Painel: quando indicador tem `metas_ppi.qty: 0` com `direction: menor_melhor` (ex: `oportunidades_sem_atividade_planejada_funil[_seg]`), aplicar regra special-case ANTES da formula padrao `meta/max(real,1)×100`:
+  - `realizado == 0` → `pct = 100%` → status verde
+  - `realizado >= 1` → `pct = 0%` → status vermelho
+- Novo valor enum `metas_ppi_zero_target` em `regra_semaforo` do canonical JSON.
+
+### Changed
+- Cards CON v2.5.1, SEG WL v2.11.1, SEG RE v1.3.1 com `metas_ppi.oportunidades_sem_atividade_planejada_funil[_seg].qty: 0` (era `pendente`).
+
+## [6.2.0] - 2026-05-04 (noite)
+
+> **Minor release retrocompativel** — RESOLVE KNOWN_ISSUES.md ISSUE #1
+> (lagging_indicator matematicamente quebrado para receita). Introduz dois
+> novos metodos de projecao em `projecting-results/SKILL.md`:
+> `installment_amortization` (receita) e `pipeline_conversion_extended`
+> (volume). Ambos suportam horizons `[mes_corrente, mes_seguinte]`.
+
+### Added
+
+- **Metodo `installment_amortization`** documentado em `projecting-results/SKILL.md` Fase 2:
+  - Decompoe receita projetada em LAGGING (parcelas das vendas dos N-1 meses anteriores caindo no mes alvo, lidas do ledger ClickHouse) + NOVA (1a parcela das vendas que fecharao no mes alvo, derivada de Vol_proj × commission_rate / installments).
+  - Parametros: `commission_rate` (CON 0.035; SEG 0.50), `installments` (12), `source_ledger` (CON: `m7Bronze.consorcio_receita`; SEG: `m7Prata.seguro_comissao_assessor_fuzzy`), `source_funil.horizon_aware: true`, `commission_rate_by_produto` (override por mix Seguros).
+  - Substitui `lagging_indicator` (DEPRECADO 2026-05-04) que somava lag_weights=1.0 sem commission_rate, produzindo receita ≈ volume — bug critico documentado em KNOWN_ISSUES.md.
+
+- **Metodo `pipeline_conversion_extended`** documentado em `projecting-results/SKILL.md` Fase 2:
+  - Mes corrente: `Vol_Oport_Ativas × Taxa_Conversao_Mes` (snapshot simplificado).
+  - Mes seguinte: `(pipeline_residual_M0 + entradas_novas_3m_média) × Taxa_Conversao` (forward projection usando media historica de oportunidades_criadas).
+  - Substitui `pipeline_conversion` (stage_probability) que dependia de stage breakdown nao retornado pelos scripts atuais — DEPRECADO 2026-05-04.
+  - Suporta `filtro_squad` (`wl`/`re`) para Cards split.
+
+- **Horizons no output JSON** (`projection-by-especialista.json`): toda metrica projetada agora tem `projecao_mes_corrente` E `projecao_mes_seguinte` populados quando metodo preferido suporta (todos `installment_amortization` + `pipeline_conversion_extended`). Spec ja existia, agora implementacao garante populacao consistente.
+
+### Changed
+
+- **KNOWN_ISSUES.md ISSUE #1** marcado como **RESOLVIDO 2026-05-04** com pointer para os Cards/Indicadores/SKILL atualizados.
+- **`projecting-results/SKILL.md` Fase 2** ganha 2 novas secoes de metodo (`installment_amortization`, `pipeline_conversion_extended`) e marca `lagging_indicator` + `pipeline_conversion` como DEPRECADOS (skill IGNORA quando encontra `applicable: false, deprecated: true` nos YAMLs).
+
+### Migration notes
+
+- Cards CON N3 v2.4.0+, SEG WL N3 v2.10.0+, SEG RE N3 v1.2.0+ ja referenciam os novos metodos via `metodo_preferido` em `kpi_references[].projecao`.
+- Indicadores `receita_consorcio_mensal`, `volume_consorcio_mensal`, `receita_seguros_mensal`, `volume_seguros_mensal` atualizados com os novos metodos em `projection.methods` (preferred=true) e antigos marcados deprecated.
+- Pipeline G2.2 E5 (`projecting-results`) precisa rodar com a v6.2.0 para popular ambos horizons no canonical JSON. Cycles antigos rodados com 5.4.0/6.1.0 nao tem `projecao_mes_seguinte` — re-rodar E5 ou aceitar fallback gracioso (slide renderiza bar vazia para M+1).
+- m7-ritual-gestao >= 3.2.0 consome ambos horizons para renderizar Card Projecao com 6 bars (Receita + Volume × MTD/M0/M+1). Versoes anteriores ignoram silenciosamente.
+
+## [6.1.0] - 2026-05-04
+
+> **Minor release retrocompativel** — documenta o padrao novo de `metas_ppi` (com `pct_ativas_max` e subbloco `por_especialista`) e adiciona Fase 4.5 ao consolidating-wbr para derivar `pct_estagnadas_ativas` e popular `n2.{especialista}.meta` no canonical JSON. Cards CON N3 e SEG WL N3 ja adotaram o padrao em 2026-05-04. Nenhuma regressao de comportamento — pipeline existente continua funcional para Cards sem essas chaves.
+
+### Added
+
+- **`configuring-cards/SKILL.md` Passo 4.5** — documenta a estrutura completa de `metas_ppi:` no top-level do Card:
+  - Estrutura por PPI com `qty`/`volume`/`ticket_medio` no top-level (N1) + subbloco opcional `por_especialista:` para metas N2 individuais (usar quando KPIs por especialista divergem, como Seg WL Claudia=18 vs Tarcisio=15 ativas).
+  - Padrao especifico para `oportunidades_estagnadas_funil_*` com novo campo `pct_ativas_max` (% das ativas que sera o teto da meta de estagnadas, semaforo regra a, cap 200%, `direction: menor_melhor`).
+  - Metodologia de derivacao top-down via Little's Law a partir de Meta Receita + Meta Volume + Meta Taxa Conversao + Meta qty WON.
+  - Convencao para documentar inputs externos (FIX TEMPORARIO) em `nota:` quando colunas no banco ainda nao existem — link para `_estudo-metas-ppi/TODO-MIGRACAO.md`.
+- **`consolidating-wbr/SKILL.md` Fase 4.5.a** — derivacao automatica de `pct_estagnadas_ativas`:
+  - Para Cards com `metas_ppi.oportunidades_estagnadas_funil_*.pct_ativas_max` declarado, o agent cria entrada derivada `oportunidades_estagnadas_funil_*_pct_ativas` no canonical JSON.
+  - `realizado = qty_estagnadas / qty_ativas × 100` (calculado para N1 e cada N2).
+  - `meta = pct_ativas_max`, `direction: menor_melhor`, `regra_semaforo: metas_ppi_a_menor_melhor`.
+  - Entrada original de `oportunidades_estagnadas_funil_*` (qty) preservada como contextual sem semaforo proprio.
+- **`consolidating-wbr/SKILL.md` Fase 4.5.b** — leitura de `por_especialista` para popular meta N2:
+  - Para Cards com subbloco `por_especialista:` em qualquer chave de `metas_ppi.{ppi}`, o agent popula `n2.{especialista}.meta` no canonical JSON com `qty`/`volume`/`ticket_medio` correspondentes.
+  - Calcula `n2.{especialista}.pct` e `n2.{especialista}.status` aplicando regra de semaforo.
+  - Sem subbloco: comportamento atual preservado (so realizado N2, sem meta N2).
+- **Estudo `02-Controle/_estudo-metas-ppi/`** (referenciado no `configuring-cards`) com modelo reverso de funil (Little's Law) e checklist de migracao em `TODO-MIGRACAO.md`.
+
+### Migration notes
+
+- Cards CON N3 (v2.2.0) e SEG WL N3 (v2.8.0) ja adotaram o padrao em 2026-05-04.
+- O `m7-ritual-gestao` >= 3.0.0 consome essas chaves derivadas para renderizar o indicador Estagnadas com `% das ativas` como linha principal e meta N2 individual no Dashboard. Versoes anteriores do ritual ignoram silenciosamente.
+- Items 5/6 do `02-Controle/_estudo-metas-ppi/TODO-MIGRACAO.md` agora considerados implementados na pipeline (G2.2 E6 — consolidating-wbr).
+
+## [6.0.0] - 2026-04-30
+
+> **Major release** — `plano-de-acao.csv` descontinuado como SoT do Plano de Acao.
+> A SoT migrou para a lista ClickUp `pa-resultado` (id `901326795742`) acessada
+> via ClickUp MCP. Atualizar `m7-ritual-gestao` para `>= 2.0.0` na mesma janela.
+
+### Added
+
+- **E2 `collecting-data` ganha Fase 1.5 — Coleta do Plano de Acao via ClickUp MCP** (`mcp__claude_ai_ClickUp__*`):
+  - Tools usadas: `clickup_filter_tasks`, `clickup_get_custom_fields`, `clickup_get_task`
+  - Filtros canonicos aplicados:
+    - **Vertical** (custom field id `a7c7bc7c-2526-4083-9753-aa2103a08f53`) — option_value mapeado por vertical
+    - **Excluir subtasks** (`parent != null`) — subtasks pendentes viram nota descritiva no campo `subtasks_pendentes` da parent
+    - **Responsavel Externo** (custom field id `e44c8cff-7d0b-4074-84ae-c10c67b0a26d`) resolvido para nome real
+  - Output: `{cycle_folder}/dados/raw/clickup-tasks-{vertical}.json` com schema documentado em SKILL.md
+  - Custom fields adicionais auto-descobertos por nome (case-insensitive): `indicador_impactado`, `origem`, `receita_impacto`, `volume_impacto`
+- **Nova secao "Dependencias Externas (MCPs)"** no SKILL.md de E2 — documenta requisito de ClickUp MCP habilitado no projeto
+- **`oportunidades_estagnadas_funil.py` (CON) e `oportunidades_estagnadas_funil_seg.py` (SEG) ganham `agg_by_stage`** — paridade com `oportunidades_ativas_funil*.py`. Output JSON agora inclui linhas com `estagio = <nome>` em N1-N5 (alem das linhas totais com `estagio = None`). Permite Slide 9 do ritual identificar em quais estagios as estagnadas estao concentradas
+
+### Changed
+
+- **E4 `summarizing-actions` reescrita** — input mudou de `plano-de-acao.csv` para `dados/raw/clickup-tasks-{vertical}.json` (gerado em E2 Fase 1.5):
+  - Schema da skill atualizado com mapeamento legado CSV ↔ JSON ClickUp
+  - Bucketing de status mapeado para 3 buckets (ativa/concluida/cancelada) sobre statuses do ClickUp (case-insensitive)
+  - Classificacao "Sem prazo" adicionada (quando `due_date == null`) — flag de warning para exigir prazo no proximo ritual
+  - Campos `volume_impacto` e `receita_impacto` ja vem como `number` do JSON (sem necessidade de parse de "R$" como no CSV)
+  - Eficacia de acoes concluidas continua igual: cruza `indicador_impactado` com dados consolidados de E2
+- **Pre-requisitos de E2** — `CLICKUP_API_TOKEN` NAO e necessario (auth gerenciada pelo MCP); pre-requisito agora e "ClickUp MCP habilitado no projeto"
+
+### Removed / Deprecated
+
+- **`plano-de-acao.csv` descontinuado como SoT** — todas as referencias removidas do SKILL.md de `summarizing-actions`. Anti-patterns adicionados:
+  - "NUNCA leia `plano-de-acao.csv` local"
+  - "NUNCA chame a API ClickUp (MCP ou HTTP) diretamente desta skill — coleta e responsabilidade de E2"
+- **Indicador `volume_oportunidades_ativas_funil_seg` depreciado** — movido para `_Historico/` com sufixo `_ate-2026-04-30`. Volume das ativas SEG agora vem embutido no output de `oportunidades_ativas_funil_seg.py` (paridade com Consorcios refatorado em 2026-03-23). Card SEG atualizado: entrada `kpi_references[]` removida; criterio de desvio critico ajustado para usar `oportunidades_ativas_funil_seg.{quantidade,volume}`
+
+### Breaking Changes
+
+1. **E4 nao funciona mais sem E2 Fase 1.5 rodada antes** — quem rodar E4 esperando ler `plano-de-acao.csv` falha. Migracao: rodar E2 completo (incluindo Fase 1.5) antes de E4.
+2. **ClickUp MCP virou dependencia mandatory de E2** — sem ele, Fase 1.5 aborta. Verificar `desempenho/.claude/settings.local.json` permissions inclui `mcp__claude_ai_ClickUp__*`.
+3. **Schema do output de `oportunidades_estagnadas_funil*.py` mudou** — JSON agora inclui coluna `estagio` (com `None` para totais e nome do estagio para breakdowns N1-N5). Consumidores externos que parsavam o JSON antigo (sem `estagio`) precisam atualizar — o `decision-recorder` e o `material-generator` ja foram atualizados.
+4. **Indicador `volume_oportunidades_ativas_funil_seg` nao existe mais como indicador top-level** — pipelines/Cards externos que referenciavam esse indicator_id precisam migrar para `oportunidades_ativas_funil_seg.volume`.
+
+### Reference
+
+- `skills/collecting-data/SKILL.md` (Fase 1.5 nova, Dependencias Externas, anti-patterns ClickUp)
+- `skills/summarizing-actions/SKILL.md` (reescrita workflow Fases 1-5)
+- `skills/projecting-results/KNOWN_ISSUES.md` (issue #1 `lagging_indicator` quebrado para receita — sem fix nesta release; m7-ritual-gestao v2.0.0 suprime visualmente o card via regra v1.13)
+
+### Compatibility
+
+- **m7-ritual-gestao requerido**: `>= 2.0.0` (consome o JSON ClickUp em Slides 4 e 5; agent decision-recorder escreve via MCP)
+- **Snapshots de ciclos antigos** (`< 2026-04-30`) podem ter JSONs sem `estagio` em estagnadas — re-rodar `oportunidades_estagnadas_funil*.py` para popular
+
+---
+
+## [5.5.0] - 2026-04-29
+
+### Added
+- **Fase 6.5 em E5 `projecting-results`** — desagregacao de projecao por especialista (na hierarquia oficial, especialista = N3 — Douglas/Tereza/Claudia/Tarcisio; coordenador = N2 — Joel. Schemas legacy continuam usando label `N2-Especialista` — renomeacao esta fora de escopo desta versao):
+  - Para cada especialista em `apresentacao.responsaveis[]` (ou colunas de especialista dos dados consolidados), aplica os mesmos `projection.methods[]` do YAML em subsets de dados
+  - Resolve dependencias cruzadas tambem em nivel de especialista (ex: receita Douglas usa volume projetado Douglas)
+  - Calcula projecao do **mes corrente E mes seguinte** (antes calculava so o mes corrente em N1)
+  - Inclui linha "Sem Especialista" (bridge gap) com realizado mas sem projecao/meta
+- **Novo output `analise/projection-by-especialista.json`** — estrutura JSON com projecoes por especialista consumida pelo m7-ritual-gestao para renderizar mini-graficos no Slide 9 (Funil Pipeline)
+
+### Changed
+- Exit Criteria de E5 agora exige `projection-by-especialista.json` gerado (alem do `projection-report.md` existente)
+
+### Compatibility
+- Output novo e **complementar** ao `projection-report.md` (que continua focado em N1) — sem breaking change para consumidores existentes
+- m7-ritual-gestao v1.8.0+ consome o novo JSON; versoes anteriores ignoram
+
 ## [5.4.0] - 2026-04-02
 
 ### Changed

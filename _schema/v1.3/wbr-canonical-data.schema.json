@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://m7.com.br/schemas/wbr-canonical-data-v1.3.json",
+  "title": "WBR Canonical Data v1.3",
+  "description": "Schema do canonical WBR JSON emitido por E6 (consolidating-wbr Fase 4.5). Single Source of Truth para todos os artefatos do WBR (Estruturado MD, Narrativo MD, HTML, PDF, Slack DMs). Schema v1.3 (Item 3 follow-up Seguros-WL 2026-05-20, 2026-05-21): adicionado bloco analise_por_responsavel (riscos+alertas+acoes_sugeridas estruturadas por especialista ou canal — prepara payload para bot Telegram de alertas instantaneos); recomendacoes top-level (lista plana com prioridade+categoria); apresentacao.escopo_kpi (Item 4).",
+  "type": "object",
+  "required": ["_schema", "vertical", "data_referencia", "indicadores"],
+  "properties": {
+    "_schema": {
+      "type": "string",
+      "pattern": "^wbr-canonical-data v1\\.[0-3]$",
+      "description": "Versao do schema. v1.0 (legacy), v1.1 (2026-05-12: direction + por_canal + M+1), v1.2 (2026-05-18: causa_raiz_resumo + volume_estagnado + vol_em_risco + aggregation_rule + acoes), v1.3 (2026-05-21: analise_por_responsavel + recomendacoes + escopo_kpi)"
+    },
+    "_generated_at": {"type": "string", "format": "date-time"},
+    "vertical": {"type": "string"},
+    "data_referencia": {"type": "string", "format": "date"},
+    "checkpoint_label": {"type": "string"},
+    "meta": {
+      "type": "object",
+      "properties": {
+        "is_first_ritual_of_month": {"type": "boolean"},
+        "vertical": {"type": "string"},
+        "ciclo_label": {"type": "string"},
+        "snapshot_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "semaforo_resumo": {
+      "type": "object",
+      "properties": {
+        "verde": {"type": "integer", "minimum": 0},
+        "amarelo": {"type": "integer", "minimum": 0},
+        "vermelho": {"type": "integer", "minimum": 0},
+        "cinza_sem_meta": {"type": "integer", "minimum": 0},
+        "total_com_meta": {"type": "integer", "minimum": 0},
+        "total_indicadores": {"type": "integer", "minimum": 0}
+      }
+    },
+    "indicadores": {
+      "type": "object",
+      "description": "Dict de indicadores por id. Cada valor segue indicator_entry schema.",
+      "additionalProperties": {"$ref": "#/$defs/indicator_entry"}
+    },
+    "projecoes": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/projection_entry"}
+    },
+    "acoes": {
+      "$ref": "#/$defs/acoes_block",
+      "description": "Bloco emitido em v1.2+ (S2a B4.18) vindo do sidecar e4-acoes-{vertical}.json. v1.3: atrasadas DEVE ser list[task_item]; contagem em metricas_agregadas.atrasadas_count."
+    },
+    "diagnostico_principal": {
+      "type": "object",
+      "properties": {
+        "manchete": {"type": "string"},
+        "gap_principal": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "recomendacoes": {
+      "type": "array",
+      "description": "NOVO v1.3 — lista plana de recomendacoes. Cada item declara categoria e prioridade. Nunca dict de 3 categorias (regressao do ciclo Seguros-WL 2026-05-20 v2 fixed em v3).",
+      "items": {"$ref": "#/$defs/recomendacao_item"}
+    },
+    "analise_por_responsavel": {
+      "type": "object",
+      "description": "NOVO v1.3 — bloco estruturado de riscos+alertas+acoes sugeridas por responsavel (especialista ou canal). OBRIGATORIO quando Card tem N2 (especialistas) ou e PJ2 (canais). Key = nome especialista (Cons: Douglas, Tereza; Seg WL: Claudia, Tarcisio; Seg RE: Emmanuel, Samuel) OU nome canal (PJ2: Investimentos, Credito, Outros) conforme Card.apresentacao.dimensao_analise. Para CADA esp/canal com qualquer indicador semaforo:vermelho em painel.indicadores[*].n2[esp], analyst MUST emitir entrada com >=1 risco + >=1 acao_sugerida citando aquele indicador_id. Bot Telegram (memory project_telegram_bot_alertas) consome acoes_sugeridas[].descricao_curta para DMs por chat_id.",
+      "additionalProperties": {"$ref": "#/$defs/analise_responsavel"}
+    }
+  },
+  "$defs": {
+    "indicator_entry": {
+      "type": "object",
+      "properties": {
+        "tipo": {"type": "string", "examples": ["KPI", "PPI"]},
+        "label": {"type": "string"},
+        "unit": {"type": "string", "examples": ["BRL", "pct", "count", "ratio", "days"]},
+        "meta": {"type": ["number", "null"]},
+        "meta_label": {"type": ["string", "null"]},
+        "realizado": {"type": ["number", "null"]},
+        "realizado_label": {"type": ["string", "null"]},
+        "gap_abs": {"type": ["number", "null"]},
+        "gap_label": {"type": ["string", "null"]},
+        "pct_atingimento": {"type": ["number", "null"]},
+        "pct_label": {"type": ["string", "null"]},
+        "status": {"type": "string", "enum": ["verde", "amarelo", "vermelho", "cinza"]},
+        "status_emoji": {"type": "string"},
+        "direction": {"type": "string", "enum": ["maior_melhor", "menor_melhor"]},
+        "regra_semaforo": {
+          "type": "string",
+          "enum": [
+            "kpi_padrao_95_80",
+            "metas_ppi_a_maior_melhor",
+            "metas_ppi_a_menor_melhor",
+            "metas_ppi_zero_target",
+            "metas_ppi_pendente",
+            "sem_meta_formal"
+          ]
+        },
+        "escopo_kpi": {
+          "type": "string",
+          "enum": ["n1_escritorio", "n2_squad"],
+          "description": "NOVO v1.3 (Item 4 follow-up) — opcional; carregado do Card.apresentacao.escopo_kpi. Quando 'n1_escritorio', validate-painel Regra 38b downgrade FALHA -> INFO (gap N1-n2 esperado pois Outros M7 nao rastreado em n2)."
+        },
+        "causa_raiz_resumo": {
+          "type": ["string", "null"],
+          "maxLength": 300,
+          "description": "1-2 frases sintetizando causa-raiz."
+        },
+        "n2": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "realizado": {"type": ["number", "null"]},
+              "meta": {"type": ["number", "null"]},
+              "pct": {"type": ["number", "null"]},
+              "status": {"type": "string", "enum": ["verde", "amarelo", "vermelho", "cinza", "mute"]},
+              "volume_estagnado": {"type": ["number", "null"]},
+              "causa_raiz_resumo": {"type": ["string", "null"], "maxLength": 300}
+            }
+          }
+        },
+        "vol_em_risco": {"type": ["number", "null"]},
+        "por_canal": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "qty": {"type": ["number", "integer", "null"]},
+              "vol": {"type": ["number", "null"]},
+              "qty_won": {"type": ["number", "integer", "null"]},
+              "pct_ativas": {"type": ["number", "null"]}
+            }
+          }
+        },
+        "aggregation_rule_applied": {"type": "boolean"},
+        "rows": {"type": "array"},
+        "riscos_principais": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/narrative_item_rico"}
+        },
+        "destaques_positivos": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/narrative_item_rico"}
+        },
+        "anomalias": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/anomalia_item"}
+        }
+      }
+    },
+    "projection_entry": {
+      "type": "object",
+      "properties": {
+        "M0": {"$ref": "#/$defs/projection_horizon"},
+        "M+1": {"$ref": "#/$defs/projection_horizon"}
+      }
+    },
+    "projection_horizon": {
+      "type": "object",
+      "properties": {
+        "meta_mes": {"type": ["number", "null"]},
+        "base": {"type": ["number", "null"]},
+        "pessimista": {"type": ["number", "null"]},
+        "otimista": {"type": ["number", "null"]},
+        "classificacao": {"type": "string"}
+      }
+    },
+    "acoes_block": {
+      "type": "object",
+      "properties": {
+        "criticas": {"type": "array", "items": {"$ref": "#/$defs/task_item"}},
+        "atrasadas": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/task_item"},
+          "description": "v1.3 (Item 3 follow-up): SEMPRE list[task_item]. Contagem em metricas_agregadas.atrasadas_count."
+        },
+        "em_dia_priorizadas": {"type": "array", "items": {"$ref": "#/$defs/task_item"}},
+        "concluidas_eficazes": {"type": "array", "items": {"$ref": "#/$defs/task_item"}},
+        "metricas_agregadas": {
+          "type": "object",
+          "properties": {
+            "atrasadas_count": {
+              "type": "integer",
+              "description": "v1.3 — contagem dedicada de tasks atrasadas (era usado erroneamente para acoes.atrasadas no ciclo v2)."
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "task_item": {
+      "type": "object",
+      "required": ["id", "name", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "status": {"type": "string"},
+        "priority": {"type": ["string", "null"]},
+        "due_date": {"type": ["string", "null"]},
+        "date_created": {"type": ["string", "null"]},
+        "date_updated": {"type": ["string", "null"]},
+        "date_closed": {"type": ["string", "null"]},
+        "responsavel_externo": {"type": ["string", "null"]},
+        "indicador_impactado": {"type": ["string", "null"]},
+        "origem": {"type": ["string", "null"]},
+        "receita_impacto": {"type": ["number", "null"]},
+        "volume_impacto": {"type": ["number", "null"]},
+        "criada_em_ritual_anterior": {"type": "boolean"},
+        "aging_dias": {"type": ["integer", "null"]},
+        "dias_restantes": {"type": ["integer", "null"]},
+        "eficacia": {
+          "type": ["string", "null"],
+          "enum": ["eficaz", "parcial", "sem_efeito", "dados_insuficientes", null]
+        },
+        "url": {"type": "string"},
+        "is_evidencia_e3": {"type": "boolean"}
+      }
+    },
+    "narrative_item_rico": {
+      "type": "object",
+      "required": ["titulo", "texto"],
+      "properties": {
+        "titulo": {"type": "string"},
+        "texto": {"type": "string"},
+        "causa": {"type": "string"},
+        "impacto": {"type": "string"},
+        "owner": {"type": "string"},
+        "prazo": {"type": "string", "format": "date"}
+      }
+    },
+    "anomalia_item": {
+      "type": "object",
+      "required": ["descricao"],
+      "properties": {
+        "descricao": {"type": "string"},
+        "acao": {"type": "string"}
+      }
+    },
+    "recomendacao_item": {
+      "type": "object",
+      "required": ["titulo", "descricao", "prioridade", "categoria"],
+      "properties": {
+        "titulo": {"type": "string"},
+        "descricao": {"type": "string"},
+        "responsavel": {"type": "string"},
+        "prazo": {"type": "string"},
+        "prioridade": {"type": "string", "enum": ["alta", "media", "baixa"]},
+        "categoria": {"type": "string", "enum": ["contramedida", "escalonamento", "ajuste_meta"]}
+      }
+    },
+    "analise_responsavel": {
+      "type": "object",
+      "required": ["dimensao", "indicadores_vermelhos", "riscos", "alertas", "acoes_sugeridas"],
+      "properties": {
+        "dimensao": {
+          "type": "string",
+          "enum": ["especialista", "canal"],
+          "description": "Tipo do responsavel — vem do Card.apresentacao.dimensao_analise."
+        },
+        "indicadores_vermelhos": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Lista de indicator_ids com semaforo:vermelho para este responsavel."
+        },
+        "riscos": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/risco_item"},
+          "description": "Riscos identificados para este responsavel. Validate-painel Regra 50: >=1 risco para cada indicador em indicadores_vermelhos."
+        },
+        "alertas": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/alerta_item"},
+          "description": "Alertas operacionais (limites violados) para este responsavel."
+        },
+        "acoes_sugeridas": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/acao_sugerida_item"},
+          "description": "Acoes concretas DM-ready (descricao_curta <=200 chars) para o bot Telegram enviar instantaneamente. Validate-painel Regra 50: >=1 acao por indicador em indicadores_vermelhos."
+        }
+      }
+    },
+    "risco_item": {
+      "type": "object",
+      "required": ["tipo", "descricao", "indicador_origem", "severidade"],
+      "properties": {
+        "tipo": {
+          "type": "string",
+          "description": "Codigo do tipo: estagnadas_alto | criadas_baixo | ativas_baixo | conversao_baixa | concentracao_receita | cobertura_zerados | mega_prospect_sem_assessor | escopo_subdimensionado | ..."
+        },
+        "descricao": {"type": "string"},
+        "indicador_origem": {
+          "type": "string",
+          "description": "indicator_id do indicador vermelho que disparou o risco. Validate-painel Regra 50."
+        },
+        "valor_observado": {"description": "Valor numerico observado (qty, BRL, pct)."},
+        "limite_referencia": {
+          "type": "string",
+          "description": "Banda fixa ou meta usada como referencia (ex: '40% ativas', 'meta R$ 135K')."
+        },
+        "severidade": {"type": "string", "enum": ["alta", "media", "baixa"]},
+        "cross_indicators": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/cross_indicator_item"},
+          "description": "Indicadores relacionados que ajudam a entender causa/consequencia. Validate-painel Regra 51: >=2 quando indicador_origem e PPI funil (criadas/ativas/estagnadas/conversao)."
+        }
+      }
+    },
+    "alerta_item": {
+      "type": "object",
+      "required": ["tipo", "descricao", "indicador_origem"],
+      "properties": {
+        "tipo": {"type": "string"},
+        "descricao": {"type": "string"},
+        "indicador_origem": {"type": "string"},
+        "acao_imediata": {
+          "type": "string",
+          "description": "Acao imediata sugerida (curta, imperativa)."
+        }
+      }
+    },
+    "acao_sugerida_item": {
+      "type": "object",
+      "required": ["descricao_curta", "indicador_origem", "prioridade"],
+      "properties": {
+        "descricao_curta": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Mensagem DM-friendly para bot Telegram. Cita indicador + numero + acao concreta. <=200 chars."
+        },
+        "descricao_completa": {
+          "type": "string",
+          "description": "Versao expandida para deck/ata."
+        },
+        "indicador_origem": {"type": "string"},
+        "prazo": {"type": "string"},
+        "prioridade": {"type": "string", "enum": ["alta", "media", "baixa"]}
+      }
+    },
+    "cross_indicator_item": {
+      "type": "object",
+      "required": ["indicador", "relacao"],
+      "properties": {
+        "indicador": {"type": "string", "description": "indicator_id do indicador relacionado."},
+        "valor": {"description": "Valor observado do indicador relacionado."},
+        "semaforo": {"type": "string", "enum": ["verde", "amarelo", "vermelho", "cinza"]},
+        "relacao": {
+          "type": "string",
+          "enum": ["causa_provavel", "consequencia", "amplifica", "compensa"],
+          "description": "Como o indicador relacionado se conecta ao indicador_origem do risco."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Briefing do Condutor — Ritual {{NIVEL}} {{VERTICAL}} — {{CICLO}} ({{DATA_RITUAL}})</title>
+<style>
+  @page { size: A4; margin: 24mm 20mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 15px; }
+  body {
+    font-family: "twkEverett", "Segoe UI", Arial, sans-serif;
+    color: #424135;
+    line-height: 1.6;
+    max-width: 750px;
+    margin: 0 auto;
+    padding: 40px 32px;
+    background: #fff;
+  }
+  h1 { font-size: 28px; font-weight: 700; color: #424135; margin-bottom: 4px; }
+  h2 { font-size: 14px; font-weight: 400; color: #424135; margin-bottom: 24px; }
+  .disclaimer {
+    background: #f6f5f0;
+    border-left: 3px solid #c5c49a;
+    padding: 12px 16px;
+    font-style: italic;
+    font-size: 13px;
+    color: #79755c;
+    margin-bottom: 32px;
+    line-height: 1.5;
+  }
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #424135;
+    margin: 36px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #eef77c;
+  }
+  .subsection-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #424135;
+    margin: 24px 0 12px;
+  }
+  p { margin-bottom: 12px; font-size: 14px; }
+  .label-bold { font-weight: 700; }
+  .label-subtitle { font-size: 13px; font-weight: 700; color: #424135; margin-bottom: 4px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 16px; font-size: 13px; }
+  thead th {
+    background: #424135;
+    color: #fffdef;
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 12px;
+  }
+  tbody td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #e8e8e4;
+    vertical-align: top;
+  }
+  tbody tr:hover { background: #fafaf6; }
+  td.bold { font-weight: 700; }
+
+  /* Question blocks */
+  .question-block {
+    background: #fff;
+    border: 1px solid #e8e8e4;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .question-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #79755c;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .question-text {
+    font-size: 14px;
+    color: #424135;
+    font-style: italic;
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+  .question-redirect {
+    font-size: 13px;
+    color: #424135;
+    padding-left: 12px;
+    border-left: 3px solid #e40014;
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+  .question-redirect strong { color: #e40014; }
+
+  /* Armadilha blocks */
+  .trap-block {
+    background: #fffdf5;
+    border-left: 4px solid #FFC107;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 0 6px 6px 0;
+  }
+  .trap-title { font-size: 14px; font-weight: 700; color: #424135; margin-bottom: 4px; }
+  .trap-body { font-size: 13px; color: #424135; line-height: 1.5; }
+  .trap-redirect { font-size: 13px; font-weight: 700; color: #79755c; margin-top: 6px; }
+
+  /* Decision blocks */
+  .decision-block {
+    background: #fff;
+    border: 1px solid #d0d0cc;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    border-left: 4px solid #e40014;
+  }
+  .decision-title { font-size: 14px; font-weight: 700; color: #424135; margin-bottom: 6px; }
+  .decision-body { font-size: 13px; color: #424135; line-height: 1.5; }
+  .decision-meta { font-size: 12px; color: #79755c; margin-top: 4px; }
+  .decision-consequence { font-size: 12px; color: #e40014; font-weight: 500; margin-top: 6px; }
+
+  /* Roteiro blocks */
+  .roteiro-block {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    background: #f6f5f0;
+    border-radius: 6px;
+  }
+  .roteiro-time {
+    font-size: 12px;
+    font-weight: 700;
+    color: #79755c;
+    white-space: nowrap;
+    min-width: 80px;
+  }
+  .roteiro-content { font-size: 13px; color: #424135; line-height: 1.5; }
+  .roteiro-content strong { color: #424135; }
+  .roteiro-content ul { margin: 6px 0 0 18px; padding: 0; }
+  .roteiro-content li { font-size: 13px; color: #424135; margin-bottom: 3px; }
+  .roteiro-expected { font-size: 12px; color: #79755c; margin-top: 6px; font-style: italic; }
+
+  /* Footer */
+  .footer {
+    margin-top: 40px;
+    padding-top: 12px;
+    border-top: 1px solid #d0d0cc;
+    font-size: 12px;
+    color: #79755c;
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  hr { border: none; border-top: 1px solid #e8e8e4; margin: 24px 0; }
+
+  @media print {
+    body { padding: 0; max-width: none; }
+    .question-block, .trap-block, .decision-block, .roteiro-block { break-inside: avoid; }
+    .section-title { break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Briefing do Condutor &mdash; Ritual {{NIVEL}} {{VERTICAL}}</h1>
+<h2>{{DATA_RITUAL}} &middot; Coordenador: {{CONDUTOR}} &middot; Participantes: {{LISTA_PARTICIPANTES}}</h2>
+
+<div class="disclaimer">
+  Guia estrategico para conducao do ritual. Quem conduz NAO analisa &mdash; os dados estao no deck. Este guia diz como USAR esses dados.
+</div>
+
+<!-- ========== 1. VEREDICTO ========== -->
+<div class="section-title">1. Veredicto</div>
+
+<p>{{FRASE_1_SITUACAO_GERAL}} {{FRASE_2_RISCO_OCULTO_PELO_SEMAFORO}}</p>
+
+<p>{{FRASE_3_DECISAO_ALVO_DA_REUNIAO}}</p>
+
+<!-- ========== 2. O QUE PROVOCAR ========== -->
+<div class="section-title">2. O Que Provocar</div>
+
+<!--
+  Para cada interlocutor i = 1..M (LISTA_PARTICIPANTES), gerar:
+    <div class="subsection-title">Para {{NOME_INTERLOCUTOR_i}}</div>
+    Para cada pergunta X = A,B,C... do interlocutor i (2-4 perguntas):
+      <div class="question-block">
+        <div class="question-label">Pergunta {{NUM_PERGUNTA_iX}} &mdash; {{TITULO_PERGUNTA_iX}}</div>
+        <div class="question-text">"{{PERGUNTA_DIRETA_iX}}"</div>
+        <div class="question-redirect"><strong>Nao aceite:</strong> {{NAO_ACEITE_iX}}</div>
+        <div class="question-redirect"><strong>Contexto:</strong> {{REDIRECIONAMENTO_iX}}</div>
+      </div>
+  Bloco de exemplo abaixo (interlocutor 1, pergunta A) serve de modelo estrutural:
+-->
+
+<div class="subsection-title">Para {{NOME_INTERLOCUTOR_1}}</div>
+
+<div class="question-block">
+  <div class="question-label">Pergunta 1 &mdash; {{TITULO_PERGUNTA_1A}}</div>
+  <div class="question-text">"{{PERGUNTA_DIRETA_1A}}"</div>
+  <div class="question-redirect"><strong>Nao aceite:</strong> {{NAO_ACEITE_1A}}</div>
+  <div class="question-redirect"><strong>Contexto:</strong> {{REDIRECIONAMENTO_1A}}</div>
+</div>
+
+<!-- {{BLOCOS_PROVOCAR}} -- agente clona question-block acima por pergunta, subsection-title por interlocutor -->
+
+<!-- ========== 3. ARMADILHAS ========== -->
+<div class="section-title">3. Armadilhas da Reuniao</div>
+
+<!--
+  Para cada armadilha j = 1..K (3-4 tipico), gerar:
+    <div class="trap-block">
+      <div class="trap-title">Armadilha {{j}} &mdash; "{{FRASE_TIPICA_ARMADILHA_j}}"</div>
+      <div class="trap-body">Sinal observado: {{SINAL_NO_WBR_j}}</div>
+      <div class="trap-redirect">Redirecione: {{REDIRECIONAMENTO_GERAL_j}}</div>
+    </div>
+  Bloco de exemplo abaixo (armadilha 1) serve de modelo estrutural:
+-->
+
+<div class="trap-block">
+  <div class="trap-title">Armadilha 1 &mdash; "{{FRASE_TIPICA_ARMADILHA_1}}"</div>
+  <div class="trap-body">Sinal observado: {{SINAL_NO_WBR_1}}</div>
+  <div class="trap-redirect">Redirecione: {{REDIRECIONAMENTO_GERAL_1}}</div>
+</div>
+
+<!-- {{BLOCOS_ARMADILHAS}} -- agente clona trap-block acima por armadilha (incluir 3-4 no total) -->
+
+<!-- ========== 4. DECISOES ========== -->
+<div class="section-title">4. Decisoes Que Precisam Sair</div>
+
+<!--
+  Para cada decisao d = 1..D (1-4), gerar:
+    <div class="decision-block">
+      <div class="decision-title">Decisao {{d}} &mdash; {{TITULO_DECISAO_d}}</div>
+      <div class="decision-body">Formato: {{FORMA_BINARIA_d}}</div>
+      <div class="decision-meta"><strong>Owner:</strong> {{OWNER_d}} &middot; <strong>Prazo:</strong> {{PRAZO_d}}</div>
+      <div class="decision-consequence">Se nao decidir: {{CONSEQUENCIA_d}}</div>
+    </div>
+  Bloco de exemplo abaixo (decisao 1) serve de modelo estrutural:
+-->
+
+<div class="decision-block">
+  <div class="decision-title">Decisao 1 &mdash; {{TITULO_DECISAO_1}}</div>
+  <div class="decision-body">Formato: {{FORMA_BINARIA_1}}</div>
+  <div class="decision-meta"><strong>Owner:</strong> {{OWNER_1}} &middot; <strong>Prazo:</strong> {{PRAZO_1}}</div>
+  <div class="decision-consequence">Se nao decidir: {{CONSEQUENCIA_1}}</div>
+</div>
+
+<!-- {{BLOCOS_DECISOES}} -- agente clona decision-block acima por decisao (D = 1..4) -->
+
+<!-- ========== 5. ROTEIRO ========== -->
+<div class="section-title">5. Roteiro</div>
+
+<!--
+  Estrutura padrao: 1 bloco Visao Geral + N blocos por especialista + 1 bloco Encerramento.
+  Default duracoes: 10 + 25*N + 5 (faixa permitida 50-90 min).
+  Calcular intervalos de tempo cumulativos (ex: [0-10], [10-35], [35-60], [60-65]).
+-->
+
+<div class="roteiro-block">
+  <div class="roteiro-time">[0-{{DUR_VISAO_GERAL}} min]</div>
+  <div class="roteiro-content">
+    <strong>Visao Geral</strong><br>
+    {{INTENCAO_VISAO_GERAL}}
+  </div>
+</div>
+
+<!--
+  Para cada especialista e = 1..N, gerar bloco abaixo:
+    <div class="roteiro-block">
+      <div class="roteiro-time">[{{INICIO_e}}-{{FIM_e}} min]</div>
+      <div class="roteiro-content">
+        <strong>Bloco {{ESPECIALISTA_e}}</strong><br>
+        <em>Intencao:</em> {{INTENCAO_ESPECIALISTA_e}}
+        <ul>
+          <li><strong>Dashboard:</strong> {{ITEM_DASHBOARD_e}}</li>
+          <li><strong>Analise:</strong> {{ITEM_ANALISE_e}}</li>
+          <li><strong>Funil:</strong> {{ITEM_FUNIL_e}}</li>
+        </ul>
+        <div class="roteiro-expected">Saida obrigatoria: {{SAIDA_OBRIGATORIA_e}}.</div>
+      </div>
+    </div>
+  Bloco de exemplo abaixo (especialista 1) serve de modelo estrutural:
+-->
+
+<div class="roteiro-block">
+  <div class="roteiro-time">[{{INICIO_E1}}-{{FIM_E1}} min]</div>
+  <div class="roteiro-content">
+    <strong>Bloco {{ESPECIALISTA_1}}</strong><br>
+    <em>Intencao:</em> {{INTENCAO_ESPECIALISTA_1}}
+    <ul>
+      <li><strong>Dashboard:</strong> {{ITEM_DASHBOARD_1}}</li>
+      <li><strong>Analise:</strong> {{ITEM_ANALISE_1}}</li>
+      <li><strong>Funil:</strong> {{ITEM_FUNIL_1}}</li>
+    </ul>
+    <div class="roteiro-expected">Saida obrigatoria: {{SAIDA_OBRIGATORIA_1}}.</div>
+  </div>
+</div>
+
+<!-- {{BLOCOS_ROTEIRO_ESPECIALISTAS}} -- agente clona roteiro-block acima por especialista (N especialistas total) -->
+
+<div class="roteiro-block">
+  <div class="roteiro-time">[{{INICIO_ENC}}-{{FIM_ENC}} min]</div>
+  <div class="roteiro-content">
+    <strong>Decisoes e Encerramento</strong><br>
+    {{INTENCAO_ENCERRAMENTO}}
+    <div class="roteiro-expected">Total: {{DUR_TOTAL}} min &mdash; alinhado com slide 2 da apresentacao ({{COMPOSICAO_AGENDA}}).</div>
+  </div>
+</div>
+
+<div class="footer">
+  Briefing gerado por m7-ritual-gestao (G2.3-E2) em {{DATA_RITUAL}}.<br>
+  Fonte: wbr-{{VERTICAL_LOWER}}-{{DATA_WBR}}.md + {{CARD_FILENAME}} (briefing_customization {{VERSAO_BRIEFING}}).<br>
+  Materiais: ritual-{{VERTICAL_LOWER}}-{{DATA_WBR}}.html + briefing-{{VERTICAL_LOWER}}-{{DATA_WBR}}.md
+</div>
+
+</body>
+</html>

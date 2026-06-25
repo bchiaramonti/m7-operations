@@ -1,0 +1,19 @@
+# Secrets — NUNCA versionar
+.env
+.env.local
+.env.*.local
+credentials/
+
+# Outputs locais de skills (artefatos finais ficam em desempenho/03-Rituais/)
+output/
+**/*.preview.json
+**/distribution-preview-*.json
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Node (recording-decisions/scripts/node_modules/ ja committed; ignorar outros)
+**/node_modules/.cache/

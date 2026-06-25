@@ -109,6 +109,99 @@ Para cada KPI principal:
 
 **Cada passo da sequencia_analise deve ter**: `step`, `acao`, `pergunta_chave`.
 
+### Passo 4.5: Definir `metas_ppi` (PPIs de funil)
+
+O bloco `metas_ppi:` no top-level do Card declara metas dos PPIs de funil que recebem semaforo (regra a — verde >=100% / amarelo 70-99% / vermelho <70%, com cap 200% para `direction: menor_melhor`). Padrao consolidado em 2026-05-04 (Cons + Seg WL):
+
+**Estrutura por PPI (vertical-level + N2 opcional):**
+
+```yaml
+metas_ppi:
+  <indicator_id>:
+    qty: <int>          # N1 = SUM dos especialistas (ou unico valor se KPIs iguais)
+    volume: <int>       # opcional, idem
+    ticket_medio: <int> # opcional, idem
+    direction: maior_melhor | menor_melhor
+    por_especialista:   # OPCIONAL — usar quando KPIs N2 divergem
+      "<Especialista 1>":
+        qty: <int>
+        volume: <int>
+        ticket_medio: <int>
+      "<Especialista 2>":
+        qty: <int>
+        ...
+    nota: >
+      Origem dos numeros (manual/banco), formula de derivacao quando aplicavel,
+      e migration path se for fix temporario.
+```
+
+**Quando usar `por_especialista`:**
+- Especialistas com KPIs (Receita/Volume) iguais (ex: Cons Douglas/Tereza com 50/50 do escritorio): NAO precisa, valor unico no top-level basta.
+- Especialistas com KPIs divergentes (ex: Seg WL Claudia vs Tarcisio com squads diferentes): OBRIGATORIO `por_especialista` para que o consolidating-wbr (E6 Fase 4.5.b) popule `n2.{esp}.meta` com a meta individual.
+
+**Padrao especifico — `oportunidades_estagnadas_funil_*`:**
+
+Este PPI sofreu mudanca estrutural de semaforo (qty -> % das ativas). Estrutura canonica:
+
+```yaml
+oportunidades_estagnadas_funil_*:
+  qty: <int>                  # contextual N1 (sem semaforo proprio; referencia P50 baseline)
+  pct_ativas_max: <int>       # meta com semaforo (estagnadas/ativas x 100, em pct 0-100)
+  direction: menor_melhor
+  nota: >
+    Composicao:
+      - Qtd: contextual (sem semaforo)
+      - % das ativas: COM meta (pct_ativas_max) e semaforo (regra a, cap 200%)
+      - Volume estagnado: sub-label (sem meta)
+      - Media de dias: sub-label (sem meta)
+```
+
+O `consolidating-wbr` (E6 Fase 4.5.a) deriva automaticamente `oportunidades_estagnadas_funil_*_pct_ativas` no canonical JSON, com `realizado = qty_estagnadas / qty_ativas x 100` e `meta = pct_ativas_max`. Nao e preciso script Python adicional na coleta (E2) — derivacao vive no consolidate.
+
+**Metodologia de derivacao top-down (Little's Law) para metas de funil:**
+
+Quando uma vertical tiver Meta Receita + Meta Volume + Meta Taxa Conversao + Meta qty WON disponiveis (do banco ou manual), os PPIs de funil podem ser derivados matematicamente:
+
+- `opps_fechadas_mes = qty_won / c`
+- `T_ciclo_meses = T_ciclo_dias / 30.4375`
+- `opps_ativas_medio = opps_fechadas_mes x T_ciclo_meses` (Little's Law)
+- `vol_opps_ativas = opps_ativas_medio x ticket_pipeline_medio` (ticket_pipeline da baseline)
+- `opps_criadas_mes = opps_fechadas_mes` (regime estacionario)
+- `pct_ativas_max` = decisao de gestao informada por baseline P75/P90 (estagnadas/ativas)
+
+Referencia: `02-Controle/_estudo-metas-ppi/modelo-reverso-funil.md` (estudo de Maio/2026).
+
+**Inputs externos atuais (FIX TEMPORARIO):**
+
+Algumas metas vem de fontes manuais enquanto colunas no banco nao existem. Documentar **sempre** em `nota:` do PPI:
+- O que e (manual/Excel/etc.)
+- Onde virá no banco quando coluna for criada
+- Tracking em `_estudo-metas-ppi/TODO-MIGRACAO.md`
+
+**Opt-in da tabela SoT `m7Prata.ciclo_metas_ppi` (2026-06-12):**
+
+As metas mensais de PPI de funil agora vivem na tabela `m7Prata.ciclo_metas_ppi` (carga TI 2026-05-27; N1 + N2 por especialista/canal, 12 meses). Para que o pipeline LEIA a meta da tabela em vez do hardcode, declare `fonte:` no PPI — o numero no Card vira **cache** (fallback offline) e a tabela vira SoT:
+
+```yaml
+metas_ppi:
+  oportunidades_ativas_funil_seg_wl:
+    qty: 7              # CACHE (snapshot do SoT; usado se ClickHouse offline)
+    volume: 317558      # CACHE
+    direction: maior_melhor
+    fonte: m7Prata.ciclo_metas_ppi    # <- opt-in: E6 Fase 4.5.h injeta o valor da tabela
+    por_especialista:                 # CACHE N2 (idem)
+      "Claudia Moraes": { qty: 3, volume: 139129 }
+      "Tarcisio Catunda": { qty: 4, volume: 178429 }
+```
+
+Como funciona o opt-in:
+- `inject_metas_ppi.py` (E6 Fase 4.6, main thread) substitui `meta`/`meta_volume`/`n2.{esp}.meta` no canonical pelo valor da tabela e recalcula semaforo. Sem `fonte:`, NO-OP (cache do Card vale).
+- `build_deck.py` defere ao canonical (= tabela) para PPIs com `fonte: ciclo_metas_ppi`; sem isso, o Card continua vencendo.
+- **ESCOPO: declarar `fonte:` APENAS em PPIs de unidade count/BRL** — `oportunidades_ativas_funil*` (qty+volume), `oportunidades_criadas_funil*`, `oportunidades_sem_atividade_planejada_funil*`. **NAO** declarar em ratio/days (`taxa_conversao`, `tempo_de_ciclo`, `oportunidades_estagnadas*` pct): sao constantes de gestao identicas em Card e tabela, com unidade inconsistente no canonical (percent vs ratio) e naming WL/RE divergente — o inject as PULA e o gate do build_deck nao deve deferir (evita corrupcao de unidade). A substancia da migracao e o `ativas` (formula corrigida).
+- **Antes de declarar `fonte:`**, rode `consolidating-wbr/scripts/compare_metas_card_vs_tabela.py --vertical <v>` e revise divergencias >5% (a tabela usa a formula corrigida de `ativas` = won/(sem×c); valores caem vs o hardcode antigo — comportamento esperado).
+- Cada Card filtra so o seu squad: Seg WL e RE compartilham `vertical='Seg'` mas resolvem N1=SUM(squad) distinto. PJ2 e por canal (`canal_pj2`), nao por especialista (pendente — build_deck_pj2).
+- Cobertura da tabela: 7 PPIs de funil (Cons/Seg) + receitas PJ2. Receita/Volume/Qty/Ticket MENSAIS de Cons/Seg seguem na tabela universal `dashboard_componente_universal` (fonte distinta).
+
 ### Passo 5: Configurar Distribuicao
 
 - Destinatarios: cargo, escopo de niveis visiveis, foco
@@ -180,3 +273,70 @@ Transicoes validas:
 - NUNCA crie arvore com mais de 2 niveis de profundidade abaixo do KPI principal
 - NUNCA pule a validacao ao criar ou editar — Modo 2 e pos-processamento obrigatorio
 - NUNCA delete Cards — archive com motivo para rastreabilidade
+
+---
+
+## Campos opcionais para integracao com m7-ritual-gestao (preparing-materials)
+
+A skill `m7-ritual-gestao:preparing-materials` (G2.3-E2) consome campos
+**adicionais** sob `apresentacao.*` e em `kpi_references[].matrix_views[].*`.
+Todos sao opcionais — ausentes = comportamento legado. Ver schema completo
+em [m7-ritual-gestao/skills/preparing-materials/references/card-apresentacao-schema.md](../../../../m7-ritual-gestao/skills/preparing-materials/references/card-apresentacao-schema.md).
+
+### `apresentacao.*` (lido pelo build_deck.py)
+
+```yaml
+apresentacao:
+  responsaveis:               # squad whitelist por especialista (zero-fill no ranking)
+    - nome: "Douglas Silva"
+      squad: ["Amanda Amarante", "Pedro Ramos", ...]
+  overrides_ritual:           # override realizado/meta de N1/N2/N5 do ciclo
+    ciclo: "..."              # bate com wbr.metadata.ciclo
+    indicadores: { ... }      # inclui n5_by_esp para sobrepor dados_n5
+  projecao_proximo_mes:       # metas M+1 quando WBR data JSON nao trouxer
+  projection_overrides:       # projecoes recalculadas pos-override (metodo "a-fix")
+  suppress_in_ritual:         # filter keywords pra Slide 12 (anomalias/destaques/recomendacoes stale)
+  destaques_positivos_custom: # destaques sob medida prepended ao Slide 12 Sinais Positivos
+  anomalias_custom:           # anomalias sob medida prepended ao Slide 12 Top Riscos
+  recomendacoes_custom:       # recomendacoes sob medida prepended ao Slide 12 Encerramento (apenas prioridade=alta)
+  pa_manual_append:           # task IDs ClickUp anexadas manualmente ao Slide 5
+```
+
+### `metadata.*` (alem do schema ESP-PERF-002 padrao)
+
+```yaml
+metadata:
+  total_label: "M7 Total"     # label da coluna Total na Matriz (substitui "{nivel} Total")
+  responsaveis_n2: [ ... ]    # fallback de esp_list para o deck
+  assessor_aliases: { ... }   # dedupe manual (lookup case-insensitive via slugify)
+  responsavel_externo_aliases: { ... }  # expansao multi-owner Slide 5
+```
+
+### `kpi_references[].matrix_views[].*` extensao
+
+```yaml
+matrix_views:
+  - label: ...
+    compute_meta: "..."        # formula da meta quando view usa compute (ex: meta_volume / meta_qty)
+    n2_compute_meta: "..."     # idem N2
+    sem_esp_ratio:             # derivacao Sem Esp para pct cross-indicator
+      numerator: { indicator, n1_path, n2_path }
+      denominator: { indicator, n1_path, n2_path }
+      multiplier: 100
+```
+
+### Quando usar
+
+- **Squad whitelist:** sempre que a vertical tiver squad oficial conhecido — habilita filtragem outsiders, zero-fill, cobertura correta.
+- **assessor_aliases / responsavel_externo_aliases:** sempre que JSON tiver variantes de nome (acentos, abreviacoes, typos) ou multi-owners em custom fields.
+- **overrides_ritual + projection_overrides:** apenas em ciclos com bug conhecido na fonte (ex: bridge SQL falhando). Remover apos correcao upstream para nao mascarar regressao.
+- **suppress_in_ritual + custom destaques/anomalias/recomendacoes:** quando WBR populou itens stale relativos ao override OU quando usuario quer adicionar item especifico ao Slide 12 (ex: recomendacao de prospeccao da vertical no Encerramento).
+- **pa_manual_append:** quando E4 nao classifica tasks com aging > cutoff mas o gestor quer mostrar no ritual.
+- **sem_esp_ratio:** sempre que indicador for `pct` derivado de cross-indicator (ex: Estagnadas % das Ativas).
+- **compute_meta / n2_compute_meta:** sempre que matrix_view usar `compute` (Ticket Médio etc).
+
+### Princípios universais aplicados pelo build_deck.py
+
+1. **Sem Especialista universal cinza** — esp="Sem Especialista" SEMPRE retorna meta=None e cell=mute, mesmo se override declarar meta.
+2. **Dedupe por slug** — squad members "Vinícius"/"Vinicius" e "Waleska "/"Waleska" viram 1 entry no set via slugify.
+3. **Callout vermelhos dedup parent_indicator** — Slide 3 callout conta indicadores vermelhos agrupados por `parent_indicator`, nao por matrix_view (Estagnadas qty + % ativas = 1 vermelho, nao 2).

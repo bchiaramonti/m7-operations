@@ -5,6 +5,14 @@ Schema do arquivo `execution-plan.json` gerado por `collect.py plan`.
 > **v2.0 BREAKING**: Steps agora referenciam scripts Python standalone ao inves de chamadas MCP.
 > Campos `tool`, `tool_params`, `substeps`, `transform_source`, `post_filters` foram removidos.
 
+## Sumário
+
+- [Campos Raiz](#campos-raiz)
+- [Step (Script)](#step-script)
+- [Script Output Format](#script-output-format)
+- [Execution Results Format](#execution-results-format)
+- [Fluxo de Execucao](#fluxo-de-execucao)
+
 ## Campos Raiz
 
 | Campo | Tipo | Descricao |

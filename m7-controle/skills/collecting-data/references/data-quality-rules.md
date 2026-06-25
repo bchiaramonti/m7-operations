@@ -3,6 +3,13 @@
 > Referencia para a skill collecting-data e o script collect.py.
 > Define thresholds, classificacao de alertas e regras de validacao.
 
+## Sumário
+
+- [Dimensoes de Qualidade](#dimensoes-de-qualidade)
+- [Classificacao Final de Alertas](#classificacao-final-de-alertas)
+- [Formato de Alerta](#formato-de-alerta)
+- [Regras de Precedencia](#regras-de-precedencia)
+
 ## Dimensoes de Qualidade
 
 ### 1. Checksum Integrity

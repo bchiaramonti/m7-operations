@@ -35,7 +35,7 @@
 | 7 | Correlacoes bidirecionais | {status} | {detalhe} |
 | 8 | conteudo_obrigatorio referencia KPIs presentes | {status} | {detalhe} |
 | 9 | codigo em UPPERCASE derivavel do id | {status} | {detalhe} |
-| 10 | vertical_code valido (INV/CRE/UNI/SEG) | {status} | {detalhe} |
+| 10 | vertical_code valido (INV/CRE/UNI/SEG/PJ2) | {status} | {detalhe} |
 | 11 | nivel valido (N1/N2/N3/N4) | {status} | {detalhe} |
 | 12 | subnivel consistente entre id e codigo | {status} | {detalhe} |
 

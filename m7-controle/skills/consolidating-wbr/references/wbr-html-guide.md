@@ -4,6 +4,18 @@
 > O analyst NAO usa template engine. Ele escreve o HTML diretamente via Write tool,
 > seguindo este guia como receita de construcao.
 
+## Sumário
+
+- [Visao Geral](#visao-geral)
+- [Estrutura do Documento](#estrutura-do-documento)
+- [Processo de Geracao](#processo-de-geracao)
+- [Mapeamento de Dados](#mapeamento-de-dados)
+- [Receitas de Graficos — D3.js Inline](#receitas-de-graficos--d3js-inline)
+- [Design Tokens (NAO Alterar)](#design-tokens-nao-alterar)
+- [Componentes HTML — Receitas Rapidas](#componentes-html--receitas-rapidas)
+- [Decisoes de Conteudo](#decisoes-de-conteudo)
+- [Checklist de Validacao Final](#checklist-de-validacao-final)
+
 ---
 
 ## Visao Geral

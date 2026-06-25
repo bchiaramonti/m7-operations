@@ -1,5 +1,5 @@
 # Card de Performance - {nome}
-# Especificacao: ESP-PERF-002 v1.1
+# Especificacao: ESP-PERF-002 v1.3
 # Gerado por m7-controle (E1 — configuring-cards)
 
 metadata:
@@ -10,13 +10,37 @@ metadata:
   version: "1.0.0"
   status: draft          # draft | active | archived
   owner: "{nome.sobrenome}"
-  vertical_crm: "{Investimentos | Credito | Universo | Seguros & Consorcios}"
-  vertical_code: "{INV | CRE | UNI | SEG}"
+  vertical_crm: "{Investimentos | Credito | Universo | Seguros & Consorcios | PJ2 (Cons + Seg)}"
+  vertical_code: "{INV | CRE | UNI | SEG | PJ2}"
   nivel: "{N1 | N2 | N3 | N4}"
   subnivel: null         # Opcional: B2B, B2C, SQUAD01...
   created_at: "YYYY-MM-DD"
   updated_at: "YYYY-MM-DD"
   tags: []
+
+  # ─────────────────────────────────────────────────────────
+  # CAMPOS OPCIONAIS — integracao com m7-ritual-gestao (preparing-materials)
+  # Schema completo: m7-operations/m7-ritual-gestao/skills/preparing-materials/
+  #                  references/card-apresentacao-schema.md
+  # ─────────────────────────────────────────────────────────
+  # total_label: "M7 Total"           # Label da linha N1 no deck (Slide 3)
+  # responsaveis_n2: ["Nome Esp 1", "Nome Esp 2"]   # Lista oficial de N2 (whitelist)
+  # assessor_aliases:                  # Mapa nome assessor canonico -> aliases
+  #   "Nome Canonico": ["Alias 1", "Alias 2"]
+  # responsavel_externo_aliases:       # Mapa para owner multi-name de tasks
+  #   "Douglas e Tereza": ["Douglas Silva", "Tereza Bernardo"]
+
+  # ─────────────────────────────────────────────────────────
+  # CAMPOS OPCIONAIS multi-canal multi-vertical (v1.3, 2026-05-11)
+  # Necessarios apenas para Cards umbrella (PJ2). Schema completo:
+  # m7-operations/m7-ritual-gestao/skills/preparing-materials/references/
+  #   - card-apresentacao-schema.md (secao "Extensao multi-canal")
+  #   - pj2-slide-requirements.md (edicoes especificas PJ2)
+  # ─────────────────────────────────────────────────────────
+  # label_responsavel: especialista    # enum: especialista (default) | canal | sub_bloco
+  # verticais: [consorcios, seguros]   # list[str] — apenas multi-vertical (PJ2)
+  # modo: auto                          # enum: atual | fechamento | combinado | auto
+  #                                     # (CLI --modo tem precedencia; Card precede is_first)
 
 kpi_references:
   - indicator_id: "{id_na_biblioteca}"
@@ -24,6 +48,42 @@ kpi_references:
     tipo_realizacao: aditivo   # aditivo | nao_aditivo | parcialmente_aditivo
     criterio_desvio_critico: "pct_atingimento < 0.90"
     quebras_obrigatorias: [equipe, squad, assessor]
+
+    # ─────────────────────────────────────────────────────────
+    # CAMPO OPCIONAL — matrix_views[] (lido pelo build_deck.py do m7-ritual-gestao)
+    # Schema: card-apresentacao-schema.md secao "kpi_references[].matrix_views[].*"
+    # Exemplo CON v2.8.0 + SEG WL v2.14.0 + SEG RE v1.6.0.
+    # ─────────────────────────────────────────────────────────
+    # matrix_views:
+    #   - label: "Receita Mensal"            # Label da row na Matriz/Slide 3
+    #     unidade: BRL                        # BRL | count | ratio | pct
+    #     value_field: realizado_mtd          # Campo do JSON N1
+    #     value_field_fallbacks: [realizado_lagging_competencia_atual]
+    #     meta_field: meta_mes_corrente
+    #     n2_value_field: realizado_mtd       # Campo do JSON N2 (sub-bloco por_especialista)
+    #     n2_value_field_fallbacks: [realizado_competencia_atual]
+    #     n2_meta_field: meta_mes
+    #     direction: maior_melhor             # maior_melhor (default) | menor_melhor
+    #     # Campos compute (para indicadores derivados, ex: ticket medio):
+    #     # compute: "volume_total / realizado_qty"
+    #     # compute_meta: "meta_volume / meta_qty"
+    #     # n2_compute: "volume / qty"
+    #     # n2_compute_meta: "meta_volume / meta_qty"
+    #     # Campos para indicadores derivados de outros (% ativas, etc):
+    #     # derived_indicator_id: oportunidades_estagnadas_funil_pct_ativas
+    #     # color_inherit_from_view: "Oport. Estagnadas (% ativas)"   # row_label do irmao
+    #     # no_meta: true                       # NUNCA tem meta nem % atingimento
+    #     # sem_esp_ratio:                      # Cross-indicator ratio para Sem Especialista
+    #     #   numerator:
+    #     #     indicator: indicator_id_numerador
+    #     #     n1_path: componentes.qtd_estagnados
+    #     #     n2_path: qtd_estagnados
+    #     #   denominator:
+    #     #     indicator: indicator_id_denominador
+    #     #     n1_path: realizado_qty
+    #     #     n2_path: qty
+    #     #   multiplier: 100
+
     correlacionado_com:
       - id: "{outro_indicator_id}"
         tipo: direta       # direta | inversa | contexto
@@ -32,6 +92,30 @@ kpi_references:
       tipo_agregacao: sum  # sum | avg | max | recalcular
       # formula_agregacao: ""   # Apenas se tipo_agregacao = recalcular
       # peso: 1.0               # Apenas se tipo_agregacao = avg
+
+    # ─────────────────────────────────────────────────────────
+    # CAMPO OPCIONAL — projecao.componentes (estrutura formal pos-2026-05-06)
+    # Cada componente declara nome+tipo+formula+descricao+confianca+obrigatorio+
+    # aplicavel_em+inputs[]. Permite analyst aplicar formula correta sem inferir.
+    # Exemplo completo: card_con_n3_001.yaml v2.8.0 secao
+    # kpi_references[].volume_consorcio_mensal.projecao.pipeline_conversion_extended.componentes
+    # ─────────────────────────────────────────────────────────
+    # projecao:
+    #   obrigatoria: true
+    #   metodo_preferido: pipeline_conversion_extended
+    #   horizonte: [mes_corrente, mes_seguinte]
+    #   pipeline_conversion_extended:
+    #     componentes:
+    #       - nome: lagging_competencia_M0
+    #         tipo: lagging
+    #         formula: "SUM(valor_base) WHERE data_competencia ∈ M0"
+    #         descricao: "Contratos formalizados com competencia no mes corrente."
+    #         confianca: high
+    #         obrigatorio: true
+    #         aplicavel_em: [mes_corrente]
+    #         inputs:
+    #           - tabela_fonte.campo_valor
+    #           - tabela_fonte.campo_competencia
 
 arvore_de_indicadores:
   "{indicator_id}":
@@ -125,3 +209,65 @@ parametros_execucao:
       nome: "Distribuicao"
       descricao: "Enviar conforme canal e destinatarios"
       dependencias: ["Passo 6"]
+
+# ─────────────────────────────────────────────────────────
+# BLOCO OPCIONAL — apresentacao (consumido por m7-ritual-gestao preparing-materials)
+# Permite Card declarar customizacoes do deck/briefing sem editar HTML.
+# Schema completo: m7-operations/m7-ritual-gestao/skills/preparing-materials/
+#                  references/card-apresentacao-schema.md
+# Exemplo pratico: card_con_n3_001.yaml v2.8.0
+# ─────────────────────────────────────────────────────────
+# apresentacao:
+#   responsaveis:
+#     - nome: "Nome Esp 1"
+#       cargo: "Especialista de {dominio}"
+#       squad:                           # Whitelist de assessores oficiais
+#         - "Assessor 1"
+#         - "Assessor 2"
+#     - nome: "Nome Esp 2"
+#       cargo: "Especialista de {dominio}"
+#       squad: [...]
+#
+#   projecao_proximo_mes:                # M+1 quando Card v6.x ainda nao calcula
+#     receita_n1: 243341.00
+#     volume_n1: 16500000.00
+#     classificacao_n1: "Provavel"
+#
+#   projection_overrides:                # Override de projecoes (ex: bug fix)
+#     ciclo: "YYYY-MM-DD"
+#     metodo: "a-fix"                    # versionamento do override
+#     indicadores:
+#       receita_consorcio_mensal:
+#         n1:
+#           projecao_mes_corrente: 153703
+#           projecao_mes_seguinte: 113153
+#         n2:
+#           "Nome Esp 1":
+#             projecao_mes_corrente: 62759
+#             projecao_mes_seguinte: 59552
+#
+#   overrides_ritual:                    # Override de realizado por bug bridge SQL
+#     indicadores:
+#       receita:
+#         n5_by_esp:
+#           "Nome Esp 1":
+#             "Assessor 1": 12345.67
+#
+#   suppress_in_ritual:                  # Filtros para Slide 12 Encerramento
+#     anomalias: [keyword1, keyword2]
+#     destaques: [keyword1]
+#     recomendacoes: [keyword1]
+#
+#   destaques_positivos_custom:          # Prepended em wbr.destaques (alta prioridade)
+#     - "Texto custom 1"
+#     - "Texto custom 2"
+#
+#   anomalias_custom:                    # Prepended em wbr.anomalias (idem)
+#     - "Risco custom 1"
+#
+#   recomendacoes_custom:                # Prepended em wbr.recomendacoes (idem)
+#     - "Recomendacao custom 1"
+#
+#   pa_manual_append:                    # Tasks manuais adicionadas no Slide 5 PA
+#     - task_id: "86abc1234"             # ID ClickUp
+#       reason: "Tarefa fora do cutoff E4 mas relevante para o ritual"

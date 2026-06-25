@@ -1,2 +1,9 @@
+# DEPRECATED 2026-04-30
+# Este template do CSV legado nao e mais usado pela skill recording-decisions.
+# A SoT do Plano de Acao migrou para o ClickUp (lista pa-resultado, id 901326795742).
+# Para criar uma task nova, usar o payload exemplo de clickup_create_task em:
+#   ../references/clickup-actions-schema.md (Secao 4)
+#
+# Linha original abaixo preservada apenas como referencia historica do schema CSV.
 "id","parent_id","data_cadastro","data_inicio","origem","origem_detalhe","indicador_impactado","vertical","titulo","descricao","responsavel","solicitante","prioridade","data_limite","data_followup","status","percentual","data_conclusao","evidencia","observacoes","volume","receita","comentarios","ultima_atualizacao"
 "PA-{YYYY}-{NNN}","","{data_ritual}","{data_ritual}","ritual","Ritual N2 {vertical} - {data_ritual}","{indicador_id}","{vertical}","{titulo}","{descricao}","{responsavel}","{solicitante}","{critica|alta|media|baixa}","{data_limite}","","pendente","0","","","{observacoes}","{volume}","{receita}","[{""data"": ""{data_ritual}"", ""autor"": ""{participante}"", ""texto"": ""{contexto_decisao}""}]","{data_ritual}"

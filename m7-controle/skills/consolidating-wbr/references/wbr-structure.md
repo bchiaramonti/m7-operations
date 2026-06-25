@@ -258,3 +258,101 @@ O WBR Narrativo HTML e uma terceira camada de output que complementa o Estrutura
 | 2 | WBR Narrativo | `.md` | Leitura rapida em 3 min, distribuicao por chat/email |
 | 3 | WBR Narrativo Visual | `.html` | Apresentacao em rituais, visualizacao de dados |
 | 4 | WBR Narrativo PDF | `.pdf` | Distribuicao por email/WhatsApp, impressao |
+
+---
+
+## WBR canonical data JSON v1.1 — campos PJ2 (por_canal + M+1)
+
+> Adicionado em 2026-05-12 (memory `feedback_canonical_data_json` + decisao Bruno).
+> Estende o schema canonical `wbr-{vertical}-{data}.data.json` (Fase 4.5) com 2 capacidades novas para rituais multi-vertical PJ2 e indicators com semaforo invertido.
+
+### A. Decomposicao `por_canal[c]` (PJ2 + N3 com `output_schema.por_canal`)
+
+Cada indicator em `wbr.indicadores.{indicator_id}` pode emitir um bloco `por_canal` quando o YAML do indicator declara `output_schema.por_canal` (schema v2.1 da skill m7-metas/creating-indicators).
+
+```json
+"wbr": {
+  "indicadores": {
+    "quantidade_consorcio_mensal_pj2": {
+      "n1_value": 18.0,
+      "n2_agregado": { ... },
+      "por_canal": {
+        "investimentos": { "qty": 12, "vol": null, "qty_won": null, "pct_ativas": null },
+        "credito":       { "qty": 4,  "vol": null, "qty_won": null, "pct_ativas": null },
+        "outros_m7":     { "qty": 2,  "vol": null, "qty_won": null, "pct_ativas": null }
+      },
+      "meta": 0.0,
+      "status": { "cor": "verde", "emoji": "🟢" },
+      "pct_atingimento": null
+    }
+  }
+}
+```
+
+**Convencoes:**
+- `canal_id` segue `_referencias/canal.yaml`:
+  - PJ2: `investimentos`, `credito`, `outros_m7` (3 buckets agregados)
+  - N3: chave = `id_especialista` (Douglas/Tereza, Claudia/Tarcisio, etc.)
+- Campos opcionais dentro de cada canal — declare apenas os que o indicator emite:
+  - `qty`: int — quantidade no canal
+  - `vol`: float (BRL) — volume agregado
+  - `qty_won`: int — convertidos (WON) no canal — separado de `qty` para edit #26 (ticket_medio = vol/qty_won)
+  - `pct_ativas`: float (ratio) — qty_estagnadas / qty_ativas (edit #29)
+- **Mesma CTE de canal** entre indicators correlacionados (ativas + estagnadas usam mesma fonte de classificacao). Builder do ritual valida coerencia.
+
+### B. Projecoes `M+1` opt-in por vertical
+
+Card declara em `apresentacao.proj_periodos_por_vertical`:
+
+```yaml
+apresentacao:
+  proj_periodos_por_vertical:
+    cons: ["M0", "M+1"]   # Cons aceita M+1 (metodo pipeline_conversion_extended_v2 calibrado)
+    seg:  ["M0"]           # Seg sem M+1 (metodo nao calibrado ainda — edit #31)
+```
+
+Consolidator (Fase 4.5) so emite `wbr.projecoes.{vert}.{ind_id}.M+1` quando declarado. Builder do ritual respeita opt-in:
+
+```json
+"wbr": {
+  "projecoes": {
+    "cons": {
+      "receita_consorcio_mensal": {
+        "M0":  { "valor": 161358, "metodo": "pipeline_conversion_extended_v2", "confidence": "high" },
+        "M+1": { "valor": 201748, "metodo": "pipeline_conversion_extended_v2", "confidence": "medium" }
+      }
+    },
+    "seg": {
+      "receita_seguros_mensal_pj2": {
+        "M0": { "valor": 184180, "metodo": "installment_amortization", "confidence": "high" }
+        // sem M+1 — Card declara so M0 para seg
+      }
+    }
+  }
+}
+```
+
+### C. Campo `is_first_ritual_of_month` no JSON canonical
+
+Atualmente fica em `CICLO.md` (`is_first_ritual_of_month: true|false`). Propagar para `wbr.meta.is_first_ritual_of_month` no JSON canonical para builder do ritual nao precisar consultar CICLO.md.
+
+```json
+"wbr": {
+  "meta": {
+    "vertical": "pj2",
+    "ciclo_label": "2026-05",
+    "data_referencia": "2026-05-12",
+    "is_first_ritual_of_month": true,
+    "snapshot_at": "2026-05-12T08:15:00Z"
+  }
+}
+```
+
+### Validacao
+
+Validator `validate-painel.py` estendido para:
+1. Conferir `SUM(por_canal[c].qty) == n1_value.qty` (aditividade, com tolerancia de 1 unit para arredondamento)
+2. Quando `por_canal[c].pct_ativas` presente, conferir `pct_ativas == qty_estagnadas/qty_ativas` cross-indicator (mesma CTE de canal)
+3. Quando Card declara `proj_periodos_por_vertical.{vert}` excluindo `M+1`, garantir que `wbr.projecoes.{vert}.*.M+1` esta AUSENTE (nao null)
+
+**Cross-references**: edits #26, #29, #31 do `pj2-slide-requirements.md` consomem esses campos diretamente em runtime.

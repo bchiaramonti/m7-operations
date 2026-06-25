@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://m7.com.br/schemas/e3-causa-raiz-v1.0.json",
+  "title": "E3 Causa-Raiz Sidecar v1.0",
+  "description": "Schema do sidecar JSON emitido por E3 (analyzing-deviations Fase 6.5) em S2a B4.17 (2026-05-18). Consumido por E6 Fase 4.5.d e injetado em canonical.indicadores.{id}.causa_raiz_resumo.",
+  "type": "object",
+  "required": ["_schema", "vertical", "data_referencia", "indicadores"],
+  "properties": {
+    "_schema": {
+      "type": "string",
+      "const": "e3-causa-raiz v1.0"
+    },
+    "_generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "vertical": {"type": "string"},
+    "data_referencia": {"type": "string", "format": "date"},
+    "indicadores": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["causa_raiz_resumo", "semaforo"],
+        "properties": {
+          "causa_raiz_resumo": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "1-2 frases sintetizando hipotese de causa-raiz principal"
+          },
+          "semaforo": {
+            "type": "string",
+            "enum": ["vermelho", "amarelo", "verde"]
+          },
+          "confianca": {
+            "type": "string",
+            "enum": ["alta", "media", "baixa"]
+          },
+          "n2_breakdown": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "causa_raiz_resumo": {
+                  "type": "string",
+                  "maxLength": 300,
+                  "description": "Frase especifica por especialista quando ha concentracao individual"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
