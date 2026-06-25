@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<!--
+  Template PJ2 N2 multi-vertical (Step 8 — 2026-05-12)
+  Contrato: m7-ritual-gestao/skills/preparing-materials/references/pj2-slide-requirements.md
+  Estrutura V13 portada: 17 slides modo combinado, ordem vert-by-vert (edit #17)
+  ⚠️ CSS — DIVIDA TECNICA (descoberta 2026-05-27):
+  Apesar do comentario original (no fim deste header) sugerir que `build_deck_pj2.py`
+  injeta o <style> do ritual.tmpl.html (DRY), na PRATICA o sidecar tem CSS PROPRIO
+  duplicado como string Python (~linhas 670-1140 do build_deck_pj2.py). Toda mudanca
+  visual em ritual.tmpl.html PRECISA ser pareada manualmente em build_deck_pj2.py,
+  ou PJ2 fica defasado.
+
+  Categorias:
+  - Classes universais nos dois (.callout, .conc-headline, .veloc-*, .mx-row.head
+    sticky, etc.) → sincronizar quando muda em um lado
+  - Classes so do PJ2 (.pareto-card, .canal-row, .nps-*, .recap2-*, .prob-headline,
+    .pipe-card-side, .next-card) → so existem em build_deck_pj2.py
+  - Classes compartilhadas mas com calibragem propria (matriz PJ2 e intencionalmente
+    menor p/ caber multi-vertical) → NAO sincronizar cegamente
+
+  Refactor futuro (backlog): extrair CSS p/ arquivo .css separado e fazer os dois
+  scripts lerem do mesmo lugar. Arquitetura a decidir: deck-base.css +
+  deck-pj2-overrides.css ou prefixo .pj2-deck.
+
+  --- Comentario original (intencao do autor, NAO reflete a realidade): ---
+  CSS: usa mesmas classes do ritual.tmpl.html legado + classes novas (.atingimento-bar,
+       .fech-vert-disclaimer, .veloc-gauge-wrap, .circulo-id). O build_deck.py em
+       modo PJ2 deve INJETAR o bloco <style>...</style> do ritual.tmpl.html (mesmo
+       CSS — DRY) antes do <body>. Veja apply_substitutions() + flag --pj2.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ritual de Gestão PJ2 N2 · {{CICLO_LABEL}}</title>
+{{STYLE_BLOCK}}
+</head>
+<body>
+
+<!-- Slide 1 · Capa PJ2 (reusa .cover do legado, label adaptado) -->
+<section class="cover" data-label="Capa">
+{{SLIDE_CAPA_PJ2}}
+</section>
+
+<!-- Slide 2 · Agenda + Recap N2 (edit #1 — bloco novo "Pontos discutidos na ultima N2") -->
+<section data-label="Agenda">
+{{SLIDE_AGENDA_RECAP_N2}}
+</section>
+
+<!-- Slide 3 · Sub-capa Bloco I — Fechamento -->
+<section class="dark" data-label="Sub-capa Fechamento">
+{{SLIDE_SUBCAPA_FECHAMENTO}}
+</section>
+
+<!-- Slide 4 · Fechamento Visao Geral PJ2 (divisor visual Seg | Cons — edits #2, #3, #4, #26, #30) -->
+<section data-label="Fechamento Visão Geral PJ2">
+{{SLIDE_FECH_VISAO_GERAL_PJ2}}
+</section>
+
+<!-- Slide 5 · Fechamento Vertical Seguros (Pareto filtra zerados #7, disclaimer #23, ticket runtime #26, status recalc #30) -->
+<section data-label="Fechamento Vertical Seguros">
+{{SLIDE_FECH_VERTICAL_SEG}}
+</section>
+
+<!-- Slide 6 · Fechamento Vertical Consorcios (idem) -->
+<section data-label="Fechamento Vertical Consórcios">
+{{SLIDE_FECH_VERTICAL_CON}}
+</section>
+
+<!-- Slide 7 · Analise do que deu errado (substitui Diretrizes — edit #9) -->
+<section data-label="Análise do que deu errado">
+{{SLIDE_ANALISE_PROBLEMAS}}
+</section>
+
+<!-- Slide 8 · Sub-capa Bloco II — Mes ate agora -->
+<section class="dark" data-label="Sub-capa Mês até agora">
+{{SLIDE_SUBCAPA_MES_ATUAL}}
+</section>
+
+<!-- ───────────── Bloco SEG ──────────────────────────────── -->
+<!-- Slide 9 · Matriz Seguros -->
+<section data-label="Matriz Seguros">
+{{SLIDE_MATRIZ_SEG}}
+</section>
+
+<!-- Slide 10 · Analise por Canal Seguros -->
+<section data-label="Análise por Canal Seguros">
+{{SLIDE_ANALISE_CANAL_SEG}}
+</section>
+
+<!-- Slide 11 · Pipeline Seguros (SEM M+1 — edit #31; #22 padrao apenas M0) -->
+<section data-label="Pipeline Seguros">
+{{SLIDE_PIPELINE_SEG}}
+</section>
+
+<!-- ───────────── Bloco CON ──────────────────────────────── -->
+<!-- Slide 12 · Matriz Consorcios -->
+<section data-label="Matriz Consórcios">
+{{SLIDE_MATRIZ_CON}}
+</section>
+
+<!-- Slide 13 · Analise por Canal Consorcios -->
+<section data-label="Análise por Canal Consórcios">
+{{SLIDE_ANALISE_CANAL_CON}}
+</section>
+
+<!-- Slide 14 · Pipeline Consorcios (COM M+1 condicional — edit #31) -->
+<section data-label="Pipeline Consórcios">
+{{SLIDE_PIPELINE_CON}}
+</section>
+
+<!-- ───────────── Conclusao ──────────────────────────────── -->
+<!-- Slide 15 · Conclusao com velocimetros (substitui Proximos Passos — edit #21) -->
+<section class="closing" data-label="Conclusão">
+{{SLIDE_CONCLUSAO_VELOCIMETROS}}
+</section>
+
+</body>
+</html>

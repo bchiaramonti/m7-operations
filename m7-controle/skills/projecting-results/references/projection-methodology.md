@@ -15,7 +15,10 @@
 3. [run_rate_linear](#3-run_rate_linear)
 4. [trend_exponential](#4-trend_exponential)
 5. [pipeline_conversion](#5-pipeline_conversion)
+   - [5.1 pipeline_conversion_extended (v1 — current/interim)](#51-pipeline_conversion_extended-v1--current-interim)
+   - [5.2 pipeline_conversion_extended_v2 (target, preferred futuro)](#52-pipeline_conversion_extended_v2-target-preferred-futuro)
 6. [lagging_indicator](#6-lagging_indicator)
+   - [6.1 Receita derivada de Volume + Real_competencia (formula universal)](#61-receita-derivada-de-volume--real_competencia-formula-universal)
 7. [Consolidacao e Projecao Final](#7-consolidacao-e-projecao-final)
 8. [Cenarios P10/P90](#8-cenarios-p10p90)
 9. [Classificacao de Probabilidade](#9-classificacao-de-probabilidade)
@@ -267,6 +270,249 @@ Projecao = R$ 6.845.000 + R$ 392.700 = R$ 7.237.700
 - Se `source_indicator` nao tem dados em E2: metodo nao aplicavel
 - Se estagio do deal nao esta no dict de rates: usar rate = 0 e registrar anomalia
 
+> **MIGRACAO 2026-05-04:** indicadores antigos com `pipeline_conversion`
+> (stage_probability complexo, modelo P×timing acima) ainda existem nos
+> YAMLs mas estao marcados `applicable: false, deprecated: true`. Skill
+> IGNORA-os e usa `pipeline_conversion_extended` (5.1/5.2 abaixo) quando
+> disponivel.
+
+---
+
+## 5.1 pipeline_conversion_extended (v1 — current/interim)
+
+> **Status:** v1 atualmente em producao. **deprecated_reason:** "M+1 sem
+> componente funil; atualizacao one-shot pendente — ver v2 (5.2)".
+> Substitui `pipeline_conversion` (5) para CON e SEG.
+
+### Conceito
+
+Substitui `pipeline_conversion` (modelo stage-aware complexo) por
+formula simplificada `Vol × Taxa_Conversao` acordada com coordenador
+de Seguros em 2026-04-29 e estendida para Consorcios em 2026-05-04.
+
+Modelo simplificado e mais robusto quando scripts de coleta nao
+retornam stage breakdown por deal — cobre o 80/20 dos cenarios.
+
+### Formula
+
+**Mes corrente (M0):**
+```
+projecao_mes_corrente = Vol_Oport_Ativas × Taxa_Conversao_Mes
+                         (snapshot atual × taxa do mes)
+```
+
+**Mes seguinte (M+1):**
+```
+pipeline_residual_M0  = Vol_Oport_Ativas - projecao_mes_corrente
+entradas_novas_M+1    = Media_oport_criadas_3m × DU_M+1 / DU_mes_padrao
+projecao_mes_seguinte = (pipeline_residual_M0 + entradas_novas_M+1) × Taxa_Conversao
+```
+
+### Parametros do YAML
+
+```yaml
+parameters:
+  source_funil:
+    indicador: "oportunidades_ativas_funil"
+    campo_volume: volume
+    campo_qty: quantidade
+    filtro_squad: null              # opcional ('wl' | 're') para Cards split
+  source_taxa:
+    indicador: "taxa_conversao_funil_con"
+    campo: taxa_conversao
+    fallback_se_ausente: 0.30
+  source_criadas:
+    indicador: "oportunidades_criadas_funil"
+    horizonte_historico_meses: 3    # janela da media movel (default 3)
+  componentes_mes_corrente:
+    formula: "Vol_Oport_Ativas × Taxa_Conversao_Mes"
+  componentes_mes_seguinte:
+    formula: "(Pipeline_residual_M0 + Entradas_novas_M+1) × Taxa_Conversao"
+    fallback_se_historico_insuficiente: run_rate_linear
+```
+
+### Aplicabilidade
+
+- **Mes corrente:** confidence high (snapshot direto do funil).
+- **Mes seguinte:** confidence medium (requer historico de criadas; cair
+  em `run_rate_linear` se historico < 3 meses).
+
+### Gap conhecido (motivo da v2)
+
+A formula M+1 em v1 **NAO incorpora cycle-time por estagio**. Trata
+todo deal do funil como capaz de fechar em M0 (subtraindo) ou M+1
+(usando residual). Mas deals em estagios iniciais (ex: Prospeccao com
+cycle 45 dias) **nao deveriam** contribuir para M+1 se faltam mais que
+DU_M+1 + DU_M0_restantes.
+
+Resultado pratico em metodo "a" interim: `componente_funil_M+1` = 0
+(workaround conservador), e M+1 e calculado como **lagging only**.
+Subestima projecao M+1.
+
+Ver [KNOWN_ISSUES.md](../KNOWN_ISSUES.md) ISSUE #5 para detalhes.
+
+---
+
+## 5.2 pipeline_conversion_extended_v2 (target, preferred futuro)
+
+> **Status:** target — implementacao agendada para "sessao posterior"
+> (ver [M+1-PROJECTION-ROADMAP.md](M+1-PROJECTION-ROADMAP.md)).
+> Quando disponivel, marcar `preferred: true` no YAML do indicador
+> e v1 vira fallback `preferred: false`.
+
+### Conceito
+
+Cycle-time-aware: cada deal do funil e classificado em horizonte (M0,
+M+1, ou fora) baseado em **`tempo_estimado_fechamento`** do estagio
+atual e **`stage_probability`** vigente.
+
+**Volume_M+1 e SEMPRE 100% Bitrix funil** — nao ha componente lagging de
+competencia futura para volume. Aplica-se a todas as verticais (Cons,
+Seg WL, Seg RE, PJ2).
+
+> **CORRECAO 2026-05-13:** versao anterior desta secao mencionava
+> `vol_lagging_competencia` proveniente de `m7Bronze.consorcio_contratos.data_competencia`.
+> ISSO ESTAVA ERRADO. Esse ledger so existe em Cons e refere-se a
+> **Receita Real de competencia futura** (parcelas dos contratos
+> antigos), nao a Volume. Volume M+1 e exclusivamente componente
+> funil em todas as verticais. Ver nota na secao 6.1 abaixo.
+
+Resolve o gap da v1 separando:
+- `vol_componente_M0` (deals do funil que fecham em M0)
+- `vol_componente_M+1` (deals do funil que fecham em M+1)
+
+A formula de receita derivada (`(Vol × rate) / installments`, secao 6)
+consome `vol_componente_M0` ou `vol_componente_M+1`. Em Cons, somar
+ainda `lagging_receita_competencia` separadamente (parcelas ja cravadas
+em `consorcio_receita.competencia=M`) — esse ledger e de **receita**,
+nao de volume. Ver secao 6.1.
+
+### Algoritmo
+
+1. Iterar deals do funil ativos (snapshot Bitrix `oportunidades_ativas_funil`).
+2. Para cada deal:
+   - Identificar estagio atual.
+   - Calcular `dias_restantes_M0` = DU restantes do mes corrente.
+   - Calcular `dias_restantes_M+1` = `DU_M0_restantes + DU_M+1`.
+   - Buscar `stage_duration_vigente` (mediana real do estagio) e
+     `stage_probability_vigente` (pct deals que avancaram para "won")
+     do estagio×mes (ver "Stage source — regra dia 15" abaixo).
+3. Classificar deal por horizonte:
+   - Se `stage_duration_vigente < dias_restantes_M0` →
+     `vol_componente_M0 += deal_volume × stage_probability_vigente`.
+   - Senao se `stage_duration_vigente < dias_restantes_M+1` →
+     `vol_componente_M+1 += deal_volume × stage_probability_vigente`.
+   - Senao → fora de horizonte (M+2 nao implementado).
+4. Estimar `vol_entradas_novas_M+1` = `media_movel_criadas_3m × DU_M+1
+   / DU_mes_padrao × stage_prob_inicial` (ainda exige pelo menos 3 meses
+   historico — fallback p/ run_rate se ausente).
+
+### Stage source — SEMPRE mes anterior completo (exit-based, 2026-06-19)
+
+| stage_metrics | Stage_probability + stage_duration source |
+|---------------|-------------------------------------------|
+| EXIT-BASED (atual) | **SEMPRE o mes ANTERIOR COMPLETO** (coorte resolvida) |
+
+> **CORRECAO 2026-06-19 (valida retroativamente no Cons 06-17):** a regra antiga
+> "dia 1-14 mes anterior; 15-fim mes atual" foi desenhada para o stage_metrics
+> ENTRY-cohort. O stage_metrics agora e EXIT-BASED (probabilidade = won_passers/
+> resolved_passers ancorada no mes de RESOLUCAO). Nesse modelo, a coorte resolvida
+> do mes CORRENTE so amadurece no FIM do mes — no meio do mes (ex: dia 17) poucos
+> deals resolveram, entao o stage_probability do mes corrente DEGENERA a ~0 e o v2
+> volta a zerar o funil.
+>
+> **Validacao retroativa (funil real Cons 06-17):** componente_funil projetado =
+> R$ 0 com mes corrente (Junho dia 17) vs **R$ 12,84M com mes anterior (Maio
+> completo)**. Por isso: usar SEMPRE o mes anterior completo como referencia
+> estavel. So trocar para o mes corrente quando ELE estiver completo (ou seja,
+> ele vira "mes anterior" no ciclo seguinte). NAO ha mais switch no dia 15.
+
+Razao: a coorte EXIT-based precisa de deals RESOLVIDOS; o ultimo mes completo e a
+amostra madura mais recente. O mes corrente parcial sub-conta resolucoes.
+
+### Exemplo concreto
+
+```
+Cenario: Maio 2026, hoje = dia 20. DU_M0_restantes = 7. DU_M+1 = 22.
+Deal D1: estagio "Prospeccao", entrou no funil dia 20. cycle_vigente_prospeccao = 45 dias.
+
+  dias_restantes_M0 = 7
+  dias_restantes_M+1 = 7 + 22 = 29
+
+  stage_duration_vigente(Prospeccao) = 45 → 45 > 7 → NAO entra em M0.
+                                          45 > 29 → NAO entra em M+1.
+                                          → fora de horizonte (M+2 ou alem).
+
+Deal D2: estagio "Cotas Alocadas", entrou dia 14.
+  cycle_vigente_cotas_alocadas = 3 → 3 < 7 → entra em M0.
+  stage_probability_vigente(Cotas Alocadas) = 0.92.
+  vol_componente_M0 += deal_volume × 0.92.
+
+Deal D3: estagio "Apresentacao", entrou dia 5.
+  cycle_vigente_apresentacao = 21 → 21 > 7 → NAO entra em M0.
+                                     21 < 29 → entra em M+1.
+  stage_probability_vigente(Apresentacao) = 0.20.
+  vol_componente_M+1 += deal_volume × 0.20.
+```
+
+### Parametros do YAML
+
+```yaml
+- id: pipeline_conversion_extended_v2
+  applicable: true
+  preferred: true
+  confidence: high
+  parameters:
+    stage_durations_source: prior_month_complete   # EXIT-BASED: sempre mes anterior completo
+    transition_day: null                           # APOSENTADO 2026-06-19 (era 15, p/ entry-cohort)
+    source_stage_metrics:
+      indicador: "stage_metrics_vigentes"          # EXIT-BASED (won_passers/resolved_passers)
+    source_funil:
+      indicador: "oportunidades_ativas_funil"
+    source_criadas:
+      indicador: "oportunidades_criadas_funil"
+      historico_meses: 3
+```
+
+> **NAO** declarar `source_lagging` em volume — Volume M+1 e exclusivamente
+> Bitrix funil. O ledger `m7Bronze.consorcio_contratos.data_competencia`
+> NAO entra em Volume; ele e referente a Receita lagging (ver secao 6.1).
+
+### Output
+
+```python
+{
+  "vol_componente_M0":      float,    # via stage classification (funil Bitrix)
+  "vol_componente_M+1":     float,    # via stage classification (funil Bitrix)
+  "vol_entradas_novas_M+1": float,    # via media movel criadas
+  "stage_breakdown": {                 # detalhe por estagio para auditoria
+    "prospeccao":        {"M0": 0, "M+1": 0, "fora": float},
+    "investigacao":      {"M0": 0, "M+1": float, "fora": float},
+    "apresentacao":      {"M0": 0, "M+1": float, "fora": 0},
+    "proposta":          {"M0": float, "M+1": float, "fora": 0},
+    "emissao_contrato":  {"M0": float, "M+1": float, "fora": 0},
+    "cotas_alocadas":    {"M0": float, "M+1": 0, "fora": 0}
+  }
+}
+```
+
+### Consolidacao final por horizonte
+
+```
+Vol_proj_M0  = realizado_acumulado_MTD + vol_componente_M0
+Vol_proj_M+1 = vol_componente_M+1 + vol_entradas_novas_M+1
+```
+
+Onde `realizado_acumulado_MTD` vem do indicador `volume_consorcio_mensal`
+(ou `volume_seguros_mensal`) ja extraido em E2 — refere-se ao mes corrente
+ate a data do checkpoint. **NAO existe `realizado_M+1` para Volume** em
+nenhuma vertical (so para Receita Cons via lagging — ver secao 6.1).
+
+### Refs
+
+- [M+1-PROJECTION-ROADMAP.md](M+1-PROJECTION-ROADMAP.md) — roadmap completo
+- [KNOWN_ISSUES.md](../KNOWN_ISSUES.md) ISSUE #3 (double-count) e ISSUE #5 (M+1 gap)
+
 ---
 
 ## 6. lagging_indicator
@@ -331,6 +577,104 @@ Se apenas fevereiro disponivel (lag_months[0]=1, peso original=0.5):
 ### Dependencia Critica
 
 O `leading_indicator` DEVE ser projetado ANTES deste indicador. A Fase 1 da skill resolve a ordem de execucao.
+
+---
+
+## 6.1 Receita derivada de Volume + Real_competencia (formula universal)
+
+> **Esclarecimento 2026-05-13:** distinguir **3 conceitos** que estavam
+> sendo confundidos:
+>
+> 1. `lagging_indicator` (secao 6) — metodo matematico que usa
+>    historico passado de um leading (volume) ponderado por
+>    `lag_weights` para projetar receita. **Nao** se usa em
+>    M+1 de Receita no slide Pipeline.
+> 2. `volume_componente_funil` — projecao de volume a partir do funil
+>    Bitrix (cycle-time-aware). Fonte de `Vol_M+1` na formula abaixo.
+> 3. `lagging_receita_competencia` — ledger de parcelas mensais ja
+>    cravadas para competencia futura (`consorcio_receita.competencia=M+1`).
+>    So existe em Cons. Equivalente conceitual a "Receita Real M+1".
+
+### Formula de Receita projetada — CORRIGIDA 2026-06-19
+
+> **CORRECAO (decisao do usuario 2026-06-19):** o `valor da oportunidade` do Card
+> JA carrega a receita. A formula antiga `(Vol × rate)/installments` estava
+> **conceitualmente errada para Seguros** — o campo OPPORTUNITY do Bitrix em Seg e
+> o VALOR DE ACEITACAO ≈ comissao estimada (NAO premio bruto, ver memory
+> `reference_seguros_receita_potencial`), entao aplicar o rate 0,5 de novo
+> DOBRA-descontava. Em Cons, a oportunidade = valor da carta (Volume), e o rate
+> 3,5% e legitimo. Formula por vertical (opp = valor da oportunidade projetado pelo
+> funil = Σ opp_estagio × stage_probability):
+
+| Vertical | Volume projetado | Receita projetada |
+|----------|------------------|-------------------|
+| **Cons** | = opp (valor da carta) | = opp × 0,035 / 12 |
+| **Seg WL** | = Receita × 2 | = opp / 12 |
+| **Seg RE** | nao projeta | = opp / 12 |
+
+NOTA: Seg NAO usa mais rate de comissao na projecao (a oportunidade ja e a comissao).
+Isso APOSENTA o ISSUE #4 (caca ao "campo de premio anualizado") e o bloqueio da
+taxa RE nao-calibrada — RE projeta receita igual ao WL (opp/12), so nao projeta Volume.
+
+### Aplicacao no slide Pipeline (M+1)
+
+```python
+# opp_proj_M = Σ(funil.opportunity_estagio × stage_probability_estagio) p/ horizonte M
+# (componente de funil; Real_competencia adicionado so onde ha ledger)
+
+# Cons (e PJ2 subset Cons): opp = valor da carta = Volume
+real_receita_m1_cons = sum(consorcio_receita.valor_comissao WHERE competencia = M+1)
+receita_proj_M1_cons = real_receita_m1_cons + (opp_proj_M1_cons × 0.035) / 12
+
+# Seg WL/RE (e PJ2 subset Seg): opp = valor de aceitacao ≈ comissao anual
+real_receita_m1_seg = 0  # nao existe ledger de competencia futura p/ comissao Seg
+receita_proj_M1_seg = real_receita_m1_seg + opp_proj_M1_seg / 12   # SEM rate ×0,5
+volume_proj_M1_seg_wl = receita_proj_M1_seg × 2                    # so WL; RE nao projeta volume
+```
+
+### M0 vs M+1 — disponibilidade de Real
+
+| Horizonte | Real Cons | Real Seg WL |
+|-----------|-----------|-------------|
+| M0 (mes corrente, MTD) | `consorcio_receita.competencia=M0` (parcelas cravadas + pagas) | tabela comissao Seg MTD |
+| M+1 (proximo mes) | `consorcio_receita.competencia=M+1` (parcelas futuras de contratos antigos) | **0** (nao ha comissao Seg cravada para competencia futura) |
+
+Implicacao para Receita M+1: Cons soma Real + componente; Seg = `opp_M+1 / 12`
+(componente de funil apenas — sem ledger Real futuro).
+
+### Quando NAO projetar Receita (M0 nem M+1)
+
+- ~~**Seg RE**~~ **CORRIGIDO 2026-06-19:** RE AGORA PROJETA receita normalmente via
+  `opp / 12` — a antiga ressalva (rate 0,5 superestimava RE) NAO se aplica mais,
+  porque a nova formula NAO usa rate de comissao (a oportunidade ja e a comissao).
+  Nao depende mais de calibrar taxa RE com coordenadores. **So Volume RE nao e
+  projetado** (decisao do usuario). Slide Pipeline Seg RE Receita = Realizado MTD
+  + componente de funil `opp/12`.
+- **PJ2 subset Seg M+1**: M0 e M+1 seguem `opp / 12` (sem rate).
+- **PJ2 Total Receita**: nao calcular separado; **somar** Proj_Cons +
+  Proj_Seg para velocimetro #21 (Total PJ2 Receita). Meta tambem e
+  soma.
+
+### Como o Card declara
+
+```yaml
+apresentacao:
+  proj_periodos_por_indicador:
+    receita_seguros_mensal: []        # Seg RE: nao projetar nada
+    receita_seguros_mensal: ["M0"]    # PJ2-Seg: so M0
+    receita_seguros_mensal: ["M0","M+1"]  # Seg WL: ambos
+```
+
+Builder le esse campo:
+```python
+proj_periodos = card.apresentacao.proj_periodos_por_indicador.get(rec_id, ["M0"])
+if not proj_periodos:
+    # render apenas Realizado MTD + Meta (sem pbars de projecao)
+elif "M+1" in proj_periodos:
+    # render Realizado + M0 + M+1
+else:
+    # render Realizado + M0
+```
 
 ---
 

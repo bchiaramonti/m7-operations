@@ -14,7 +14,7 @@ Exibe o status do pipeline G2.2 para uma ou todas as verticais ativas.
 ## Steps
 
 1. **Localizar CICLO.md** da vertical especificada.
-   - Se vertical omitida, localizar todos os CICLOs ativos via glob `**/{vertical}/????-??-??/CICLO.md`.
+   - Se vertical omitida, localizar todos os CICLOs ativos via glob `02-Controle/**/{Vertical-cap}[-{subnivel}]/????-??/????-??-??/CICLO.md` (inclui o month-wrapper `????-??/`; o `**/` tolera o nivel level-first `N{N}/`; ignorar `_Historico/`).
    - Se nenhum ciclo encontrado: exibir `"Nenhum ciclo ativo. Inicie com /m7-controle:run-weekly {vertical}"` e parar.
 
 2. **Ler cada CICLO.md** e extrair:

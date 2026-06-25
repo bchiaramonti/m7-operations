@@ -112,6 +112,7 @@
 |-------|--------|
 | id corresponde ao nome do arquivo | {{OK/CRITICO}} |
 | domain corresponde ao subdiretorio | {{OK/CRITICO}} |
+| org_level presente e path N{org_level}/ confere (D5) | {{OK/ATENCAO}} |
 | parameters referenciados existem | {{OK/ATENCAO}} |
 | dependencies completas | {{OK/ATENCAO}} |
 | tags lowercase sem acentos | {{OK/ATENCAO}} |

@@ -1,421 +1,666 @@
-# Estrutura de Slides — Ritual de Gestao
+# Estrutura dos Slides do Deck — v3.0 (Editorial M7-2026)
 
-Referencia para o material-generator sobre a estrutura do deck de ritual. O ritual e organizado **por especialista**, nao por KPI.
+Referência canônica para o agente `material-generator` montar o deck HTML do ritual de gestão. Vigente para qualquer vertical (CON, INV, SEG, CRE, UNI), qualquer nível (N1-N5) e qualquer subnível (WL/RE/etc).
 
----
+> **Princípio fundador:** o ritual é organizado **por especialista**, não por KPI. O WBR é a única fonte de verdade — nenhum número é calculado ou inventado nesta etapa. O deck visual é editorial (TWK Everett, 1920×1080, deck-stage web component) e autocontido (CSS+fonts+JS+logos inline em base64).
 
-## Sumario
+## Sumário
 
-- [Arquitetura geral](#arquitetura-geral)
-- [Slide 1: Capa](#slide-1-capa)
-- [Slide 2: Visao Geral (Matriz)](#slide-2-visao-geral-matriz)
-- [Slide 3: Agenda](#slide-3-agenda)
-- [Bloco por Especialista (4 slides)](#bloco-por-especialista-4-slides)
-  - [Dashboard](#dashboard)
-  - [Analise](#analise)
-  - [Projecao](#projecao)
-  - [Sugestoes PPI](#sugestoes-ppi)
-- [Agenda Transicao](#agenda-transicao)
-- [Status Plano de Acao](#status-plano-de-acao)
-- [Plano de Acao (tabela)](#plano-de-acao-tabela)
-- [Encerramento](#encerramento)
-- [Regras gerais de design](#regras-gerais-de-design)
-- [Calculo de slides](#calculo-de-slides)
-
----
-
-## Arquitetura geral
-
-O deck segue esta estrutura fixa, derivada do Card de Performance da vertical:
-
-```
-1. Capa
-2. Visao Geral (Matriz 7 colunas)
-3. Agenda
-
---- Bloco Especialista 1 ---
-4. [Esp1] Dashboard
-5. [Esp1] Analise
-6. [Esp1] Projecao
-7. [Esp1] Sugestoes PPI
-8. Agenda (transicao: Esp1 concluido, Esp2 atual)
-
---- Bloco Especialista 2 ---
-9.  [Esp2] Dashboard
-10. [Esp2] Analise
-11. [Esp2] Projecao
-12. [Esp2] Sugestoes PPI
-13. Agenda (transicao: todos concluidos, Encerramento atual)
-
---- Encerramento ---
-14. Status Plano de Acao
-15. Plano de Acao (tabela)
-16. Encerramento
-```
-
-**Regra**: Um bloco por especialista listado no Card de Performance (`metadata.responsaveis`). Cada bloco tem 3 ou 4 slides (Sugestoes PPI e **condicional** — gerar APENAS se o WBR contem secao de sugestoes por assessor).
-
-**Formula**: `total_slides = 6 + n_especialistas * (slides_por_bloco + 1)`
-- `slides_por_bloco` = 4 se WBR tem sugestoes, 3 se nao tem
-- `+1` por bloco = slide de agenda transicao
-
-Exemplo: 2 especialistas sem sugestoes = 6 + 2*(3+1) = 14 slides.
-Exemplo: 2 especialistas com sugestoes = 6 + 2*(4+1) = 16 slides.
+1. [Estrutura geral](#1-estrutura-geral)
+2. [Tokens M7-2026 e tipografia](#2-tokens-m7-2026-e-tipografia)
+3. [Asset bundle e placeholders globais](#3-asset-bundle-e-placeholders-globais)
+4. [Slide 1 · Capa](#slide-1--capa)
+5. [Slide 2 · Agenda](#slide-2--agenda)
+6. [Slide 3 · Matriz](#slide-3--matriz)
+7. [Slide 4 · PA Status](#slide-4--pa-status)
+8. [Slide 5 · PA Vencendo](#slide-5--pa-vencendo)
+9. [Bloco por especialista (3 slides)](#bloco-por-especialista-3-slides)
+   - [Slide N · Dashboard](#slide-n--dashboard)
+   - [Slide N+1 · Análise (ranking)](#slide-n1--análise-ranking)
+   - [Slide N+2 · Pipeline (funil)](#slide-n2--pipeline-funil)
+10. [Slide pré-último · Consolidado](#slide-pré-último--consolidado)
+11. [Slide último · Encerramento](#slide-último--encerramento)
+12. [Regra de cor 3-tier (semáforo aplicado ao valor)](#12-regra-de-cor-3-tier-semáforo-aplicado-ao-valor)
+13. [Renumeração e composição da agenda](#13-renumeração-e-composição-da-agenda)
+14. [Anti-patterns](#14-anti-patterns)
 
 ---
 
-## Slide 1: Capa
+## 1. Estrutura geral
 
-| Campo | Fonte | Exemplo |
-|-------|-------|---------|
-| Titulo | Fixo + Card | "Ritual de Gestao N3 {Vertical}" |
-| Subtitulo | CICLO.md | "Resultados {Mes} {Ano} \| Ciclo {data}" |
-| Area/Nivel | Card | "Area: {vertical} \| Nivel: {nivel}" |
-| Diretos | Card | "Diretos: {especialista1} \| {especialista2}" |
-| Footer | Fixo | "M7 Investimentos" |
-| Background | Design System | DARK (#424135) |
+| Posição | Slide | Quantidade |
+|---------|-------|------------|
+| 1 | Capa | 1 (fixo) |
+| 2 | Agenda | 1 (fixo) |
+| 3 | Matriz {NIVEL} | 1 (fixo) |
+| 4 | PA Status | 1 (fixo) |
+| 5 | PA Vencendo | 1 (fixo) |
+| 6..(5+3N) | Bloco por especialista (Dashboard + Análise + Pipeline) | 3 × N |
+| (6+3N) | Consolidado {NIVEL} | 1 (fixo) |
+| (7+3N) | Encerramento | 1 (fixo) |
 
----
+**Fórmula:** `total_slides = 7 + 3 × N`, onde `N = len(Card.apresentacao.responsaveis)`.
 
-## Slide 2: Visao Geral (Matriz)
+Exemplos:
+- N=1 (CON N3 · Douglas): 10 slides
+- N=2 (SEG WL · Claudia + Tarcísio): 13 slides
+- N=3 (INV N1 expandido): 16 slides
+- N=6 (vertical hipotética): 25 slides
 
-Matriz de 4 colunas com semaforo por indicador, desdobrada por especialista para o mes corrente.
-
-### Estrutura da tabela
-
-```
-| Indicador | N3 | Esp1 | Esp2 |
-```
-
-- **Header row 1**: periodo ("Mes Corrente ({{periodo_mes_label}})") spanning todas as colunas de dados
-- **Header row 2**: estrutura (N3, nome especialista 1, nome especialista 2)
-- **Colunas de dados**: tons progressivos de verde-caqui (#424135 → #4f4e3c → #5f5e4c)
-
-### Secoes de indicadores (rows agrupadas — derivadas do Card)
-
-> **NUNCA hardcodar indicadores.** A lista de indicadores vem do campo `kpi_references` do Card de Performance da vertical. Cada indicador tem um `papel` que determina a secao.
-
-| Secao | Header BG | Header Color | Criterio de inclusao |
-|-------|-----------|-------------|----------------------|
-| KPIs — Resultado | `#eef77c` (lime) | `#424135` | Indicadores com `papel: kpi_principal` no Card |
-| PPIs — Processo | `#79755c` (gray) | `#FFFFFF` | Indicadores com `papel: ppi_funil` ou `papel: ppi_sugestoes` no Card |
-
-**Regra de preenchimento:**
-1. Ler `kpi_references[]` do Card de Performance
-2. Agrupar por `papel`: `kpi_principal` → secao KPIs, `ppi_*` → secao PPIs
-3. Para cada indicador do Card, buscar meta + realizado + desvio no **Painel de Indicadores** do WBR (Secao 1.5)
-4. Se o WBR nao tem dados para um indicador do Card → exibir "—" com dot cinza (verde-caqui-200). **NUNCA omitir um indicador do Card**
-5. Ordenar dentro de cada secao: vermelhos primeiro (por gap absoluto), amarelos, verdes
-
-### Celula com status
-
-Cada celula mostra: valor + meta (subscript) + desvio% (colorido) + dot de semaforo.
-
-```html
-<div class="status-cell">
-  <div class="cell-data">
-    <span class="cell-value">R$ 49,5K</span>
-    <span class="cell-meta">meta 73,4K</span>
-    <span class="cell-deviation negative">-32,6%</span>
-  </div>
-  <span class="status-dot red"></span>
-</div>
-```
-
-- Dados nao disponiveis (PPIs sem dados): exibir "—" em cor #BDBDBD
-- Legenda no rodape: No alvo (verde), Atencao (amarelo), Critico (vermelho), Sem meta (cinza)
+> **Mudança v3:** o slide histórico "Agenda Especialista" (transição) foi removido. O avatar de iniciais (`<div class="avatar">XX</div>`) no header dos slides Dashboard/Análise/Pipeline sinaliza visualmente a troca de especialista. Os 3 slides do bloco compartilham o mesmo eyebrow `Bloco K · …` (K = posição na agenda, contado de 03 em diante).
 
 ---
 
-## Slide 3: Agenda
+## 2. Tokens M7-2026 e tipografia
 
-Lista de blocos do ritual, um por especialista + encerramento.
-
-| # | Titulo | Subtitulo | Tempo |
-|---|--------|-----------|-------|
-| 1 | {Especialista 1} | Resultados, analises e acoes da estrutura | ~20 min |
-| 2 | {Especialista 2} | Resultados, analises e acoes da estrutura | ~20 min |
-| N+1 | Encerramento | Resumo do plano de acao e proximos passos | ~10 min |
-
-- Cada item: card com borda esquerda lime (#eef77c), numero em circulo verde-caqui (#424135), tempo em lime
-- Tempo por especialista: ~20 min (fixo)
-- Tempo encerramento: ~10 min (fixo)
-- Background: OFF_WHITE (#fffdef)
-
----
-
-## Bloco por Especialista (4 slides)
-
-Repetido para cada especialista. Todos os dados vem do WBR desdobrado por N2.
-
-### Dashboard
-
-**Header**: Avatar (iniciais, circulo lime) + nome + badge periodo
-
-**Layout** (3 areas verticais):
-
-1. **Tabela de indicadores** — Mesmos grupos da Matriz (KPIs + PPIs derivados do Card via `kpi_references`), filtrados para este especialista. Rows: Meta, Real, Desvio (dots coloridos). Dados do Painel de Indicadores do WBR (Secao 1.5), coluna do especialista.
-
-2. **Cards lado a lado** (2 colunas):
-   - **Acoes Executadas** (header verde-caqui): bullets com dots coloridos (verde=feito, amarelo=parcial)
-   - **Acoes Planejadas** (header verde-caqui): bullets com dots coloridos (vermelho=urgente, amarelo=planejado)
-
-3. **Riscos e Pontos de Atencao** (header vermelho #e40014): ate 3 risk items com borda esquerda vermelha
-
-**Fontes de dados**:
-- Tabela indicadores: WBR Secao 1.5 (Painel), coluna N2 do especialista
-- Acoes executadas/planejadas: WBR + plano-de-acao.csv
-- Riscos: WBR secao de riscos
-
-### Analise
-
-**Header**: Avatar + nome + desvio principal (ex: "R$ 17.898 vs R$ 44.223 (-59,5%)")
-
-**Layout** (2 paineis):
-
-1. **Painel esquerdo (55%)** — 2 graficos de barras horizontais divergentes (zero no centro):
-   - **Receita — Desvio em R$**: barras por assessor, ordenadas por desvio (positivo acima, negativo abaixo). Cores: verde (`#4CAF50`) para positivo, vermelho (`#e40014`) para negativo. Labels: nome assessor (8px), valor (8px weight 700).
-   - **Volume — Desvio em R$**: mesmo layout para volume.
-
-2. **Painel direito (45%)** — Card **Diagnostico 3G**:
-   - **PROBLEMA** (vermelho): indicador principal + gap em R$
-   - **ONDE OCORREU** (lime): quantos assessores abaixo + top 3 gaps + % do gap total (highlight amarelo)
-   - **POR QUE?** (verde-caqui): 3 causas numeradas com metricas em vermelho
-   - **DESTAQUE POSITIVO** (verde, fundo `#EFE`): 1-2 metricas positivas
-
-**Regras dos graficos de barras**:
-- Barras alinhadas ao centro (zero), com zona negativa a esquerda e positiva a direita
-- Linha central cinza (`#79755c`) de 1px
-- Altura de cada barra: 8px, border-radius 2px
-- Label do assessor: 75px, font-size 8px, text-align right, truncate com ellipsis
-- Valor: font-size 8px, weight 700, cor verde/vermelho conforme sinal
-- Ordenar por valor absoluto descendente dentro de cada zona
-
-**Fontes de dados (Analise)**:
-- **Barras por assessor**: JSON consolidado (`DADOS_PATH`), filtrar por `indicator_id` receita/volume, `especialista` = nome, `assessor` != null. Extrair `realizado`, `meta`, gap. **Fallback**: WBR narrativo (secao analise desagregada)
-- **Diagnostico 3G**: WBR narrativo (secao causa-raiz N2)
-
-### Projecao
-
-**Header**: Avatar + nome + "Projecao {Mes seguinte}" + tag "PROJECAO"
-
-**Layout** (2 colunas):
-
-1. **Coluna esquerda**:
-   - **Pipeline card** (header verde-caqui): funil por estagio do CRM
-     - Cada estagio: label + % probabilidade (colorido) + barra horizontal + contagem estagnados
-     - Estagios: Prospeccao (25%), Investigacao (25%), Apresentacao (50%), Proposta (50%), Emissao (75%)
-     - Totais no rodape: "Fecha {mes}" + "Estagnados" (vermelho se >5) + "Vol. Pond."
-   - **Tags grid** (2×2): risk cards (fundo #FEE, borda vermelha) + success cards (fundo #EFE, borda verde)
-
-2. **Coluna direita**:
-   - **Gauges** (2 semicirculos SVG lado a lado): Receita + Volume. Cor do arco conforme atingimento (<85% vermelho, 85-95% amarelo, >95% verde).
-   - **Projecao Receita**: card com rows (recorrente + pipeline ponderado) + total verde-caqui com desvio
-   - **Projecao Volume**: mesmo layout
-
-**Fontes de dados (Projecao)**:
-- **Pipeline por estagio**: JSON consolidado (`DADOS_PATH`), filtrar indicadores de funil (`oportunidades_ativas`, `oportunidades_estagnadas`) por especialista. **Fallback**: WBR narrativo (secao pipeline detalhado)
-- **Cenarios e projecao receita/volume**: WBR narrativo (secao projecoes N2)
-- **Risk/success tags**: WBR narrativo (secao riscos N2)
-
-### Sugestoes PPI (CONDICIONAL)
-
-> **Gerar este slide APENAS se o WBR contem secao de sugestoes por assessor.** Se o WBR nao tem dados de sugestoes, pular este slide — o bloco do especialista tera 3 slides em vez de 4.
-
-**Header**: Avatar + nome + "Sugestoes PPI" + tag lime "SUGESTOES"
-
-**Layout**:
-
-1. **KPI strip** (4 cards horizontais):
-   - Total Sugestoes (verde-caqui)
-   - Tx Tratamento (cor conforme semaforo)
-   - Tx Execucao (cor conforme semaforo)
-   - Tx Vencimento (cor conforme semaforo)
-
-2. **Tabela detalhada por assessor**:
-   - Colunas: Assessor, Total, Exec., Vencida, Ativa, Tx Tratam., Tx Vencim.
-   - Taxas com badges coloridos (verde >80%, amarelo 50-80%, vermelho <50%)
-   - Row total no rodape (fundo verde-caqui, texto branco)
-   - Ordenar por Tx Tratamento ascendente (piores primeiro)
-
----
-
-## Agenda Transicao
-
-Mesmo layout da Agenda (slide 3), mas com estado atualizado:
-- Especialistas concluidos: circulo verde com checkmark, opacity 0.7, borda esquerda verde
-- Especialista atual: circulo verde-caqui, opacity 1, borda esquerda lime, fundo #FFFDF5
-- Proximos: circulo cinza, opacity 0.5, borda esquerda cinza
-
-Gerar 1 slide de transicao entre cada bloco de especialista e antes do encerramento.
-
----
-
-## Status Plano de Acao
-
-**Header**: "Status do Plano de Acao" + tag "{N} ACOES | CICLO {data}"
-
-**Layout** (grid 2×2, coluna esquerda span 2 rows):
-
-1. **Status Geral** (span 2 rows): donut/pie chart com contagem total no centro. Segmentos por status.
-2. **Acoes por Semana (Prazo)**: stacked bar chart horizontal por semana ISO.
-3. **Acoes por Responsavel**: stacked bar chart horizontal por nome.
-
-**Legenda global** no rodape:
-- Nao iniciada (#BDC3C7)
-- Em andamento (#3498DB)
-- Atrasada (#E74C3C)
-- Concluida (#27AE60)
-
----
-
-## Plano de Acao (tabela)
-
-**Header**: "Plano de Acao: {N} acoes para {objetivo}" + tag "PLANO DE ACAO"
-
-**Tabela completa**:
-
-| Col | Largura | Conteudo |
-|-----|---------|----------|
-| # | 22px | Numero em circulo lime |
-| Acao | flex | Descricao da acao |
-| Causa | 90px | Indicador/metrica que originou |
-| Resp. | 60px | Nome bold verde-caqui |
-| Prazo | 42px | DD/MM em cinza |
-| Status | 70px | Badge colorido (nao iniciada/andamento/atrasada/concluida) |
-
-- Rows alternadas (#F9F9F9)
-- Dados: plano-de-acao.csv filtrado para a vertical + acoes novas do WBR
-- Ordenar por prazo ascendente
-
----
-
-## Encerramento
-
-**Background**: DARK (#424135)
-
-| Campo | Conteudo |
-|-------|----------|
-| Titulo | "Proximos Passos" |
-| Subtitulo | "Foco em {objetivo principal}" |
-| Cards (3) | Top 3 prioridades: titulo lime + descricao branca |
-| Footer | "Ritual de Gestao N3 {Vertical} \| M7 Investimentos \| {data}" |
-
-- Cards: fundo rgba(255,255,255,0.1), border-radius 8px
-- Numeros em lime (#eef77c), bold, 24px
-- Titulo de cada card em lime, descricao em branco 12px
-
----
-
-## Regras gerais de design
-
-| Regra | Detalhe |
-|-------|---------|
-| Dimensoes slide | 720pt × 405pt (16:9) |
-| Fundo content slides | `#fffdef` (OFF_WHITE), nunca branco puro |
-| Fundo dark slides | `#424135` (capa, encerramento) |
-| Header slides | `#424135`, h1 branco 18px weight 400, tags em lime |
-| Section labels | `#eef77c` (lime) para KPIs, `#79755c` (gray) para PPIs |
-| Fonte | `"twkEverett", Arial, sans-serif` |
-| Font weight | 400 headings, 500 card headers, 700 **apenas** metricas/numeros. NUNCA usar keyword `bold` |
-| Font min | 8px minimo absoluto. 10px para body/tabela. Ver escala tipografica abaixo |
-| line-height | 1.4 minimo em todo body text |
-| Semaforo | Verde `#4CAF50`, Amarelo `#FFC107`, Vermelho `#e40014` |
-| Sem meta | Dot cinza `#d0d0cc` com borda `#aeada8` |
-| Risk cards | Fundo `#FEE`, borda `#e40014`, titulo vermelho |
-| Success cards | Fundo `#EFE`, borda `#4CAF50`, titulo verde |
-| Avatar | Circulo 32px, fundo lime, iniciais verde-caqui weight 700 |
-| Footer | Numero de pagina cinza `#79755c`, 9px, alinhado a direita |
-| Dados | Identicos ao WBR — mesmo arredondamento, mesmas unidades |
-
----
-
-## Valores CSS Mandatorios
-
-O agent DEVE usar exatamente estes valores. Nao sao diretrizes — sao requisitos.
-Se o conteudo nao cabe com estes tamanhos, REDUZA CONTEUDO (menos rows, texto abreviado), NAO reduza fontes ou espacamento.
-
-> **Legibilidade > Completude.** Se uma tabela tem muitas rows para o slide a 10px: (1) dividir em 2 slides, (2) abreviar nomes de indicadores, (3) remover linhas menos criticas. **NUNCA** reduzir fonte abaixo de 8px.
-
-### Paleta de cores permitidas (EXAUSTIVA)
+Paleta canônica (qualquer hex fora desta lista é violação):
 
 | Token | Hex | Uso |
 |-------|-----|-----|
-| verde-caqui | `#424135` | Texto primario, bg headers, headings |
-| off-white | `#fffdef` | Bg slides conteudo, superficies claras |
-| lime | `#eef77c` | Labels KPI, acentos decorativos. **NUNCA como texto sobre fundo claro** |
-| verde-medio | `#4f4e3c` | Headers secundarios, bg card headers |
-| verde-claro | `#79755c` | Texto muted, meta, subtitulos, footers |
-| verde-caqui-50 | `#f6f6f5` | Rows alternadas, backgrounds sutis |
-| verde-caqui-100 | `#d0d0cc` | Bordas, separadores |
-| verde-caqui-200 | `#aeada8` | Estados desabilitados, dot cinza "sem meta" |
-| white | `#ffffff` | Fundo de cards internos |
-| success | `#4CAF50` | Positivo, dot verde, titulo success card |
-| warning | `#FFC107` | Atencao, dot amarelo |
-| error | `#e40014` | Critico, dot vermelho, borda risk card |
-| blue | `#3B82F6` | Status "em andamento" |
-| risk-bg | `#FEE` | Fundo risk cards |
-| success-bg | `#EFE` | Fundo success cards |
+| `--verde-caqui` | `#424135` | Fundo dark, headings, headers |
+| `--verde-medio` | `#4f4e3c` | Headers secundários, card-head |
+| `--verde-claro` | `#79755c` | Subtítulos, footnotes, muted text |
+| `--off-white` | `#fffdef` | Fundo light, texto sobre dark |
+| `--lime` | `#eef77c` | Accent (tags, eyebrows, lime card-head) — NUNCA texto sobre fundo light |
+| `--vc-50/100/200/300/400` | `#f6f6f5..#66655b` | Linhas alternadas, bordas, separadores |
+| `--success` | `#4caf50` | Dot/seg verde, won bars |
+| `--warning` | `#ffc107` | Dot/seg amarelo |
+| `--error` | `#e40014` | Dot/seg vermelho, lose bars, riscos |
+| `--success-text` | `#2e7d32` | Texto verde (legibilidade WCAG) |
+| `--warning-text` | `#8a6d00` ou `#d18000` | Texto amarelo |
+| `--error-text` | `#b8000f` | Texto vermelho secundário |
 
-**Qualquer outro hex e VIOLACAO.** Mapeamento dos valores incorretos comuns:
+**Tipografia:**
+- Família única `var(--font-sans)` = `"twkEverett", "twkEverett Fallback", Arial, Helvetica, sans-serif`.
+- Pesos disponíveis: 200 (Ultralight, p/ donut-num e h1 capa), 300 (Light, p/ headings grandes), 400 (Regular, body), 500 (Medium, headers/labels), 700 (Bold, valores destacados).
+- **NUNCA usar** `font-weight: bold` (use o numérico 700).
+- **Mínimo absoluto** 8px. Body padrão 13-15px.
 
-| Valor incorreto | Substituir por | Token |
-|-----------------|---------------|-------|
-| `#2C3E50` | `#424135` | verde-caqui |
-| `#D0D0D0`, `#E0E0E0` | `#d0d0cc` | verde-caqui-100 |
-| `#BDBDBD` | `#aeada8` | verde-caqui-200 |
-| `#F0F0F0`, `#F5F5F5`, `#F9F9F9` | `#f6f6f5` | verde-caqui-50 |
-| `#9E9E9E` | `#79755c` | verde-claro |
-| `#BDC3C7` | `#aeada8` | verde-caqui-200 |
-| `#3498DB` | `#3B82F6` | blue |
-| `#E74C3C` | `#e40014` | error |
-| `#27AE60` | `#4CAF50` | success |
-
-### Escala tipografica
-
-| Elemento | Tamanho Min. | Weight |
-|----------|-------------|--------|
-| Header h1 (barra escura) | 18px | 400 |
-| Section tag (barra escura) | 11px | 400 |
-| Texto tabela/body | 10px | 400 |
-| Valor metrica (cell-value) | 10px | 700 |
-| Meta (cell-meta) | 8px | 400 |
-| Desvio (cell-deviation) | 8px | 700 |
-| Legenda | 9px | 400 |
-| Card header (sub-titulo) | 11px | 500 |
-| Body em cards/diagnosticos | 10px | 400 |
-| Risk/alert items | 10px | 400 |
-| Status badge | 9px | 700 |
-| Page number | 9px | 400 |
-| **Minimo absoluto** | **8px** | qualquer |
-
-**NUNCA** font-size abaixo de 8px. **NUNCA** usar keyword `bold` — usar 400, 500 ou 700.
-
-### Espacamento minimo (grid 4px)
-
-| Elemento | Min. |
-|----------|------|
-| Content area padding | `12px 16px` |
-| Table cell padding | `4px 4px` |
-| Status dot | 14px × 14px |
-| Legend dot | 8px × 8px |
-| Card body padding | 12px |
-| Gap entre elementos | 8px |
-| line-height body text | 1.4 |
-
-Todos os valores de espacamento DEVEM ser multiplos de 4px: 4, 8, 12, 16, 20, 24, 32.
+**Dimensões:**
+- Canvas autoral 1920 × 1080 (16:9).
+- Slides são `<section>` direct children de `<deck-stage width="1920" height="1080">`.
+- Print: 1 slide por página em landscape via `@media print` do `deck-stage.js`.
 
 ---
 
-## Calculo de slides
+## 3. Asset bundle e placeholders globais
 
-| Componente | Slides |
-|------------|--------|
-| Capa + Visao Geral + Agenda | 3 |
-| Por especialista | 3 ou 4 (dashboard + analise + projecao + sugestoes PPI se disponivel) |
-| Agenda transicao (entre blocos) | n_especialistas |
-| Status + Plano + Encerramento | 3 |
-| **Total** | **6 + n_especialistas × (slides_por_bloco + 1)** |
+O agente substitui os placeholders de asset lendo `templates/assets/`:
 
-Exemplo Consorcios sem sugestoes (2 esp): 6 + 2*(3+1) = 14 slides.
-Exemplo Consorcios com sugestoes (2 esp): 6 + 2*(4+1) = 16 slides.
+| Placeholder | Origem | Conteúdo |
+|-------------|--------|----------|
+| `{{ASSET_FONT_ULTRALIGHT_B64}}` | `assets/twk-everett-ultralight.b64` | Base64 do `.otf` weight 200 |
+| `{{ASSET_FONT_LIGHT_B64}}` | `assets/twk-everett-light.b64` | Base64 weight 300 |
+| `{{ASSET_FONT_REGULAR_B64}}` | `assets/twk-everett-regular.b64` | Base64 weight 400 |
+| `{{ASSET_FONT_MEDIUM_B64}}` | `assets/twk-everett-medium.b64` | Base64 weight 500 |
+| `{{ASSET_FONT_BOLD_B64}}` | `assets/twk-everett-bold.b64` | Base64 weight 700 |
+| `{{ASSET_LOGO_OFFWHITE_B64}}` | `assets/m7-logo-offwhite.b64` | Logo claro (fundo escuro) |
+| `{{ASSET_LOGO_DARK_B64}}` | `assets/m7-logo-dark.b64` | Logo escuro (fundo claro) |
+| `{{ASSET_DECK_STAGE_JS}}` | `assets/deck-stage.js` | Conteúdo JS literal (não base64) |
+
+**Placeholders globais** (substituídos uma vez no documento):
+
+| Placeholder | Exemplo | Origem |
+|-------------|---------|--------|
+| `{{VERTICAL}}` | `Seguros` | parâmetro skill, capitalizado |
+| `{{NIVEL}}` | `N3` | `Card.metadata.nivel` |
+| `{{SUBNIVEL_SUFFIX}}` | ` · WL` ou string vazia | sufixo formatado quando subnivel ativo |
+| `{{NIVEL_TOTAL_LABEL}}` | `N3 Total` | `{NIVEL} Total` (escopo da matriz) |
+| `{{MES_ANO}}` | `Abril 2026` | Mês e ano de fechamento |
+| `{{CICLO_LABEL}}` | `S18` (semanal) ou `04/2026` (mensal) | Período do ciclo |
+| `{{DATA_FECHAMENTO}}` | `29/Abr/2026` | Data formato longo |
+| `{{DATA_FECHAMENTO_CURTA}}` | `29/04` | Data formato curto |
+| `{{ESPECIALISTAS_LISTA}}` | `Claudia Moraes · Tarcisio Catunda` | Diretos separados por `·` |
+| `{{COORDENADOR}}` | `Joel Freitas` | `Card.apresentacao.coordenador` |
+| `{{N3_SLIDE_NUM}}` | `12` | Posição do Consolidado = `6 + 3N` |
+| `{{N3_BLOCO_NUM}}` | `05` | Eyebrow do Consolidado (zerofill 2-dig) |
+| `{{N3_FNUM}}` | `12` | Numeração footer Consolidado (zerofill 2-dig) |
+| `{{ENC_SLIDE_NUM}}` | `13` | Posição do Encerramento |
+| `{{NIVEL_TOTAL_LABEL}}` | `N3 Total` | Label da última coluna da Matriz |
+
+---
+
+## Slide 1 · Capa
+
+Estrutura editorial em 2 colunas, fundo `var(--verde-caqui)` com grid-bg sutil.
+
+**Coluna esquerda (1fr)**: eyebrow `Ritual de Gestão · {NIVEL}` + bar lime; H1 `Resultados {VERTICAL}{SUBNIVEL_SUFFIX} {MES_ANO}` (font-size 116px, weight 300, lime no nome da vertical via `<em>`).
+
+**Coluna direita (1fr)**: 4 meta-blocks empilhados (Ciclo, Área·Nível, Diretos, Coordenador). Cada bloco tem `.k` em verde-claro 13px uppercase + `.v` 22px off-white com strong em lime.
+
+**Footer absoluto**: logo M7 (offwhite, 56px) à esquerda + stamp `M7 Investimentos · Ritual de Gestão` à direita.
+
+Placeholders: `{{VERTICAL}}`, `{{NIVEL}}`, `{{SUBNIVEL_SUFFIX}}`, `{{MES_ANO}}`, `{{CICLO_LABEL}}`, `{{DATA_FECHAMENTO}}`, `{{ESPECIALISTAS_LISTA}}`, `{{COORDENADOR}}`, `{{ASSET_LOGO_OFFWHITE_B64}}`.
+
+---
+
+## Slide 2 · Agenda
+
+Layout grid 320px (aside) + 1fr (timeline).
+
+**Aside**: eyebrow `Estrutura do ritual` + headline `{{AGENDA_HEADLINE}}` (44px weight 300). Default headline:
+- N≥2 especialistas: `Visão consolidada<br>+ gestão direta`
+- N=1 especialista: `Visão consolidada<br>+ direto único`
+
+**Timeline editorial** (`.agenda-tl`): linha vertical à esquerda + dots em cada `.tl-row`. Estrutura sequencial:
+
+1. **`01 — Visão · Matriz de Indicadores`** — `{{AGENDA_T_VISAO}} min` (default 8)
+2. **`02 — Operação · Plano de Ação · status das PAs`** — `{{AGENDA_T_OPERACAO}} min` (default 10)
+3. **(feature rows · 1 por especialista)** — geradas pelo agente em `{{AGENDA_TL_FEATURE_ROWS}}`. Cada row tem fundo `var(--verde-caqui)` + dot lime + `tl-num` lime + `tl-title` off-white com `<em>` lime no nome do especialista. Default 15 min/cada.
+4. **`{{AGENDA_NUM_SINTESE}} — Síntese · Consolidado {NIVEL} · sinais`** — `{{AGENDA_T_SINTESE}} min` (default 4)
+5. **`{{AGENDA_NUM_FECHAMENTO}} — Fechamento · Encerramento · Próximos passos`** — `{{AGENDA_T_FECHAMENTO}} min` (default 3)
+
+**Numeração dinâmica de tl-num**: Visão=01, Operação=02, especialistas=03..(02+N), Síntese=03+N, Fechamento=04+N.
+
+**Fórmula de tempo total** (gatekeeper SSoT #12 — coerência com Roteiro do briefing):
+```
+T_total = T_VISAO + T_OPERACAO + Σ(T_ESP_K) + T_SINTESE + T_FECHAMENTO
+       = 8 + 10 + 15*N + 4 + 3 = 25 + 15*N  (default)
+```
+Ajustável conforme briefing — o agente garante igualdade entre Slide 2 e Roteiro.
+
+Placeholders adicionais: `{{AGENDA_HEADLINE}}`, `{{AGENDA_T_VISAO}}`, `{{AGENDA_T_OPERACAO}}`, `{{AGENDA_TL_FEATURE_ROWS}}`, `{{AGENDA_NUM_SINTESE}}`, `{{AGENDA_NUM_FECHAMENTO}}`, `{{AGENDA_T_SINTESE}}`, `{{AGENDA_T_FECHAMENTO}}`.
+
+---
+
+## Slide 3 · Matriz
+
+Tabela única consolidando KPIs e PPIs por especialista. Colunas dinâmicas conforme `Card.apresentacao.responsaveis[]`.
+
+### Cabeçalho (mx-row.head)
+
+```
+| Indicador | Sem Especialista | {Esp1} | {Esp2} | … | {NIVEL_TOTAL_LABEL} |
+```
+
+- `col-ind`: fundo `var(--off-white)`, texto `var(--verde-caqui)`.
+- `col-noesp`: fundo `#353530`, texto off-white.
+- `col-esp`: fundo `var(--verde-caqui)`. Para 2º especialista, classe `.tone-2` (`--verde-medio`); 3º `.tone-3` (`#5a5945`); 4º `.tone-4` (`#6c6b54`); 5º+ usar tom incremental ou repetir.
+- `col-tot`: fundo `#5f5e4c`, font-weight 500, label `{NIVEL_TOTAL_LABEL}` (ex: `N3 Total`, `N2 Total`, `WL Total` se preferir o subnível).
+
+### Grid de colunas dinâmico
+
+O placeholder `{{MX_COLS_SPEC_FRACTIONS}}` recebe a string de fractions para `grid-template-columns`. Exemplo para N=2:
+```
+1.4fr 1fr 1fr 1fr 1fr   →   Indicador + Sem Esp + Esp1 + Esp2 + Total
+```
+
+Fórmula geral: `1.4fr` + `(N+2)` × `1fr` (Sem Esp + N Esps + Total).
+
+### Seções
+
+Duas seções obrigatórias com bandas coloridas:
+
+```html
+<div class="mx-section kpi">KPI · Indicadores de Resultado</div>
+{{MX_ROWS_KPI}}
+<div class="mx-section ppi">PPI · Indicadores de Funil</div>
+{{MX_ROWS_PPI}}
+```
+
+> **Renames v3:** `KPI · Resultado` → **`KPI · Indicadores de Resultado`**; `PPI · Resultado` → **`PPI · Indicadores de Funil`**. **Leitura canônica da seção PPI:** "O que preciso ter no meu funil para atingir minhas metas de KPI?" — PPIs trazem suas metas dos Cards (`metas_ppi[*]` top-level + `kpi_references[*].regras_meta`).
+
+### Linhas de dados (mx-row.data)
+
+Cada linha tem 1 `col-ind` + (N+2) `cell`s. Cada cell:
+
+```html
+<div class="cell {{COLOR_CLASS}}">
+  <div class="v">
+    <div class="num">{{VALOR_REALIZADO}}</div>
+    <div class="meta">{{PCT_ATINGIMENTO}}% meta · {{VALOR_META}}</div>
+  </div>
+</div>
+```
+
+- `{{VALOR_REALIZADO}}`: realizado formatado pela unidade (ex: `R$ 12K`, `8`, `28%`).
+- `{{PCT_ATINGIMENTO}}`: % de atingimento calculado conforme `direction`:
+  - `maior_melhor`: `(realizado / meta) × 100`
+  - `menor_melhor`: `(meta / max(realizado, 1)) × 100`, capado a 200%
+  - **special-case meta=0 + menor_melhor**: `100%` se `realizado==0`, `0%` se `realizado>=1`
+- `{{VALOR_META}}`: valor da meta formatado pela mesma unidade.
+- `{{COLOR_CLASS}}`: regra 3-tier (ver §12). Aplicada ao `.cell` (afeta `.num` via cascata):
+  - `.good` → ≥100%
+  - `.warn` → 70–99,9%
+  - `.bad` → <70%
+  - `.mute` → meta ausente
+- Sub-line opcional `<div class="sub">{{CONTEXTO}}</div>` quando o indicador tem contexto (ex: `8 deals` ao lado de `R$ 138K`). Vai abaixo do `.meta`.
+
+> **Sem dot semáforo na Matriz.** A coloração reside no `.num` via classe da `.cell`. Não há `<div class="dot">` aqui (o Slide 7 Dashboard mantém a coluna emoji 🔴🟡 como exceção visual).
+
+### Total = soma das colunas
+
+A coluna `col-tot` (`{NIVEL_TOTAL_LABEL}`) é renderizada como **soma** das células anteriores (Sem Esp + Esp1 + Esp2 + …). Para indicadores com unidade aditiva (BRL, count): soma direta. Para taxas (%, ticket médio): média ponderada ou recálculo a partir dos componentes — o agente lê `regras_meta.tipo_agregacao` no Card para decidir (`sum`, `weighted_avg`, `ratio`).
+
+> **Mudança v3:** anteriormente esta coluna era `M7 Total = N1 bruto`. Agora é estritamente a soma/agregação das demais colunas. Diferença vs N1 bruto representa "deals não mapeados" e fica fora do quadro (movida para `.sub` opcional ou para o callout).
+
+### Indicador "Estagnadas" — composição refatorada (TODO-MIGRACAO Item 5)
+
+Para indicadores `oportunidades_estagnadas_funil_*` (CON e SEG WL desde 2026-05-04), o agent renderiza:
+
+- **Linha principal (com semáforo 3-tier):** `% das ativas` lido de `oportunidades_estagnadas_funil_*_pct_ativas` no canonical JSON (entrada derivada gerada pelo `consolidating-wbr` Fase 4.5.a). Meta = `pct_ativas_max`. `direction: menor_melhor`.
+- **Sub-linha contextual (sem semáforo):** `qty estagnadas`.
+- **Sub-linha adicional:** `R$ volume estagnado` + `Xd média de aging` em `<div class="sub">…</div>`.
+
+Formato HTML:
+```html
+<div class="cell {{COLOR_CLASS_PCT}}">
+  <div class="v">
+    <div class="num">{{PCT_ESTAGNADAS_ATIVAS}}%</div>
+    <div class="meta">{{PCT_ATINGIMENTO}}% meta · {{PCT_ATIVAS_MAX}}% máx</div>
+    <div class="sub">{{QTY}} deals · R$ {{VOL}} · {{DIAS}}d média</div>
+  </div>
+</div>
+```
+
+**Fallback (Cards sem `pct_ativas_max` ou ciclos antigos sem entrada derivada):** render legado com `qty` como linha principal e semáforo regra a sobre `qty / meta`.
+
+### Callout final
+
+Abaixo da matriz, callout `<div class="callout {{MX_CALLOUT_CLASS}}">` com label `Leitura` e corpo curto narrando a conclusão central do ciclo. Classe `.bad` quando situação geral crítica (≥1 KPI em vermelho); default lime border.
+
+Placeholders: `{{MX_COLS_SPEC_FRACTIONS}}`, `{{MX_HEADERS}}`, `{{MX_ROWS_KPI}}`, `{{MX_ROWS_PPI}}`, `{{MX_CALLOUT_CLASS}}`, `{{MX_CALLOUT_BODY}}`, `{{NIVEL_TOTAL_LABEL}}`.
+
+---
+
+## Slide 4 · PA Status
+
+Layout 460px (donut card) + 1fr (bars + callout). Fonte: ClickUp lista `pa-resultado` (901326795742) com filtros canônicos (custom field Vertical + Responsável Externo + parent only).
+
+### Donut
+
+`{{PA_DONUT_SVG}}` é gerado pelo agente como SVG inline 200×200 com 3 segmentos (verde no prazo / amarelo atenção / vermelho atrasada). Valor central `{{PA_TOTAL}}` em weight 200 96px.
+
+Lógica de classificação por aging:
+- **No prazo**: deadline > hoje + 7d (ou sem prazo mas status ativo).
+- **Atenção**: deadline ∈ [hoje, hoje+7d].
+- **Atrasada**: deadline < hoje OU status `atrasada`/`bloqueada`.
+
+### Distribuição por owner
+
+`{{PA_BARS_BY_OWNER}}` é gerado pelo agente — uma `.bar-row` por `Responsável Externo` único, com 3 segments (verde/amarelo/vermelho) proporcionais. Cada row: `lbl` (nome), `track` (3 segs), `total` (soma).
+
+### Callout
+
+`{{PA_CALLOUT_CLASS}}` (`.bad` ou default), `{{PA_CALLOUT_LABEL}}` (`Atenção` ou `Foco`), `{{PA_CALLOUT_BODY}}` (narrativa curta extraída do `analise/action-report.md`).
+
+Placeholders: `{{PA_TOTAL}}`, `{{PA_NO_PRAZO}}`, `{{PA_NO_PRAZO_PCT}}`, `{{PA_ATENCAO}}`, `{{PA_ATENCAO_PCT}}`, `{{PA_ATRASADAS}}`, `{{PA_ATRASADAS_PCT}}`, `{{PA_DONUT_SVG}}`, `{{PA_BARS_BY_OWNER}}`, `{{PA_CALLOUT_CLASS}}`, `{{PA_CALLOUT_LABEL}}`, `{{PA_CALLOUT_BODY}}`.
+
+---
+
+## Slide 5 · PA Vencendo
+
+Tabela das PAs com prazo nos próximos 7 dias (priorização por aging crescente, top 5).
+
+### Schema da tabela
+
+```
+# | Ação | Causa raiz | Responsável | Prazo | Status
+60px | 1fr | 220px | 180px | 120px | 160px
+```
+
+### Renderização de cada linha (`{{PA_TABLE_ROWS}}`)
+
+```html
+<div class="pa-row">
+  <div class="num"><span>{{N}}</span></div>
+  <div class="acao">{{TITULO_ACAO}}</div>
+  <div class="causa">{{CAUSA_RAIZ}}</div>
+  <div class="resp">{{RESPONSAVEL}}</div>
+  <div class="prazo {{PRAZO_CLASS}}">{{DATA}}<span class="sub">{{ETIQUETA_AGING}}</span></div>
+  <div><span class="pill {{PILL_CLASS}}">{{STATUS_LABEL}}</span></div>
+</div>
+```
+
+- `{{PRAZO_CLASS}}`: `.bad` quando aging < 0 (atrasada); default sem classe.
+- `{{ETIQUETA_AGING}}`: `D-{N}` ou `D+{N}` ou `D-1 · DECISÃO` quando crítica.
+- `{{PILL_CLASS}}`: `pill-bad` (Atrasada/Bloqueada), `pill-warn` (Em curso), `pill-good` (No prazo).
+
+### Callout `Foco da semana`
+
+`{{PA_VENCENDO_FOCO}}` é narrativa curta apontando 1-3 PAs que precisam decisão imediata, citando ID/owner.
+
+---
+
+## Bloco por especialista (3 slides)
+
+O agente gera, para cada especialista K em `Card.apresentacao.responsaveis[]`, uma sequência de 3 `<section>`s consecutivos. Numeração:
+- Slide N = `5 + 3*(K-1) + 1` (Dashboard)
+- Slide N+1 = `5 + 3*(K-1) + 2` (Análise)
+- Slide N+2 = `5 + 3*(K-1) + 3` (Pipeline)
+- Bloco eyebrow K = `03..02+N` (zerofill 2-dig)
+
+Todos os 3 slides do bloco compartilham o `<div class="avatar">{{ESP_INICIAIS}}</div>` no `.h-left` como sinalizador visual.
+
+### Slide N · Dashboard
+
+Layout grid `1.4fr 1fr` — tabela à esquerda, riscos-card à direita (**leitura horizontal**, não empilhada).
+
+**Tabela 6-col:**
+```
+Indicador | Meta | Real | Desvio | Δ vs {{PREV_CICLO_LABEL}} | (stat)
+2fr | 1fr | 1fr | 1.4fr | 1.2fr | 60px
+```
+
+Bandas KPI (lime) e PPI (verde-claro) dividem as linhas.
+
+**Renderização de cada linha** (`{{ESP_DASHBOARD_ROWS_KPI}}`/`{{ESP_DASHBOARD_ROWS_PPI}}`):
+```html
+<div class="dt-row">
+  <div class="ind">{{INDICADOR}}</div>
+  <div>{{META_N2}}</div>
+  <div class="real">{{REAL_N2}}</div>
+  <div class="desv {{DESV_CLASS}}">{{DESV_FORMATTED}}</div>
+  <div class="delta">
+    <span class="arrow">{{DELTA_ARROW}}</span>
+    <span class="{{DELTA_TONE}}">{{DELTA_VAL}}</span>
+  </div>
+  <div class="stat">{{STAT_EMOJI}}</div>
+</div>
+```
+
+- `{{META_N2}}` é a meta N2 individual: agente lê `n2.{especialista}.meta` do canonical JSON `dados/dados-consolidados-{vertical}.json` quando presente (TODO-MIGRACAO Item 6 — Cards com `metas_ppi.{indicador}.por_especialista`). Fallback: meta N1 agregada.
+- `{{DESV_CLASS}}`: regra 3-tier sobre desvio relativo (`.good` ≥100%, `.warn` 70-99,9%, `.bad` <70%).
+- `{{DESV_FORMATTED}}`: `±X% · ±R$ Y` ou `±N pp` para %, ou `±N` para counts. Usar pontos percentuais (pp) para indicadores em %.
+- `{{DELTA_ARROW}}`: `▲`, `▼`, `→` (literal, cor cinza via classe `.arrow`).
+- `{{DELTA_TONE}}`: `up`/`down`/`flat` define cor (verde/vermelho/cinza) baseado em `direction` do indicador. `up` quando o delta foi favorável.
+- `{{DELTA_VAL}}`: valor literal (ex: `+12%`, `-6pp`, `+R$ 2,8M`).
+- `{{STAT_EMOJI}}`: 🔴 / 🟡 / 🟢 / ⚪ por % atingimento (3-tier do §12). **Mantido nesta coluna** como exceção visual da Matriz.
+
+**Indicador "Estagnadas" no Dashboard** (Item 5): mesma lógica da Matriz — linha principal `% das ativas`, sub-line `qty + R$ + dias`. A coluna stat usa o emoji baseado em `% das ativas` vs `pct_ativas_max`.
+
+**Riscos card** (`{{ESP_RISCOS}}`):
+- 3-4 itens `<div class="risk-item"><strong>{{TITULO_CURTO}}</strong> {{NARRATIVA}}.</div>`
+- Cada item destaca 1 risco do WBR para esse especialista (concentração, queda de conv., subutilização etc.).
+
+Placeholders por especialista: `{{ESP_NOME}}`, `{{ESP_INICIAIS}}`, `{{ESP_BLOCO_NUM}}`, `{{ESP_FNUM_DASH}}`, `{{ESP_DASHBOARD_ROWS_KPI}}`, `{{ESP_DASHBOARD_ROWS_PPI}}`, `{{ESP_RISCOS}}`, `{{PREV_CICLO_LABEL}}`.
+
+### Slide N+1 · Análise (ranking)
+
+Layout grid `1.4fr 1fr` — rank-card à esquerda, side-cards à direita.
+
+**Rank-card** (`.rank-card`): cabeçalho 5-col `Assessor | Ativas | Criadas | Fechadas | Estagnadas`.
+
+Bloco 1 — `<div class="rank-section squad">Squad {{ESP_PRIMEIRO_NOME}} · {{ESP_SQUAD_SIZE}} assessores</div>` em lime/preto.
+
+Cada `.rank-row` da squad:
+```html
+<div class="rank-row">
+  <div class="rname{{ESP_FLAG}}">{{NOME_ASSESSOR}}{{ESP_TAG}}</div>
+  <div class="rcell{{EMPTY}}"><div class="mini"><div class="fb fb-good" style="width:{{W}}%"></div></div><div class="vlbl">{{QTY}} · R$ {{VOL}}</div></div>
+  …
+</div>
+```
+- `.rname.esp` (italic + bold) quando o assessor é o próprio especialista (label `(esp)` adicionado).
+- `.rname.outside` (cinza muted) na seção `Fora da squad`.
+- `.rcell.empty` quando sem dado (mini track vazio + vlbl `—`).
+- Larguras das bars são percentuais relativos ao máximo daquela coluna.
+
+**Linhas verticais entre rcells:** `border-left: 1px solid var(--vc-100)` (versão escurecida vs `--vc-50` antigo).
+
+**Coluna "Fechadas" — bars duplas (won + lose):**
+```html
+<div class="rcell">
+  <div class="mini dual">
+    <div class="fb fb-won"  style="width:{{W_WON}}%">  </div>
+    <div class="fb fb-lose" style="width:{{W_LOSE}}%"> </div>
+  </div>
+  <div class="vlbl">{{WON}} won · {{LOSE}} lose</div>
+</div>
+```
+Larguras proporcionais ao total de oportunidades fechadas (won+lose) do mês. Fonte: `taxa_conversao_funil_*` (Bitrix won/lose), não ClickHouse.
+
+Bloco 2 — `<div class="rank-section outside">Fora da squad · referência</div>` (cinza/muted) + linhas com `.outside`.
+
+**Side cards** (`{{ESP_SUMMARY_CARDS}}`): até 5 `.summary-card`s seguidos de 1 `.callout`:
+
+1. **Concentração de receita** — `sv` mostra `X / Y` (top contribuintes / total squad). `sd` aponta single-point-of-failure.
+2. **Cobertura** — `sv.bad` quando <50%; mostra `assessores_com_deal_ativo / total_squad`.
+3. **Estagnação · alerta** — `sv.bad`; mostra dias médios ou `qty estagnados`.
+4. **Assessores com opp criada no mês (NOVO)** — `sv` mostra `X / Y` (assessores com ≥1 `oportunidades_criadas_funil_*` no mês / total_squad). Calculado pelo agente sobre o canonical JSON agrupando por `responsavel_id` distinct dentro do mês.
+5. **Oportunidades sem atividade planejada — variante LISTA (NOVO)** (`.summary-card.list`) — fonte: indicador `oportunidades_sem_atividade_planejada_funil[_seg]` (canonical JSON, `nivel='Detalhe'` filtrado por `especialista=ESP_NOME`).
+
+   **Layout 2-linhas por item** (atualizado 2026-05-05):
+   ```
+   ┌─────────────────────────────────────────────────────┐
+   │ Marina Bonelli — Vida 500K                          │  ← linha 1: dl-name
+   │ Bruna Fontes · COTAÇÃO                              │  ← linha 2: dl-resp · dl-stage
+   │ ─────────────                                        │
+   │ Carlos Tinoco — Patrimônio                          │
+   │ Tarcisio Catunda (esp) · PROPOSTA  ← classe .esp    │  italic+muted quando não há assessor
+   │ ─────────────                                        │
+   │ Empresa XYZ — Empresarial                           │
+   │ Pedro Ramos · APRESENT.                             │
+   └─────────────────────────────────────────────────────┘
+   ```
+
+   **HTML por item:**
+   ```html
+   <li>
+     <div class="dl-name">{nome_deal}</div>
+     <div class="dl-meta">
+       <span class="dl-resp{| esp if assessor null/vazio}">{assessor_ou_esp_label}</span>
+       <span class="dl-stage{| late if dias_sem_atividade > 14}">{estagio}</span>
+     </div>
+   </li>
+   ```
+
+   **Regras de renderização:**
+   - Top 5 deals ordenados por `dias_sem_atividade DESC` (mais críticos primeiro).
+   - **Coluna responsável** (linha 2 esquerda):
+     - `assessor` populado no JSON → texto normal (`Bruna Fontes`).
+     - `assessor` null/vazio → italic muted com sufixo `(esp)` (`Tarcisio Catunda (esp)`).
+   - Estágio em uppercase pequeno; classe `.late` (vermelho + bold) quando `dias_sem_atividade > 14`.
+   - Header `<div class="sh">Sem atividade planejada<span class="sh-count">{N} deals</span></div>`.
+   - Se total > 5: `<div class="more-note">+{total-5} restante(s)</div>`.
+   - Se 0 deals (ideal): render `<div class="sd">Sem deals nesta condição.</div>` em verde-claro.
+
+   **Filtro de pipeline:**
+   - SEG: `STAGE_SEMANTIC_ID='P'` (inclui On Hold C156:UC_1SS9EP por design — ver YAML).
+   - CON: whitelist por NOME `STAGES_ATIVO = {Prospecção, Investigação, Apresentação, Proposta, Emissão de Contrato, Cotas Alocadas}` (exclui "Cotas Fechadas/Vencidas/Contempladas/Finalizadas" que têm semantic_id='P' mas são deals já ganhos).
+   - Card sem o indicador (verticais ainda não migradas) → pular este card silenciosamente (degradação graciosa).
+
+   **Aparição também na Matriz (Slide 3) e Dashboard (Slide N por especialista) — NOVO 2026-05-05:**
+   - Após ser declarado com `papel: ppi_funil` no Card e `metas_ppi.qty: pendente`, o indicador aparece como linha de **PPI · Indicadores de Funil** na Matriz consolidada e no Dashboard de cada especialista.
+   - Renderização: realizado normal (qty + sub-label "Meta pendente"); dot/cor cinza no semáforo (regra de meta ausente).
+   - Quando meta for definida (3-6 ciclos de baseline), o card transita para semáforo 3-tier normal sem mudança no agente.
+6. **Callout `Comparativo`** (apenas quando N≥2) — compara métrica do especialista vs outro(s) do squad. Classe `.bad` se este está pior.
+
+### Slide N+2 · Pipeline (funil)
+
+Layout: kpi-row (6 tiles fixos) + grid `1fr 1fr` (funnel + cards laterais).
+
+**KPI tiles** (`{{ESP_KPI_TILES}}` — agente compõe 6):
+```
+Deals ativos · Volume ativo · Ticket médio · Estagnados · Squad c/ opp · Conv. mês
+```
+Cada `.kpi-tile`: valor `.v` (com classe `.bad`/`.warn`/`.good` por status) + label `.l`. Agent computa estagnados em vermelho se 100%; conversão em verde se ≥40%; etc.
+
+**Funil SVG** (`{{ESP_FUNNEL_SVG}}`): SVG inline 720×380 com N estágios do pipeline (lê `Card.kpi_references` ou cabeçalho do indicador `oportunidades_*_funil_*`). Cada estágio é um polygon centralizado, decrescente em largura proporcional ao volume relativo. Cores interpoladas linear de `var(--vc-500)` (topo) a `#2e7d32` (último, quando há volume) ou `var(--error)` (acúmulo terminal). Anotações:
+- Lateral esquerda: `% conversão entre estágios` (cinza ou vermelho/verde se crítico).
+- Lateral direita: `qty deals · R$ valor`.
+- Footer: diagnóstico curto (gargalo principal, em vermelho).
+
+**Cards laterais** (3 vertical):
+1. **Destaque** (success) — pontos positivos (top-deals, conversão).
+2. **Estagnação** (error) — bloqueios, deals parados.
+3. **Projeção · `{{ESP_PROJECAO_LABEL}}`** (muted) — projeção de fechamento.
+
+**Card Projeção (v3.2.0 — 2026-05-04):** card EXPANDIDO para Receita E Volume com 6 bars total (3 por métrica × Realizado MTD + Proj. mês corrente + Proj. mês seguinte).
+
+Lê `{cycle_folder}/analise/projection-by-especialista.json` (gerado por E5 v6.2.0+ via método `installment_amortization` para receita + `pipeline_conversion_extended` para volume — resolve KNOWN_ISSUES.md ISSUE #1).
+
+**Estrutura visual:**
+```
+┌─ Projeção · {Provável|Possível|Improvável} ─────────────┐
+│ RECEITA                                                  │
+│   Realizado MTD          [████░░░░░] R$ 56,8K            │
+│   Proj. Mai              [██████░░░] R$ 59,8K            │
+│   Proj. Jun              [█████████] R$ 62,0K            │
+│ ─────────────────────                                     │
+│ VOLUME                                                   │
+│   Realizado MTD          [██████░░░] R$ 14,5M            │
+│   Proj. Mai              [█████████] R$ 15,3M            │
+│   Proj. Jun              [████░░░░░] R$ 13,7M            │
+│ Meta Mai: R$ 110K · gap proj. -R$ 50K. {comentário}     │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Placeholders:**
+- `{{ESP_PROJECAO_LABEL}}`: classificação consolidada (pega o pior dos dois — se Receita=Provável e Volume=Improvável, label = Improvável).
+- `{{ESP_PROJECAO_RECEITA_BARS}}`: 3 `.proj-row` consecutivos (Realizado MTD + Proj. {MES_CORR} + Proj. {MES_SEG}). Cada bar: `.fill` largura proporcional à `meta_mes` (cap 100%); cor 3-tier sobre `pct_atingimento_proj` (verde ≥100%, amarelo 80-99%, vermelho <80%).
+- `{{ESP_PROJECAO_VOLUME_BARS}}`: idem para Volume. Quando `Card.regras_meta.meta=0` (ex: SEG WL/RE Volume), cor neutra `var(--verde-caqui)` proporcional ao maior valor (sem comparação).
+- `{{ESP_PROJECAO_NOTA}}`: `Meta {MES_CORR}: R$ X · gap proj. {±} R$ Y. {comentário curto}`. Sufixar `(confiança baixa em {Receita|Volume})` quando aplicável.
+
+**Source data por especialista (no JSON):**
+```json
+{
+  "receita_*_mensal": {
+    "realizado_mtd": <num>, "meta_mes": <num>,
+    "projecao_mes_corrente": <num>, "projecao_mes_seguinte": <num>,
+    "classificacao": "Provavel|Possivel|Improvavel",
+    "confianca": "high|medium|low",
+    "comentario": "..."
+  },
+  "volume_*_mensal": { ...mesma estrutura... }
+}
+```
+
+**Métodos (resumo, detalhe em `m7-controle/skills/projecting-results/SKILL.md`):**
+- **Receita** (`installment_amortization`): LAGGING (parcelas das vendas dos N-1 meses anteriores caindo no mês alvo, lidas do ledger ClickHouse) + NOVA (1ª parcela do volume projetado × commission_rate / 12).
+- **Volume** (`pipeline_conversion_extended`):
+  - Mês corrente: `Vol_Oport_Ativas × Taxa_Conversao_Mes`
+  - Mês seguinte: `(pipeline_residual + entradas_novas_3m_média) × Taxa_Conversao`
+
+**Quando renderizar o card:**
+- 2 sections (default): Card tem `kpi_references[].projecao.obrigatoria == true` para Receita E Volume (CON v2.4.0+, SEG WL v2.10.0+, SEG RE v1.2.0+).
+- 1 section: só uma das métricas com obrigatoria=true.
+- Sem card: nenhuma das duas (raro — só se Card explicitamente desabilita).
+
+**Fallback gracioso:**
+- `projecao_mes_seguinte` ausente no JSON → bar vazia + vlbl `—` + classe `.confidence-low` (italic muted).
+- `confianca == "low"` → mesma classe no `.v` (sinal visual de incerteza).
+- JSON ausente (E5 não rodou ou falhou) → toda section em `.confidence-low` com vlbls `—`. Não bloqueia o slide.
+
+---
+
+## Slide pré-último · Consolidado
+
+Sempre gerado, independente de N. Posição = `6 + 3*N`.
+
+Layout grid `1fr 1fr` — esquerda (KPIs + Receita por direto), direita (Top riscos + Sinais positivos).
+
+**KPI tiles N3** (`{{N3_KPI_TILES}}` — 3 tiles):
+- `Receita {NIVEL} · X% meta` (em vermelho quando <70%, amarelo 70-99,9%, verde ≥100%)
+- `Volume · X% meta`
+- `Deals · Y estagn.` (warn quando estagnação >40%)
+
+**Card "Receita por direto · MTD vs meta"** (`{{N3_BARRAS_POR_DIRETO}}` — 1 `.bar-row` por especialista + 1 row consolidado):
+```html
+<div class="bar-row" style="grid-template-columns: 200px 1fr 110px;">
+  <div class="lbl">{{ESP_NOME}}</div>
+  <div class="track" style="height:32px;"><div class="seg fill-{{TONE}}" style="width:{{PCT}}%;{{COLOR}}">{{PCT}}%</div></div>
+  <div class="total">R$ {{REAL}} / {{META}}</div>
+</div>
+```
+Última row é `{NIVEL} consolidado` (soma agregada). `.fill-lime` para 70-100%, `.fill-bad` para <70%, verde sólido para ≥100%.
+
+**Card "Top 3 riscos {NIVEL}"** (`{{N3_TOP_RISCOS}}` — 3 `.risk-item`s): priorização por impacto (volume × probabilidade). Origem: WBR Riscos + análise de desvios E3.
+
+**Card "Sinais positivos"** (`{{N3_SINAIS_POSITIVOS}}` — 3 `.risk-item`s com `border-left-color:#4caf50`): WBR Recomendações executadas + ações concluídas no ciclo.
+
+**Quando N=1** (1 especialista): omitir o card `Receita por direto` (trivial) e reorganizar layout: mover "Top riscos" + "Sinais positivos" para 2 colunas largas. Manter os 3 KPI tiles à esquerda + 1 callout adicional (síntese da operação) embaixo.
+
+---
+
+## Slide último · Encerramento
+
+Posição = `7 + 3*N`. Fundo dark `var(--verde-caqui)`, layout editorial com 3 next-cards em grid.
+
+**Head row**: bar lime + eyebrow `Encerramento · {{CICLO_LABEL}}` (lime); H2 `Próximos <em>passos</em>` (lime no `<em>`); intro `{{ENC_INTRO}}` (default `Decisões que precisam sair do ritual antes do fechamento de {{PROX_PERIODO}}.`); logo offwhite à direita.
+
+**Next-grid 3-col** (`{{NEXT_CARDS}}`): 1 a 4 `.next-card`s. Cada decisão da Seção 4 do briefing vira um card:
+```html
+<div class="next-card">
+  <div class="nc-num">{{NN}}</div>
+  <div class="nc-title">{{TITULO_DECISAO}}</div>
+  <div class="nc-meta">
+    <div><div class="k">Formato</div><div class="v">{{FORMATO_BINARIO}}</div></div>
+    <div><div class="k">Owner</div><div class="v">{{OWNER}}</div></div>
+    <div><div class="k">Prazo</div><div class="v">{{PRAZO}}</div></div>
+  </div>
+  <div class="nc-risk">
+    <div class="k">Sem decisão</div>
+    <div class="v">{{CONSEQUENCIA}}</div>
+  </div>
+</div>
+```
+
+**Layout adaptativo:**
+- D=1: 1 card centralizado (60% width).
+- D=2: 2 cards lado a lado (cada 1fr).
+- D=3: 3 cards 1fr cada (default visual).
+- D=4: 4 cards (grid passa a `repeat(4, 1fr)` ou empilha 2x2 se viewport apertar).
+
+**Coerência crítica (gatekeeper SSoT #10):** `count(NEXT_CARDS) == count(briefing.decisoes)` e títulos idênticos.
+
+**Closing-foot**: rodapé com `<strong>Ritual de Gestão {NIVEL} {VERTICAL}{SUBNIVEL_SUFFIX}</strong>` à esquerda + `{CICLO_LABEL} · {DATA_FECHAMENTO} · Fechamento` à direita.
+
+---
+
+## 12. Regra de cor 3-tier (semáforo aplicado ao valor)
+
+Para QUALQUER indicador com meta, o agente computa `pct_atingimento` e mapeia em uma de 4 classes:
+
+| % atingimento | Classe CSS | Cor primária | Significado |
+|---------------|------------|--------------|-------------|
+| ≥ 100% | `.good` | `#2e7d32` (`--success-text`) | Atingiu/superou |
+| 70 – 99,9% | `.warn` | `#d18000` (warning-text) | Atenção |
+| < 70% | `.bad` | `#e40014` (`--error`) | Crítico |
+| meta ausente / null | `.mute` | `#aeada8` (`--vc-200`) | Sem comparação |
+
+**Fórmula:**
+- `direction: maior_melhor` (default KPIs/PPIs de volume/criadas/conversão): `pct = (real / meta) × 100`
+- `direction: menor_melhor` (estagnadas, lose rate): `pct = (meta / max(real, 1)) × 100`, capado a 200%
+
+**Special-case `meta=0` + `direction: menor_melhor`** (zero-target, ex: `oportunidades_sem_atividade_planejada_funil[_seg]`):
+- `real = 0` → `pct = 100%` → `.good` (verde — atingiu o ideal)
+- `real >= 1` → `pct = 0%` → `.bad` (vermelho — qualquer valor >0 é desvio)
+
+> A fórmula padrão `meta/max(real,1) × 100` produziria `0%` mesmo com `real=0` quando `meta=0` (matematicamente quebrado). O agente DEVE detectar `meta=0 AND direction=menor_melhor` e aplicar a regra special-case acima antes de cair na fórmula padrão.
+
+**Aplicação por slide:**
+- Slide 3 (Matriz): classe na `.cell` afeta `.num`. Sem dot.
+- Slide 6/9/… Dashboard: classe em `.desv` (coluna Desvio). Coluna stat usa emoji 🟢🟡🔴⚪ pelo mesmo % atingimento.
+- Slide 8/11/… Pipeline KPI tiles: classe em `.v`.
+- Slide 12 Consolidado: classe em `.v` dos KPI tiles + `.fill-{tone}` nos bars de Receita por direto.
+
+---
+
+## 13. Renumeração e composição da agenda
+
+O agente computa, em ordem:
+
+1. `N = len(Card.apresentacao.responsaveis)`
+2. `total_slides = 7 + 3*N`
+3. Numerar `<section>`s sequencialmente; `data-label` recebe sufixo curto.
+4. `f-num` no footer = posição zerofill 2-dig (`01`..`NN`).
+5. Eyebrows dos blocos por especialista K = `Bloco {03..02+N} · …`. Slide 12 = `Bloco {03+N}`. Slide 13 (Encerramento) sem eyebrow numerado.
+6. Tempo total = T_VISAO (8) + T_OPERACAO (10) + Σ T_ESP_K (15 default) + T_SINTESE (4) + T_FECHAMENTO (3) = **25 + 15*N min** (default; ajustável).
+
+---
+
+## 14. Anti-patterns
+
+- **NUNCA** usar cor fora da paleta M7-2026 documentada.
+- **NUNCA** organizar slides por KPI — o ritual é por especialista.
+- **NUNCA** pular um especialista do Card.
+- **NUNCA** calcular números — todos vêm do WBR/canonical JSON.
+- **NUNCA** usar `font-weight: bold` (use 700 numérico).
+- **NUNCA** usar dot/emoji de semáforo na **Matriz** (Slide 3) — apenas no Dashboard (Slide 6/9/…) na coluna stat.
+- **NUNCA** quebrar a fórmula `total_slides = 7 + 3*N` — falha automática do gatekeeper de contagem.
+- **NUNCA** renderizar Total da Matriz como N1 bruto — sempre soma das colunas.
+- **NUNCA** ignorar `n2.{esp}.meta` quando presente no canonical JSON — usar como meta individual no Dashboard.
+- **NUNCA** ignorar `oportunidades_estagnadas_funil_*_pct_ativas` quando presente — render como linha principal.
+- **NUNCA** mergear cards de subníveis distintos numa mesma execução — 1 ritual = 1 card.
+- **NUNCA** publicar com gatekeeper SSoT falhando (#7 rastreabilidade armadilha→WBR; #10 decisões briefing==slide encerramento; #12 tempo briefing==agenda; #15 replicação 03-Rituais byte-equal).

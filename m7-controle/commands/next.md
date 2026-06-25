@@ -1,20 +1,39 @@
 ---
 description: Avanca o pipeline G2.2 para a proxima fase pendente. Le CICLO.md, identifica a proxima fase com status "pendente", verifica entry criteria e invoca a skill correspondente via agent correto.
-argument-hint: [vertical]
+argument-hint: [vertical] [subnivel]
 ---
 
 # m7-controle:next
 
-Avanca o pipeline G2.2 para a proxima fase pendente de uma vertical.
+Avanca o pipeline G2.2 para a proxima fase pendente de uma vertical (ou Card especifico em vertical com subnivel).
 
 ## Input
 
 - **vertical** (opcional): `$ARGUMENTS[0]` — nome da vertical em kebab-case. Se omitido, usa a ultima vertical ativa registrada no CICLO.md mais recente.
+- **subnivel** (condicional): `$ARGUMENTS[1]` — quando a vertical tem 2+ Cards split (ex: SEG `wl`/`re`), define qual Card retomar. Alinhado com `m7-controle:run-weekly`. v6.5.0+.
 
 ## Steps
 
-1. **Localizar CICLO.md** da vertical no diretorio de trabalho, buscando em `{vertical}/????-??-??/CICLO.md`.
-   - Se nao encontrado, criar novo ciclo para a data atual (YYYY-MM-DD) usando o template padrao (incluindo criacao da estrutura de pastas).
+0. **Resolver OUTPUT_VERTICAL_DIR** (label simbolico para logs/UI):
+   - Se `$ARGUMENTS[1]` passado: `OUTPUT_VERTICAL_DIR = "{vertical}-{subnivel}"` (ex: `seguros-wl`)
+   - Se ausente: `OUTPUT_VERTICAL_DIR = "{vertical}"`
+   - Validar que o subnivel existe em algum Card da vertical (mesma logica do `run-weekly` Step 1.1); se invalido, exibir erro e parar.
+
+0b. **Resolver CARD_PATH** (Card unico, mesma logica run-weekly Step 1.1):
+   - Identificar o Card alvo dado vertical+subnivel; sair com erro se ambiguo ou ausente.
+
+1. **Localizar CICLO.md** do Card:
+   - `Glob('02-Controle/**/{Vertical-cap}[-{subnivel}]/????-??/????-??-??/CICLO.md')` — o `**/` tolera o segmento de nivel level-first (`N{N}/`) quando ativo e o layout legado quando OFF; ignorar `_Historico/`.
+   - Pegar o mais recente.
+   - Se nao encontrado, criar novo ciclo para a data atual (YYYY-MM-DD) usando o template padrao + helper `resolve_controle_path.py`:
+     ```bash
+     CYCLE_DIR_ABS=$(python3 {plugin_dir}/m7-controle/skills/collecting-data/scripts/resolve_controle_path.py \
+       --base-dir {DESEMPENHO_ROOT} \
+       --vertical {vertical} \
+       --ciclo-date {YYYY-MM-DD} \
+       --card-path {CARD_PATH} \
+       --create)
+     ```
 
 2. **Identificar proxima fase pendente** lendo a tabela Progresso do CICLO.md. A ordem de execucao e fixa:
    - E2 → E3 → E4 → E5 → E6
@@ -48,6 +67,8 @@ Avanca o pipeline G2.2 para a proxima fase pendente de uma vertical.
    | E5 | projecting-results |
    | E6 | consolidating-wbr |
 
+   > **E6 roda em 2 passadas do analyst (v6.5.0):** a skill consolidating-wbr orquestra Passada 1 (canonical) → **main thread roda `normalize_canonical` + `inject_metas_ppi` (Fase 4.6)** → Passada 2 (Estruturado/Narrativo do canonical injetado) → gate `validate-painel`. Seguir a secao "Modelo de Execucao" do SKILL.md — NAO tratar E6 como uma unica chamada do analyst.
+
    Contexto disponivel para a skill: vertical, periodo (YYYY-MM), granularidade, checkpoint_label, data_inicio, data_fim, dias_uteis_totais, dias_uteis_decorridos, dias_uteis_restantes, caminho da pasta do ciclo e artefatos anteriores. Todos estes valores sao lidos do header do CICLO.md.
 
 6. **Gate especial apos E2** (apenas quando fase executada = E2):
@@ -78,7 +99,7 @@ Avanca o pipeline G2.2 para a proxima fase pendente de uma vertical.
 |---------|------|
 | CICLO.md nao encontrado | Criar novo ciclo para a data atual (YYYY-MM-DD) com estrutura de pastas |
 | Entry criteria nao atendido | Exibir pre-requisito faltante e parar |
-| Todas as fases concluidas | Exibir: `"Pipeline G2.2 concluido para {vertical}. Proximo: /m7-ritual-gestao:prepare-ritual {vertical}"` |
+| Todas as fases concluidas | Exibir: `"Pipeline G2.2 concluido para {VERTICAL_LABEL}. Proximo: /m7-ritual-gestao:prepare-ritual {vertical}{SUBNIVEL_SUFIX}"` |
 | Skill falha durante execucao | Registrar erro no CICLO.md (Anomalias + Log), exibir detalhes e sugerir retry |
 
 ## Output
@@ -86,13 +107,16 @@ Avanca o pipeline G2.2 para a proxima fase pendente de uma vertical.
 Exibir ao usuario:
 
 ```
-Executando fase {fase} ({skill}) para {vertical}...
+Executando fase {fase} ({skill}) para {VERTICAL_LABEL}...
 Agent: {agent}
 Entry criteria: {descricao}
 
 [... execucao da skill ...]
 
 {fase} concluida em {duracao}
-Output: {vertical}/{YYYY-MM-DD}/{caminho-artefato}
-Proximo: /m7-controle:next {vertical} ({proxima-fase}: {proxima-skill})
+Output: {CYCLE_DIR_ABS}/{caminho-artefato}
+Proximo: /m7-controle:next {vertical}{SUBNIVEL_SUFIX} ({proxima-fase}: {proxima-skill})
 ```
+
+> `{VERTICAL_LABEL}` = `"{vertical} ({subnivel})"` quando subnivel ativo, senao apenas `vertical`.
+> `{SUBNIVEL_SUFIX}` = `" {subnivel}"` quando ativo, senao string vazia.

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://m7.com.br/schemas/e4-acoes-v1.0.json",
+  "title": "E4 Acoes Sidecar v1.0",
+  "description": "Schema do sidecar JSON emitido por E4 (summarizing-actions Fase 6.5) em S2a B4.18 (2026-05-18). Consumido por E6 Fase 4.5.e e injetado em canonical.acoes.*.",
+  "type": "object",
+  "required": ["_schema", "vertical", "data_referencia", "acoes"],
+  "properties": {
+    "_schema": {
+      "type": "string",
+      "const": "e4-acoes v1.0"
+    },
+    "_generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "vertical": {"type": "string"},
+    "data_referencia": {"type": "string", "format": "date"},
+    "escopo_fonte": {
+      "type": "string",
+      "description": "Documentacao do escopo (ex: 'escopo_ritual_passado + ad_hoc_pos_ritual')"
+    },
+    "filtros_aplicados": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "acoes": {
+      "type": "object",
+      "required": ["criticas", "atrasadas", "em_dia_priorizadas", "concluidas_eficazes"],
+      "properties": {
+        "criticas": {"type": "array", "items": {"$ref": "#/$defs/task_item"}},
+        "atrasadas": {"type": "array", "items": {"$ref": "#/$defs/task_item"}},
+        "em_dia_priorizadas": {"type": "array", "items": {"$ref": "#/$defs/task_item"}},
+        "concluidas_eficazes": {"type": "array", "items": {"$ref": "#/$defs/task_item"}}
+      }
+    },
+    "metricas_agregadas": {
+      "type": "object",
+      "properties": {
+        "total_escopo": {"type": "integer", "minimum": 0},
+        "total_criticas": {"type": "integer", "minimum": 0},
+        "total_atrasadas": {"type": "integer", "minimum": 0},
+        "total_em_dia": {"type": "integer", "minimum": 0},
+        "total_concluidas_periodo": {"type": "integer", "minimum": 0},
+        "volume_em_risco": {"type": ["number", "null"]},
+        "receita_em_risco": {"type": ["number", "null"]},
+        "taxa_conclusao_30d_pct": {"type": ["number", "null"]},
+        "aging_medio_dias": {"type": ["number", "null"]}
+      }
+    }
+  },
+  "$defs": {
+    "task_item": {
+      "type": "object",
+      "required": ["id", "name", "status"],
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "status": {"type": "string"},
+        "priority": {"type": ["string", "null"]},
+        "due_date": {"type": ["string", "null"]},
+        "date_created": {"type": ["string", "null"]},
+        "date_updated": {"type": ["string", "null"]},
+        "date_closed": {"type": ["string", "null"]},
+        "responsavel_externo": {"type": ["string", "null"]},
+        "indicador_impactado": {"type": ["string", "null"]},
+        "origem": {"type": ["string", "null"]},
+        "receita_impacto": {"type": ["number", "null"]},
+        "volume_impacto": {"type": ["number", "null"]},
+        "subtasks_pendentes": {
+          "type": ["array", "null"],
+          "items": {"type": "string"}
+        },
+        "criada_em_ritual_anterior": {"type": "boolean"},
+        "aging_dias": {"type": ["integer", "null"]},
+        "dias_restantes": {"type": ["integer", "null"]},
+        "eficacia": {
+          "type": ["string", "null"],
+          "enum": ["eficaz", "parcial", "sem_efeito", "dados_insuficientes", null]
+        },
+        "url": {"type": "string"}
+      }
+    }
+  }
+}

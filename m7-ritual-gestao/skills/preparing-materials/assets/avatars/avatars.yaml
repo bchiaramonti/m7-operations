@@ -1,0 +1,50 @@
+# Avatar registry — SoT das base64 dos especialistas e text labels dos eixos PJ2.
+# Cards declaram `apresentacao.responsaveis[i].avatar_key` (N3) ou `.id_circulo` (PJ2);
+# builder resolve aqui, lê o arquivo .b64 referenciado em `base64_file` e injeta em
+# `.circulo-id` como `data:image/png;base64,...` (~56-64px, fundo lime #EEF77C).
+# Decisão registrada em reference_avatar_circulo_id.md (memory).
+
+specialists:
+  douglas_silva:
+    vertical: consorcios_n3
+    nome: "Douglas Silva"
+    base64_file: "douglas_silva.b64"   # png ~190KB
+
+  tereza_bernardo:
+    vertical: consorcios_n3
+    nome: "Tereza Bernardo"
+    base64_file: "tereza_bernardo.b64" # png ~350KB
+
+  claudia_moraes:
+    vertical: seguros_n3_wl
+    nome: "Cláudia Moraes"
+    base64_file: "claudia_moraes.b64"  # jpeg ~30KB
+
+  tarcisio_catunda:
+    vertical: seguros_n3_wl
+    nome: "Tarcísio Catunda"
+    base64_file: "tarcisio_catunda.b64" # png ~325KB
+
+  emmanuel_martins:
+    vertical: seguros_n3_re
+    nome: "Emmanuel Martins"
+    base64_file: "emmanuel_martins.b64" # jpeg ~30KB
+
+  # samuel_sinval: migrado para text_circles abaixo até foto profissional ficar pronta.
+
+text_circles:
+  SEG:
+    vertical: pj2_n2
+    label: "SEG"
+    full_name: "Seguros"
+
+  CON:
+    vertical: pj2_n2
+    label: "CON"
+    full_name: "Consórcios"
+
+  SS:
+    vertical: seguros_n3_re
+    label: "SS"
+    full_name: "Samuel Sinval"
+    # TODO: migrar para specialists/samuel_sinval quando foto profissional estiver disponível.

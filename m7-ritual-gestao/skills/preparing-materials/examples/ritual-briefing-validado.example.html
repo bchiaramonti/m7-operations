@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Briefing do Condutor — Ritual N3 Consorcios — S18 (27/04/2026)</title>
+<style>
+  @page { size: A4; margin: 24mm 20mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 15px; }
+  body {
+    font-family: "twkEverett", "Segoe UI", Arial, sans-serif;
+    color: #424135;
+    line-height: 1.6;
+    max-width: 750px;
+    margin: 0 auto;
+    padding: 40px 32px;
+    background: #fff;
+  }
+  h1 { font-size: 28px; font-weight: 700; color: #424135; margin-bottom: 4px; }
+  h2 { font-size: 14px; font-weight: 400; color: #424135; margin-bottom: 24px; }
+  .disclaimer {
+    background: #f6f5f0;
+    border-left: 3px solid #c5c49a;
+    padding: 12px 16px;
+    font-style: italic;
+    font-size: 13px;
+    color: #79755c;
+    margin-bottom: 32px;
+    line-height: 1.5;
+  }
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #424135;
+    margin: 36px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #eef77c;
+  }
+  .subsection-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #424135;
+    margin: 24px 0 12px;
+  }
+  p { margin-bottom: 12px; font-size: 14px; }
+  .label-bold { font-weight: 700; }
+  .label-subtitle { font-size: 13px; font-weight: 700; color: #424135; margin-bottom: 4px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 16px; font-size: 13px; }
+  thead th {
+    background: #424135;
+    color: #fffdef;
+    padding: 6px 8px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 12px;
+  }
+  tbody td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #e8e8e4;
+    vertical-align: top;
+  }
+  tbody tr:hover { background: #fafaf6; }
+  td.bold { font-weight: 700; }
+
+  /* Question blocks */
+  .question-block {
+    background: #fff;
+    border: 1px solid #e8e8e4;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .question-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #79755c;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .question-text {
+    font-size: 14px;
+    color: #424135;
+    font-style: italic;
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+  .question-redirect {
+    font-size: 13px;
+    color: #424135;
+    padding-left: 12px;
+    border-left: 3px solid #e40014;
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+  .question-redirect strong { color: #e40014; }
+
+  /* Armadilha blocks */
+  .trap-block {
+    background: #fffdf5;
+    border-left: 4px solid #FFC107;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 0 6px 6px 0;
+  }
+  .trap-title { font-size: 14px; font-weight: 700; color: #424135; margin-bottom: 4px; }
+  .trap-body { font-size: 13px; color: #424135; line-height: 1.5; }
+  .trap-redirect { font-size: 13px; font-weight: 700; color: #79755c; margin-top: 6px; }
+
+  /* Decision blocks */
+  .decision-block {
+    background: #fff;
+    border: 1px solid #d0d0cc;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    border-left: 4px solid #e40014;
+  }
+  .decision-title { font-size: 14px; font-weight: 700; color: #424135; margin-bottom: 6px; }
+  .decision-body { font-size: 13px; color: #424135; line-height: 1.5; }
+  .decision-meta { font-size: 12px; color: #79755c; margin-top: 4px; }
+  .decision-consequence { font-size: 12px; color: #e40014; font-weight: 500; margin-top: 6px; }
+
+  /* Roteiro blocks */
+  .roteiro-block {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    background: #f6f5f0;
+    border-radius: 6px;
+  }
+  .roteiro-time {
+    font-size: 12px;
+    font-weight: 700;
+    color: #79755c;
+    white-space: nowrap;
+    min-width: 80px;
+  }
+  .roteiro-content { font-size: 13px; color: #424135; line-height: 1.5; }
+  .roteiro-content strong { color: #424135; }
+  .roteiro-content ul { margin: 6px 0 0 18px; padding: 0; }
+  .roteiro-content li { font-size: 13px; color: #424135; margin-bottom: 3px; }
+  .roteiro-expected { font-size: 12px; color: #79755c; margin-top: 6px; font-style: italic; }
+
+  /* Footer */
+  .footer {
+    margin-top: 40px;
+    padding-top: 12px;
+    border-top: 1px solid #d0d0cc;
+    font-size: 12px;
+    color: #79755c;
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  hr { border: none; border-top: 1px solid #e8e8e4; margin: 24px 0; }
+
+  @media print {
+    body { padding: 0; max-width: none; }
+    .question-block, .trap-block, .decision-block, .roteiro-block { break-inside: avoid; }
+    .section-title { break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Briefing do Condutor &mdash; Ritual N3 Consorcios</h1>
+<h2>S18 (2026-04-27 a 2026-05-01) &middot; Coordenador: Joel Freitas &middot; Participantes: Douglas Silva, Tereza Bernardo</h2>
+
+<div class="disclaimer">
+  Guia estrategico para conducao do ritual. Nao e um resumo do WBR. Quem conduz NAO analisa &mdash; os dados estao no deck. Este guia diz como USAR esses dados. Dados: Abril 2026 MTD (17/20 DU) | WBR gerado 2026-04-27T16:05.
+</div>
+
+<!-- ========== 1. VEREDICTO ========== -->
+<div class="section-title">1. Veredicto</div>
+
+<p>O N1 saiu do vermelho mas segue estruturalmente fragil: dois individuos carregam 86% do volume e o pipeline de R$ 110M tem 95% classificado como estagnado. A Receita verde de 148,3% reflete o volume de marco, nao valida abril, e ja pressionara maio e junho.</p>
+
+<p>A decisao que precisa sair desta reuniao e a classificacao binaria dos 14 deals de Douglas estagnados acima de 30 dias e o escopo revisado de intervencao em Tereza, que encerrou o quarto ciclo consecutivo em vermelho nos tres KPIs.</p>
+
+<!-- ========== 2. O QUE PROVOCAR ========== -->
+<div class="section-title">2. O Que Provocar</div>
+
+<div class="subsection-title">Para Douglas Silva</div>
+
+<div class="question-block">
+  <div class="question-label">Pergunta 1 &mdash; 14 deals estagnados</div>
+  <div class="question-text">"Das 14 acoes de limpeza de backlog, qual o status de cada uma das deals acima de 30 dias &mdash; WIN, LOSE ou RENEGOCIAR?"</div>
+  <div class="question-redirect"><strong>Nao aceite:</strong> "estou trabalhando nisso" ou lista parcial. Exija nome-do-deal, status e proximo passo com data. Se nao tiver na cabeca, paramos aqui e fazemos juntos.</div>
+  <div class="question-redirect"><strong>Contexto:</strong> A acao 86agt95nw tem 23 dias de atraso com prioridade Low. Estagnadas pioraram de 18 para 62 deals em uma semana. Isso nao e backlog &mdash; e parada operacional.</div>
+</div>
+
+<div class="question-block">
+  <div class="question-label">Pergunta 2 &mdash; Concentracao de producao</div>
+  <div class="question-text">"Se Rebeca Canafistula sair amanha, qual e o plano para os R$ 2,17M que ela carrega sozinha?"</div>
+  <div class="question-redirect"><strong>Nao aceite:</strong> "ela nao vai sair" ou "vamos trabalhar mais o time". Exija plano B explicito: quem absorve, qual o timeline, qual o gap projetado.</div>
+  <div class="question-redirect"><strong>Contexto:</strong> 86% do volume em duas pessoas e ponto unico de falha. Concentracao nao e merito &mdash; e risco operacional sem mitigacao documentada.</div>
+</div>
+
+<div class="question-block">
+  <div class="question-label">Pergunta 3 &mdash; Icoforte (172 dias)</div>
+  <div class="question-text">"O deal Icoforte esta parado ha 172 dias. WIN, LOSE ou RENEGOCIAR &mdash; decide agora."</div>
+  <div class="question-redirect"><strong>Nao aceite:</strong> "precisamos conversar mais". O Summit CON foi concluido em 24/04. A janela de momentum passou. Uma decisao ruim e melhor que nenhuma decisao.</div>
+  <div class="question-redirect"><strong>Contexto:</strong> Cada dia que esse deal fica em aberto distorce a projecao e ocupa gestao sem contribuir para o numero.</div>
+</div>
+
+<div class="subsection-title">Para Tereza Bernardo</div>
+
+<div class="question-block">
+  <div class="question-label">Pergunta 1 &mdash; Apresentacao travada</div>
+  <div class="question-text">"Voce tem 18 deals em Apresentacao somando R$ 5,2M e zero em Emissao. O que bloqueia a passagem para Proposta em cada um?"</div>
+  <div class="question-redirect"><strong>Nao aceite:</strong> "os clientes estao pensando" ou lista generica. Exija os tres deals com maior probabilidade de fechar e o proximo passo concreto com data.</div>
+  <div class="question-redirect"><strong>Contexto:</strong> O gargalo nao e prospeccao (48 criados em abril &mdash; lider da vertical). E conducao em Apresentacao &rarr; Proposta &rarr; Emissao, que nao se resolve com mais atividade.</div>
+</div>
+
+<div class="question-block">
+  <div class="question-label">Pergunta 2 &mdash; Eficacia do treinamento</div>
+  <div class="question-text">"O treinamento de abril nao moveu sua conversao individual. O que nao funcionou e o que muda?"</div>
+  <div class="question-redirect"><strong>Nao aceite:</strong> "precisa de mais tempo" ou atribuicao ao mercado. Quatro ciclos de vermelho com acoes de suporte indicam que o diagnostico da intervencao esta errado, nao que o mercado esta ruim.</div>
+  <div class="question-redirect"><strong>Contexto:</strong> Exija analise propria de por que nao funcionou e qual seria uma abordagem diferente &mdash; especificamente para os seis deals em Proposta (R$ 8,9M).</div>
+</div>
+
+<!-- ========== 3. ARMADILHAS ========== -->
+<div class="section-title">3. Armadilhas da Reuniao</div>
+
+<div class="trap-block">
+  <div class="trap-title">Armadilha 1 &mdash; "O N1 melhorou, estamos no caminho certo"</div>
+  <div class="trap-body">Sinal observado: N1 saiu de Vermelho para Amarelo com R$ 470k incrementais via dois individuos (86% do volume).</div>
+  <div class="trap-redirect">Redirecione: Forcar desdobramento em N2 antes de qualquer leitura positiva. O agregado mascara Tereza a 12,3% e bridge falhando ha quatro ciclos.</div>
+</div>
+
+<div class="trap-block">
+  <div class="trap-title">Armadilha 2 &mdash; "O pipeline de R$ 110M mostra que temos potencial"</div>
+  <div class="trap-body">Sinal observado: 65 deals ativos, mas 62 classificados como estagnados (95%) com media de 19,9 dias parados.</div>
+  <div class="trap-redirect">Redirecione: Pipeline que nao flui nao e ativo. Pedir classificacao deal-a-deal antes de contar como potencial de conversao.</div>
+</div>
+
+<div class="trap-block">
+  <div class="trap-title">Armadilha 3 &mdash; "A receita vai se resolver sozinho" (lag como blindagem)</div>
+  <div class="trap-body">Sinal observado: Receita 148,3% Verde, mas projecao lagging aponta risco mediano em maio e pressao em junho.</div>
+  <div class="trap-redirect">Redirecione: Separar eixos &mdash; o verde de hoje e o volume de marco. A janela de acao para maio-junho e agora, nao quando o numero aparecer no painel.</div>
+</div>
+
+<div class="trap-block">
+  <div class="trap-title">Armadilha 4 &mdash; "Estamos trabalhando na acao" (sem entrega mensuravel)</div>
+  <div class="trap-body">Sinal observado: 86agt95nw em andamento ha 23 dias, Low prioridade, sem campos de impacto preenchidos.</div>
+  <div class="trap-redirect">Redirecione: O que foi entregue &mdash; nao o que esta sendo feito. Pedir metrica de saida: deals classificados, nao horas dedicadas.</div>
+</div>
+
+<!-- ========== 4. DECISOES ========== -->
+<div class="section-title">4. Decisoes Que Precisam Sair</div>
+
+<div class="decision-block">
+  <div class="decision-title">Decisao 1 &mdash; Classificacao binaria dos 14 deals Douglas estagnados acima de 30 dias</div>
+  <div class="decision-body">Formato: WIN / LOSE / RENEGOCIAR para cada deal, com nome e data de proximo passo.</div>
+  <div class="decision-meta"><strong>Owner:</strong> Douglas Silva &middot; <strong>Prazo:</strong> 2026-04-30</div>
+  <div class="decision-consequence">Se nao decidir: Projecao de volume para maio sem base. Pipeline cresce em estagnacao.</div>
+</div>
+
+<div class="decision-block">
+  <div class="decision-title">Decisao 2 &mdash; Escopo revisado de intervencao em Tereza</div>
+  <div class="decision-body">Formato: Aprovamos nova abordagem (coaching especifico em conducao) OU aceitamos mais um ciclo sem mudanca.</div>
+  <div class="decision-meta"><strong>Owner:</strong> Joel Freitas (define) + Tereza Bernardo (executa) &middot; <strong>Prazo:</strong> 2026-04-29 (N2 mensal)</div>
+  <div class="decision-consequence">Se nao decidir: Quinto ciclo consecutivo com Vermelho nos tres KPIs sem intervencao estrutural.</div>
+</div>
+
+<div class="decision-block">
+  <div class="decision-title">Decisao 3 &mdash; Atribuicao formal de Juliane Miranda e Emmanuel Martins (bridge)</div>
+  <div class="decision-body">Formato: Formalizamos atribuicao a Douglas Silva no bridge ClickHouse OU aceitamos volume nao-rastreado com risco assumido.</div>
+  <div class="decision-meta"><strong>Owner:</strong> Pedro Villarroel (dados) + Joel Freitas (decisao de squad) &middot; <strong>Prazo:</strong> 2026-04-30</div>
+  <div class="decision-consequence">Se nao decidir: 20 contratos formalizados em Abril (Juliane 19 + Emmanuel 1, total R$ 2,51M = 47,4% do volume N1) seguem invisiveis no coaching de Douglas. Apos atribuicao manual no slide, Douglas passa a contar 29 contratos no mes (vs 9 no bridge atual) &mdash; toda a producao da empresa fica explicada pelos especialistas.</div>
+</div>
+
+<!-- ========== 5. ROTEIRO ========== -->
+<div class="section-title">5. Roteiro</div>
+
+<div class="roteiro-block">
+  <div class="roteiro-time">[0-10 min]</div>
+  <div class="roteiro-content">
+    <strong>Visao Geral</strong><br>
+    Posicionar leitura compartilhada da semana e sinalizar as tres decisoes obrigatorias do dia. Entrar em modo de decisao, nao de relato. Quem nao chega com dados busca durante a reuniao.
+  </div>
+</div>
+
+<div class="roteiro-block">
+  <div class="roteiro-time">[10-35 min]</div>
+  <div class="roteiro-content">
+    <strong>Bloco Douglas Silva</strong><br>
+    <em>Intencao:</em> Sair com status binario dos 14 deals estagnados e decisao sobre Icoforte.
+    <ul>
+      <li><strong>Dashboard:</strong> Confirmar numeros (R$ 2,38M / 73,3% / 56,3% conversao); 29 contratos fechados no mes apos atribuir Juliane Miranda (19) + Emmanuel Martins (1) que sao assessores de Douglas no Bitrix mas estavam sob "Sem Especialista" no ClickHouse.</li>
+      <li><strong>Funil:</strong> Classificar Icoforte (deal Joel Freitas em Prospeccao, R$ 10M, 172 dias parado) e o unico deal Douglas em Proposta (R$ 2M); decidir os 7 deals em Prospeccao R$ 66,7M.</li>
+    </ul>
+    <div class="roteiro-expected">Saida obrigatoria: Lista com status WIN/LOSE/RENEGOCIAR + data de follow-up por deal.</div>
+  </div>
+</div>
+
+<div class="roteiro-block">
+  <div class="roteiro-time">[35-60 min]</div>
+  <div class="roteiro-content">
+    <strong>Bloco Tereza Bernardo</strong><br>
+    <em>Intencao:</em> Sair com plano de intervencao diferente &mdash; foco nos tres deals mais proximos de fechar.
+    <ul>
+      <li><strong>Dashboard:</strong> Confirmar 1 contrato no mes e conversao 13,3%.</li>
+      <li><strong>Analise:</strong> Nomear os deals de Thomaz Bianchi (ativa R$ 8,5M) e Gustavo Melo (12 ativas R$ 5,9M) como prioritarios.</li>
+      <li><strong>Funil:</strong> Proximo passo concreto para cada um dos seis deals em Proposta (R$ 8,9M) com data.</li>
+    </ul>
+    <div class="roteiro-expected">Saida obrigatoria: Tres deals priorizados com acao nomeada e data.</div>
+  </div>
+</div>
+
+<div class="roteiro-block">
+  <div class="roteiro-time">[60-65 min]</div>
+  <div class="roteiro-content">
+    <strong>Decisoes e Encerramento</strong><br>
+    Registrar decisoes em ata com owner, prazo e consequencia de nao-executar. Confirmar atribuicao da auditoria bridge para Pedro Villarroel. Alinhar pauta do N2 mensal 2026-04-29.
+    <div class="roteiro-expected">Total: 65 min &mdash; alinhado com slide 2 da apresentacao (10 + 25 + 25 + 5).</div>
+  </div>
+</div>
+
+<div class="footer">
+  Briefing gerado por m7-ritual-gestao (G2.3-E2) em 2026-04-27.<br>
+  Fonte: wbr-consorcios-2026-04-27.md + card_con_n3_001.yaml v2.1.0 (briefing_customization v2.0).<br>
+  Materiais: Apresentacao-Ritual-CON-N3-2026-S18.html + Briefing-CON-N3-2026-S18.md
+</div>
+
+</body>
+</html>

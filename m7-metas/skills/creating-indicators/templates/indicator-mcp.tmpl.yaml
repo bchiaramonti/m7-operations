@@ -8,6 +8,8 @@ status: draft
 updated_at: {{YYYY-MM-DD}}
 owner: {{nome.sobrenome}}
 domain: {{comercial|receita|clientes|operacional|risco|pessoas}}
+org_level: {{N1|N2|N3|N4|N5}}            # nivel organizacional (pasta N{org_level}/); != coluna 'nivel' do output
+vertical_folder: {{Consorcios|Seguros|Investimentos|Produtos|...}}  # subpasta da vertical sob N{org_level}/
 tags:
   - {{tag1}}
   - {{tag2}}
@@ -22,6 +24,18 @@ granularity: "{{dimensao / periodo}}"
 source_type: mcp
 source_layer: api
 refresh_frequency: {{realtime|daily|weekly|monthly}}
+
+# ─────────────────────────────────────────────────────────
+# CAMPOS VISUAIS OPCIONAIS (schema v2.1)
+# ─────────────────────────────────────────────────────────
+# Preencher apenas quando aplicavel — todos sao opcionais.
+
+# display_name: "{{Label para slides quando diferente do name canonico}}"
+# display_suffix: "{{Sufixo concatenado, ex: CRM, MTD, YTD — max 16 chars}}"
+# direction: {{maior_melhor|menor_melhor}}  # default: maior_melhor. Use menor_melhor para unit=days, tempo de ciclo, % estagnacao.
+
+# output_schema.por_canal pode ser declarado dentro de extraction.output_schema mais abaixo,
+# OU top-level aqui se preferir paralelo. Ver guia em references/schema-v2.md secao 3.2.
 
 # ─────────────────────────────────────────────────────────
 # EXTRACTION (source_type: mcp)
@@ -89,6 +103,11 @@ extraction:
     columns: [{{mes, nivel, assessor, metrica_1, metrica_2}}]
     types: [{{date, string, string, float64, int}}]
     sort: [{{mes, nivel, assessor}}]
+    # Opcional (schema v2.1) — decomposicao por canal emitida pelo indicator:
+    # por_canal:
+    #   investimentos: { qty: int, vol: float }
+    #   credito:       { qty: int, vol: float }
+    #   outros_m7:     { qty: int, vol: float }
 
 # ─────────────────────────────────────────────────────────
 # GUIA DE ANALISE E QUALIDADE

@@ -1,7 +1,7 @@
 {
   "name": "m7-metas",
-  "version": "1.0.1",
-  "description": "Criacao e manutencao de indicadores na Biblioteca M7 conforme ESP-PERF-001. Entrevista guiada, validacao contra schema v2.0, ciclo de maturidade (draft > validated > promoted_to_gold) e templates por source_type (sql, mcp, hybrid).",
+  "version": "1.2.0",
+  "description": "Criacao e manutencao de indicadores na Biblioteca M7 conforme ESP-PERF-001. Entrevista guiada, validacao contra schema v2.1 (4 campos visuais: display_name, display_suffix, direction, output_schema.por_canal), ciclo de maturidade (draft > validated > promoted_to_gold), templates por source_type (sql, mcp, hybrid), 5 modos (Criar, Validar, Promover, Editar, Clone), Protocolo obrigatorio de Data Lineage e padrao especial de modo Detalhe (1 linha por entidade).",
   "author": {
     "name": "Bruno Chiaramonti",
     "email": "bruno.chiaramonti@multisete.com"

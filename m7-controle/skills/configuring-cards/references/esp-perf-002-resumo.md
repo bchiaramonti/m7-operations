@@ -1,6 +1,8 @@
 # ESP-PERF-002 — Resumo de Regras para Cards de Performance
 
-> Referencia: ESP-PERF-002 v1.1, Secao 6.5
+> Referencia: ESP-PERF-002 v1.3, Secao 6.5
+> Versao anterior: v1.2 (2026-05-06)
+> Atualizado 2026-05-11: Regra 10 expandida (PJ2); +4 regras (13-16) para Cards multi-canal multi-vertical (PJ2). Campos opcionais multi-canal documentados.
 
 ## Indice
 
@@ -9,6 +11,7 @@
 3. [Ciclo de Vida](#ciclo-de-vida)
 4. [Correlacoes](#correlacoes)
 5. [Pipeline de Execucao](#pipeline-de-execucao)
+6. [Campos opcionais (m7-ritual-gestao integration)](#campos-opcionais-m7-ritual-gestao-integration)
 
 ---
 
@@ -27,9 +30,13 @@ Estas regras devem ser verificadas no Modo 2 (Validar). Issues sao classificadas
 | 7 | Correlacoes sao bidirecionais (se A declara B, B deve declarar A) | ATENCAO |
 | 8 | `conteudo_obrigatorio` referencia KPIs presentes no Card | ATENCAO |
 | 9 | `codigo` em UPPERCASE com hifens, derivavel do `id` (substituir `_` por `-`, uppercase) | CRITICO |
-| 10 | `vertical_code` valido: INV, CRE, UNI, SEG | CRITICO |
+| 10 | `vertical_code` valido: INV, CRE, UNI, SEG, **PJ2** (v1.3) | CRITICO |
 | 11 | `nivel` valido: N1, N2, N3, N4 | CRITICO |
 | 12 | `subnivel` consistente entre `id` e `codigo` (se presente em um, deve estar no outro) | ATENCAO |
+| 13 | Se `metadata.label_responsavel == "canal"`, cada `apresentacao.responsaveis[].id` deve estar declarado (canal_id obrigatorio) | CRITICO |
+| 14 | Se `metadata.label_responsavel == "sub_bloco"`, ao menos 1 `apresentacao.responsaveis[].sub_blocos` preenchido | CRITICO |
+| 15 | Se algum `matrix_views[].column_axis == "canal"`, `column_order` deve ser declarado nao-vazio | CRITICO |
+| 16 | Se `metadata.verticais` declarado (multi-vertical), `vertical_code` deve ser umbrella (PJ2) e nao single (INV/CRE/UNI/SEG) | ATENCAO |
 
 ### Formato do relatorio de validacao
 
@@ -122,3 +129,83 @@ O pipeline de 7 passos e fixo conforme ESP-PERF-002. Cada Card herda esta sequen
 | 7 | Distribuicao | Enviar conforme canal e destinatarios | Nao |
 
 O Passo 2 e um gate: se a validacao de qualidade falha (alertas criticos), o pipeline nao avanca para Passo 3+.
+
+---
+
+## Campos opcionais (m7-ritual-gestao integration)
+
+Adicionado em ESP-PERF-002 v1.2 (2026-05-06).
+
+Cards podem declarar campos OPCIONAIS adicionais consumidos pelo plugin
+`m7-ritual-gestao` (skill `preparing-materials`, script `build_deck.py`)
+para customizar deck e briefing **sem editar HTML output**. Backward compat:
+campos ausentes = comportamento legado padrao.
+
+**Schema completo (autoritativo):**
+- `m7-operations/m7-ritual-gestao/skills/preparing-materials/references/card-apresentacao-schema.md`
+
+**Categorias de campos:**
+
+| Bloco | Onde | Proposito |
+|-------|------|-----------|
+| `metadata.total_label` | Card.metadata | Label da linha N1 no deck (Slide 3) |
+| `metadata.responsaveis_n2` | Card.metadata | Lista oficial de N2 (whitelist) |
+| `metadata.assessor_aliases` | Card.metadata | Mapa nome canonico -> aliases |
+| `metadata.responsavel_externo_aliases` | Card.metadata | Owner multi-name de tasks |
+| `kpi_references[].matrix_views[]` | Card.kpi_references | Declarativo de rows da Matriz com `label`, `value_field`, `meta_field`, `direction`, `compute`, `derived_indicator_id`, `color_inherit_from_view`, `no_meta`, `sem_esp_ratio` |
+| `kpi_references[].projecao.*.componentes` | Card.kpi_references | Componentes formais da projecao com `nome`, `tipo`, `formula`, `descricao`, `confianca`, `obrigatorio`, `aplicavel_em`, `inputs[]` |
+| `apresentacao.responsaveis[].squad` | Card.apresentacao | Whitelist de assessores oficiais por especialista |
+| `apresentacao.projecao_proximo_mes` | Card.apresentacao | Projecao M+1 quando Card v6.x ainda nao calcula |
+| `apresentacao.projection_overrides` | Card.apresentacao | Override de projecoes com `metodo` versionado (ex: bug fix) |
+| `apresentacao.overrides_ritual` | Card.apresentacao | Override de realizado por bug bridge SQL upstream |
+| `apresentacao.suppress_in_ritual` | Card.apresentacao | Filtros para Slide 12 (anomalias / destaques / recomendacoes) |
+| `apresentacao.destaques_positivos_custom` | Card.apresentacao | Prepended em wbr.destaques (alta prioridade) |
+| `apresentacao.anomalias_custom` | Card.apresentacao | Prepended em wbr.anomalias |
+| `apresentacao.recomendacoes_custom` | Card.apresentacao | Prepended em wbr.recomendacoes |
+| `apresentacao.pa_manual_append` | Card.apresentacao | Tasks manuais adicionadas no Slide 5 PA |
+
+**Ordem de aplicacao no script build_deck.py:**
+1. `_apply_card_overrides` (carrega Card e aplica overrides_ritual + projection_overrides em-place no JSON).
+2. `_apply_n5_overrides` (n5_by_esp por assessor).
+3. Render dos slides com overrides ja aplicados.
+4. `responsavel_externo_aliases` + `pa_manual_append` na renderizacao do Slide 5.
+5. `*_custom` (destaques/anomalias/recomendacoes) prepended antes de `suppress_in_ritual` filtrar.
+
+**Exemplo pratico:**
+- `card_con_n3_001.yaml` v2.8.0 (Consorcios — todos os campos)
+- `card_seg_wl_n3_001.yaml` v2.14.0 + `card_seg_re_n3_001.yaml` v1.6.0 (Seguros — subset)
+
+**Validacao:** o validator do Modo 2 (Validar) **NAO** rejeita Card por
+ausencia destes campos (todos sao opcionais). Quando presentes, deve validar
+que valores sao internamente consistentes (ex: `n2_value_field` referenciado
+existe no JSON do indicador).
+
+---
+
+## Campos opcionais multi-canal multi-vertical (v1.3, 2026-05-11)
+
+Adicionados em ESP-PERF-002 v1.3 para suportar Cards umbrella (PJ2) que agregam
+multiplas verticais sob um eixo de canal compartilhado (Inv / Cred / Outros M7).
+Schema completo (autoritativo) em:
+- `m7-operations/m7-ritual-gestao/skills/preparing-materials/references/card-apresentacao-schema.md`
+- `m7-operations/m7-ritual-gestao/skills/preparing-materials/references/pj2-slide-requirements.md`
+
+**Categorias:**
+
+| Bloco | Onde | Proposito | Quando |
+|-------|------|-----------|--------|
+| `metadata.label_responsavel` | Card.metadata | Eixo de iteracao do bloco repetido: `especialista` (default) \| `canal` \| `sub_bloco` | Sempre opcional. PJ2 = `canal` |
+| `metadata.verticais` | Card.metadata | Lista de verticais que o Card cobre: `[consorcios, seguros]` | Apenas multi-vertical |
+| `metadata.modo` (alt: `apresentacao.modo`) | Card.metadata | Modo do deck: `atual` \| `fechamento` \| `combinado` \| `auto` | Override Card → CLI |
+| `apresentacao.template` | Card.apresentacao | Template do builder: `default` (ritual.tmpl.html) \| `pj2` (ritual-pj2.tmpl.html — Sessao 5) | Default = `default` |
+| `apresentacao.responsaveis[].id` | Card.apresentacao | Canal_id obrigatorio quando label_responsavel=canal: `investimentos` / `credito` / etc | Regra 13 valida |
+| `apresentacao.responsaveis[].sub_blocos` | Card.apresentacao | Sub-divisoes do eixo: `B2B`, `B2C`, `Outros` (Card N3 INV) | Regra 14 valida |
+| `apresentacao.hidden_in_squad_lists` | Card.apresentacao | Nomes (normalizados) ocultos das listagens visuais | Sem regra valida (lista plana) |
+| `apresentacao.outros_m7` | Card.apresentacao | Sub-grupos do canal Outros M7: `{especialistas, coordenador, outros}` | Opcional |
+| `apresentacao.metas_split` | Card.apresentacao | Split de meta por canal: `default_method: proporcional_squad`, overrides por indicator com `fixed_ratio` ou `absolute` | Opcional |
+| `canal_taxonomia` | Card top-level | Taxonomia compartilhada de canais: `buckets_pareto_5`, `agregados_total_3`, `rollup_bucket_para_agregado`, `de_para_canal_path` | Opcional |
+| `kpi_references[].matrix_views[].column_axis` | Card.kpi_references | Eixo de colunas da Matriz: `especialista` (default) \| `canal` | Regra 15 valida column_order |
+| `metas_canal` | Card top-level | Override explicito de meta por canal e periodo: `{vertical: {ind_id: {periodo_key: {investimentos, credito, outros_m7}}}}` | Opcional |
+
+**Exemplo pratico:**
+- `card_pj2_n2_001.yaml` v1.0.0 (PJ2 — todos os campos novos)

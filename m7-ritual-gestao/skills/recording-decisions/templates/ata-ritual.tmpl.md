@@ -16,11 +16,12 @@
 
 ## Decisoes
 
-<!-- Numerar sequencialmente. Toda decisao deve ter responsavel e prazo. -->
+<!-- Numerar sequencialmente. Toda decisao deve ter responsavel. -->
+<!-- v2.0 (2026-05-31): decisoes NAO tem prazo (memory feedback_decisoes_sem_prazo). -->
 
-| # | Decisao | Responsavel | Prazo |
-|---|---------|-------------|-------|
-| D-001 | {decisao} | {responsavel} | {prazo} |
+| # | Decisao | Responsavel |
+|---|---------|-------------|
+| D-001 | {titulo} | {responsavel} |
 
 <!-- Se nenhuma decisao: "Nenhuma decisao registrada neste ritual." -->
 
@@ -28,24 +29,27 @@
 
 ## Contramedidas Definidas
 
-<!-- Ordenar por prioridade: critica > alta > media > baixa. Desempate por receita desc. -->
+<!-- Ordenar por prioridade v2.0: urgent > high > normal > low. Desempate por receita desc. -->
+<!-- IDs ClickUp internos sao machine-only (bloco scope_task_ids no final do MD); -->
+<!-- nao aparecem nas tabelas humanas. Membros M7 nao precisam saber que ClickUp existe. -->
 
-| ID CSV | Titulo | Indicador | Responsavel | Prazo | Prioridade | Volume | Receita | Status |
-|--------|--------|-----------|-------------|-------|------------|--------|---------|--------|
-| {id} | {titulo} | {indicador} | {responsavel} | {prazo} | {prioridade} | {volume} | {receita} | Nova |
+| # | Titulo | Indicador | Responsavel | Prazo | Prioridade | Volume | Receita |
+|---|--------|-----------|-------------|-------|------------|--------|---------|
+| C-001 | {titulo} | {indicador} | {responsavel} | {prazo} | {prioridade} | {volume} | {receita} |
 
-<!-- Status: "Nova" = inserida neste ritual | "Atualizada" = ja existia, atualizada neste ritual -->
+<!-- Numerar C-001, C-002, ... sequencialmente (humano-friendly). -->
 <!-- Se nenhuma contramedida: "Nenhuma contramedida definida neste ritual." -->
 
 ---
 
 ## Acoes Atualizadas
 
-<!-- Acoes existentes que tiveram status, percentual ou comentarios modificados no ritual. -->
+<!-- Acoes pre-existentes que tiveram status, percentual ou comentarios atualizados no ritual. -->
+<!-- Sem coluna ID — identificacao via Titulo (humano-friendly). -->
 
-| ID | Titulo | Campo Alterado | Valor Anterior | Valor Novo |
-|----|--------|----------------|----------------|------------|
-| {id} | {titulo} | {campo} | {antes} | {depois} |
+| Titulo | Campo Alterado | Valor Anterior | Valor Novo |
+|--------|----------------|----------------|------------|
+| {titulo} | {campo} | {antes} | {depois} |
 
 <!-- Se nenhuma atualizacao: "Nenhuma acao existente atualizada neste ritual." -->
 
@@ -53,11 +57,11 @@
 
 ## Duplicatas Detectadas
 
-<!-- Contramedidas solicitadas que ja existiam no CSV. Omitir secao se nenhuma. -->
+<!-- Contramedidas solicitadas que ja existiam. Omitir secao se nenhuma. -->
 
-| Titulo Solicitado | ID Existente | Status Atual | Acao Tomada |
-|-------------------|--------------|--------------|-------------|
-| {titulo} | {id_existente} | {status} | {atualizada/ignorada} |
+| Titulo Solicitado | Acao Tomada |
+|-------------------|-------------|
+| {titulo} | {atualizada/ignorada — Titulo da task existente: "..."} |
 
 ---
 
@@ -78,6 +82,32 @@
 | {acao} | {responsavel} | {prazo} |
 
 ---
+
+<!--
+================================================================================
+BLOCO MACHINE-READABLE — INVISIVEL NO RENDER MD/HTML/PDF
+
+scope_task_ids (v3.8.0+ 2026-05-12): handoff para o proximo ciclo G2.2.
+Consumido pela `m7-controle/collecting-data` Fase 1.5 (subcomando
+`collect.py apply-scope-filter`) para particionar tasks ClickUp em
+escopo_ritual_passado vs ad_hoc_pos_ritual.
+
+Memory: reference_g2_2_action_scope_filter.
+
+Membros M7 nao veem este bloco — fica em HTML comment para nao poluir
+a leitura humana da ata. IDs sao infra de governanca pura.
+================================================================================
+-->
+<!-- scope_task_ids:
+ritual_date: {data_ritual}
+vertical: {vertical}
+nivel: {nivel}
+subnivel: {subnivel}
+created_in_ritual:
+{lista_ids_created_in_ritual}
+preexisting_discussed:
+{lista_ids_preexisting_discussed}
+-->
 
 ## Resumo Quantitativo
 

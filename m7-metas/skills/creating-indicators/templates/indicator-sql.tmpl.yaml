@@ -8,6 +8,8 @@ status: draft
 updated_at: {{YYYY-MM-DD}}
 owner: {{nome.sobrenome}}
 domain: {{comercial|receita|clientes|operacional|risco|pessoas}}
+org_level: {{N1|N2|N3|N4|N5}}            # nivel organizacional (pasta N{org_level}/); != coluna 'nivel' do output
+vertical_folder: {{Consorcios|Seguros|Investimentos|Produtos|...}}  # subpasta da vertical sob N{org_level}/
 tags:
   - {{tag1}}
   - {{tag2}}
@@ -22,6 +24,23 @@ granularity: "{{dimensao / periodo}}"
 source_type: sql
 source_layer: bronze
 refresh_frequency: {{realtime|daily|weekly|monthly}}
+
+# ─────────────────────────────────────────────────────────
+# CAMPOS VISUAIS OPCIONAIS (schema v2.1)
+# ─────────────────────────────────────────────────────────
+# Preencher apenas quando aplicavel — todos sao opcionais.
+
+# display_name: "{{Label para slides quando diferente do name canonico}}"
+# display_suffix: "{{Sufixo concatenado, ex: CRM, MTD, YTD — max 16 chars}}"
+# direction: {{maior_melhor|menor_melhor}}  # default: maior_melhor. Use menor_melhor para unit=days, tempo de ciclo, % estagnacao.
+
+# output_schema.por_canal: declara que o indicator emite decomposicao por canal
+# (PJ2: investimentos/credito/outros_m7 | N3: id_especialista).
+# output_schema:
+#   por_canal:
+#     investimentos: { qty: int, vol: float, qty_won: int }
+#     credito:       { qty: int, vol: float, qty_won: int }
+#     outros_m7:     { qty: int, vol: float, qty_won: int }
 
 # ─────────────────────────────────────────────────────────
 # QUERY E PARAMETROS

@@ -1,6 +1,16 @@
 # Schema do plano-de-acao.csv
 
-Referencia canonica para o schema de 24 campos do plano-de-acao.csv. Usada tanto pela skill `recording-decisions` quanto pelo agent `decision-recorder`.
+> **⚠ DEPRECATED 2026-04-30** — este documento esta preservado apenas como **referencia historica** do schema CSV legado. A SoT do Plano de Acao migrou para a lista ClickUp `pa-resultado` (id `901326795742`). Toda escrita agora vai via ClickUp MCP.
+>
+> **Use** [clickup-actions-schema.md](clickup-actions-schema.md) **em vez deste arquivo.**
+>
+> A skill `recording-decisions` e o agent `decision-recorder` NAO devem mais ler este documento como fonte autoritativa. Mantido aqui apenas para fins de auditoria e mapeamento campo-a-campo durante migracao de dados historicos (se necessario).
+
+---
+
+## (Conteudo legado abaixo — referencia historica apenas)
+
+Referencia canonica do schema de 24 campos do plano-de-acao.csv (descontinuado).
 
 ---
 

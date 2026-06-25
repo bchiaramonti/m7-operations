@@ -2,6 +2,14 @@
 
 > Referencia para o agente `decision-recorder` ao gerar a versao visual (HTML) da ata de ritual.
 
+## Sumário
+
+- [Principio Geral](#principio-geral)
+- [Mapeamento de Secoes da Ata para Componentes HTML](#mapeamento-de-secoes-da-ata-para-componentes-html)
+- [Regras de Cores](#regras-de-cores)
+- [Estrutura do HTML](#estrutura-do-html)
+- [Checklist de Validacao (obrigatorio antes de salvar HTML)](#checklist-de-validacao-obrigatorio-antes-de-salvar-html)
+
 ## Principio Geral
 
 O CSS do template `ata-ritual.tmpl.html` e **imutavel** — ja validado como M7-2026 Design System Score A. O agente deve:

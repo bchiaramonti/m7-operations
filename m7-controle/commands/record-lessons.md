@@ -1,6 +1,7 @@
 ---
 description: Consolida licoes aprendidas do ciclo mensal para o processo G2.2. Escaneia todos os ciclos semanais de TODAS as verticais no mes, rituais e artefatos para produzir registro unico de licoes e propostas de melhoria.
 argument-hint: [periodo]
+disable-model-invocation: true
 ---
 
 # m7-controle:record-lessons
@@ -30,7 +31,7 @@ Executa a etapa E7 (Licoes Aprendidas) do processo G2.2 para um periodo mensal.
 
 ### 2. Descobrir ciclos de TODAS as verticais
 
-1. Executar `Glob('*/{periodo}-*/CICLO.md')` no diretorio de trabalho
+1. Executar `Glob('02-Controle/**/{periodo}/????-??-??/CICLO.md')` (mes = `{periodo}` no month-wrapper; o `**/` cobre `[N{N}/]{Vertical}` legado e level-first; ignorar `_Historico/`)
 2. Para cada CICLO.md encontrado:
    - Ler header para extrair vertical e status
    - Classificar como **completo** (E6 = concluido) ou **parcial**
@@ -54,7 +55,7 @@ Executa a etapa E7 (Licoes Aprendidas) do processo G2.2 para um periodo mensal.
 
 ### 3. Descobrir atas de rituais
 
-1. Executar `Glob('*/{periodo}-*/output/*/ata-ritual-*.md')` no diretorio de trabalho
+1. Executar `Glob('03-Rituais/**/ata/ata-ritual-*.md')` (atas vivem em `03-Rituais/` desde 2026-05-12, NAO mais em `output/` dentro do ciclo; o `**/` tolera o nivel level-first `N{N}/`; ignorar `_Historico/`). Filtrar pelas atas do mes `{periodo}` lendo a data do nome da pasta/arquivo (Semanal usa `YYYY-Sxx`, Mensal usa `YYYY-MM`)
 2. Contar atas e extrair nomes de gestores N2 (ler secao `## Participantes` de cada ata)
 3. Se **0 atas encontradas**: registrar WARNING:
    ```

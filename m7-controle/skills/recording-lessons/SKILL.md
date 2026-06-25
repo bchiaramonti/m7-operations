@@ -46,9 +46,9 @@ Esta skill consolida licoes aprendidas de todos os ciclos semanais e rituais de 
   - `analise/action-report.md` (E4 — Input I3)
   - `data-quality/data-quality-report.md` (E2 — Input I4)
 - Outputs de rituais do mes:
-  - `output/*/ata-ritual-*.md` (G2.3 — Input I2)
+  - `03-Rituais/**/ata/ata-ritual-*.md` (G2.3 — Input I2)
 
-> **Resolucao de caminhos**: Os ciclos semanais ficam em `{vertical}/YYYY-MM-DD/` no diretorio de trabalho do usuario. As atas ficam em `output/{vertical}/ata-ritual-YYYY-MM-DD.md` dentro das pastas de ciclo. Localizar via Glob com filtro pelo periodo.
+> **Resolucao de caminhos** (canonical S3): Os ciclos ficam em `02-Controle/[N{N}/]{Vertical-cap}[-{sub}]/{YYYY-MM}/{YYYY-MM-DD}/` e as atas em `03-Rituais/[N{N}/]{Vertical-cap}[-{sub}]/.../ata/ata-ritual-*.md` (atas migraram de `output/` para `03-Rituais/` em 2026-05-12). O `[N{N}/]` so existe quando o level-first esta ativo — use `**/` nos Globs para tolerar ambos os layouts. Localizar via Glob com filtro pelo periodo; ignorar `_Historico/`.
 
 ## Pre-requisitos (Entry Criteria)
 
@@ -60,7 +60,7 @@ Esta skill consolida licoes aprendidas de todos os ciclos semanais e rituais de 
 
 ### Fase 1 — Descobrir Artefatos do Mes
 
-1. **Localizar ciclos de TODAS as verticais**: `Glob('*/{periodo}-*/CICLO.md')` onde `{periodo}` e o YYYY-MM do mes
+1. **Localizar ciclos de TODAS as verticais**: `Glob('02-Controle/**/{periodo}/????-??-??/CICLO.md')` onde `{periodo}` e o YYYY-MM do mes (month-wrapper); o `**/` cobre `[N{N}/]{Vertical}` legado e level-first; ignorar `_Historico/`
 2. **Para cada CICLO.md encontrado**:
    - Ler o header para extrair vertical e status
    - Verificar se E6 = `concluido`
@@ -69,7 +69,7 @@ Esta skill consolida licoes aprendidas de todos os ciclos semanais e rituais de 
    - `wbr/wbr-narrativo-*.md` (I1: WBRs)
    - `analise/action-report.md` (I3: acoes)
    - `data-quality/data-quality-report.md` (I4: qualidade)
-4. **Localizar atas de rituais**: `Glob('*/{periodo}-*/output/*/ata-ritual-*.md')` (I2: feedback)
+4. **Localizar atas de rituais**: `Glob('03-Rituais/**/ata/ata-ritual-*.md')` (atas em `03-Rituais/` desde 2026-05-12, nao em `output/`; `**/` tolera o nivel level-first; ignorar `_Historico/`). Filtrar pelas do mes `{periodo}` lendo a data do nome da pasta/arquivo (I2: feedback)
 5. **Agrupar por vertical** para rastreabilidade — registrar quantos ciclos e atas cada vertical tem
 6. **Validar**:
    - Se 0 ciclos completos: **ABORTAR** com mensagem "Nenhum ciclo completo encontrado para {periodo}. Execute pelo menos 1 /m7-controle:run-weekly primeiro."

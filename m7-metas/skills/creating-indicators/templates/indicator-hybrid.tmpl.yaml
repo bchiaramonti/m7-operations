@@ -8,6 +8,8 @@ status: draft
 updated_at: {{YYYY-MM-DD}}
 owner: {{nome.sobrenome}}
 domain: {{comercial|receita|clientes|operacional|risco|pessoas}}
+org_level: {{N1|N2|N3|N4|N5}}            # nivel organizacional (pasta N{org_level}/); != coluna 'nivel' do output
+vertical_folder: {{Consorcios|Seguros|Investimentos|Produtos|...}}  # subpasta da vertical sob N{org_level}/
 tags:
   - {{tag1}}
   - {{tag2}}
@@ -23,6 +25,17 @@ granularity: "{{dimensao / periodo}}"
 source_type: hybrid
 source_layer: api
 refresh_frequency: {{realtime|daily|weekly|monthly}}
+
+# ─────────────────────────────────────────────────────────
+# CAMPOS VISUAIS OPCIONAIS (schema v2.1)
+# ─────────────────────────────────────────────────────────
+# Preencher apenas quando aplicavel — todos sao opcionais.
+
+# display_name: "{{Label para slides quando diferente do name canonico}}"
+# display_suffix: "{{Sufixo concatenado, ex: CRM, MTD, YTD — max 16 chars}}"
+# direction: {{maior_melhor|menor_melhor}}  # default: maior_melhor.
+
+# output_schema.por_canal pode ser declarado dentro de extraction.output_schema mais abaixo.
 
 # ─────────────────────────────────────────────────────────
 # EXTRACTION (source_type: hybrid)
