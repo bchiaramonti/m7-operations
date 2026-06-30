@@ -53,11 +53,12 @@ Ler `periodo`, `granularidade` e `checkpoint_label` do CICLO.md. A analise tempo
 
 ### Fase 1 — Classificar Semaforo
 
-> **OBRIGATORIO antes de classificar**: Ler **TODAS** as fontes de meta do Card de Performance da vertical. Metas podem estar em DOIS lugares diferentes do YAML:
-> 1. `kpi_references[].regras_meta` — metas de KPIs principais (geralmente Receita/Volume)
-> 2. `metas_ppi:` — bloco SEPARADO no top-level do Card com metas dos PPIs de funil (ex: `oportunidades_ativas_funil_seg.qty`, `oportunidades_criadas_funil_seg.qty`, `oportunidades_estagnadas_funil_seg.qty` etc.)
+> **OBRIGATORIO antes de classificar**: Ler as metas de `dados/metas-resolvidas.json` (SoT gerado pelo `resolve_metas.py` pre-E3). Se ausente ou `offline_fallback=true`, emitir WARN e usar o Card como fallback:
+> 1. `metas-resolvidas.json["indicadores"]` — **SoT** para PPIs de funil e KPIs mensais do ciclo
+> 2. `kpi_references[].regras_meta` do Card — complemento para KPIs sem entrada no JSON
+> 3. `metas_ppi:` do Card — **fallback** somente quando `offline_fallback=true`
 >
-> NAO classifique nenhum PPI como "sem meta / cinza" antes de verificar AMBAS as fontes. Use `Grep('metas_ppi', card_path)` para confirmar existencia do bloco. Se `metas_ppi` existe, leia integralmente — cada chave declarada e uma meta formal a aplicar.
+> NAO classifique nenhum PPI como "sem meta / cinza" antes de verificar o JSON. Cada chave em `indicadores` e uma meta formal a aplicar.
 
 **Para indicadores em `kpi_references[].regras_meta` ou sem direction explicito** (regra padrao):
 
@@ -67,7 +68,7 @@ Ler `periodo`, `granularidade` e `checkpoint_label` do CICLO.md. A analise tempo
 | **Amarelo** | 80-94% da meta | Analise simplificada (tendencia + contexto) |
 | **Vermelho** | < 80% da meta | Analise de fenomeno completa (5 dimensoes) |
 
-**Para PPIs em `metas_ppi:` do Card** (regra a documentada no Card):
+**Para PPIs em `metas-resolvidas.json` (ou fallback `metas_ppi:` do Card)** (regra a):
 
 | Classificacao | Criterio (maior_melhor) | Criterio (menor_melhor) |
 |---------------|-------------------------|--------------------------|
@@ -84,7 +85,7 @@ Onde:
 > Exemplo correto: Volume N1 a 105% = Verde, mesmo que Tereza esta a 0% e Douglas a 175%.
 > Exemplo incorreto: Douglas "reclassificado" como Vermelho por "concentracao excessiva".
 
-**Output Fase 1:** Tabela-semaforo com todos os indicadores classificados, separando KPIs (regra padrao 95/80) de PPIs em metas_ppi (regra a do Card 100/70). Registrar EXPLICITAMENTE quais indicadores nao tem meta (verdadeiramente cinza) e quais tem meta declarada no Card mas com `valor: pendente` (cinza com justificativa).
+**Output Fase 1:** Tabela-semaforo com todos os indicadores classificados, separando KPIs (regra padrao 95/80) de PPIs (regra a 100/70 via `metas-resolvidas.json`). Registrar EXPLICITAMENTE quais indicadores nao tem meta (verdadeiramente cinza) e quais tem `_pending` no JSON ou `valor: pendente` no Card (cinza com justificativa).
 
 ### Fase 2 — Analise de Fenomeno (Vermelhos)
 
@@ -317,7 +318,7 @@ python3 {plugin_root}/m7-controle/skills/consolidating-wbr/scripts/normalize_can
 ## Exit Criteria
 
 - [ ] Relatorio de Desvios e Causa-Raiz gerado em `analise/deviation-cause-report.md` (na pasta do ciclo)
-- [ ] **`metas_ppi:` do Card foi lido e aplicado** (Grep no Card confirmou se bloco existe; cada chave virou linha do semaforo com regra a 100/70/menor_melhor)
+- [ ] **`dados/metas-resolvidas.json` foi lido e aplicado** (SoT; ou fallback `metas_ppi:` do Card quando `offline_fallback=true`; cada PPI virou linha do semaforo com regra a 100/70/menor_melhor)
 - [ ] 100% dos indicadores classificados no semaforo (Verde/Amarelo/Vermelho/Cinza-com-justificativa)
 - [ ] Indicadores cinza tem motivo explicito: "sem meta no Card" OU "meta marcada como `valor: pendente` no Card"
 - [ ] Analise de fenomeno completa (5 dimensoes) para cada Vermelho

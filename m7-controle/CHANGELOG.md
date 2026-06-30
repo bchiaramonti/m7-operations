@@ -5,6 +5,41 @@ Todas as mudancas notaveis neste plugin serao documentadas neste arquivo.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [7.0.0] - 2026-06-29
+
+> **Major release** — Centraliza resolucao de metas em `resolve_metas.py` (pre-E3),
+> elimina o inject pos-analise (E6·∫) e reverte E6 para 1 passada do analyst.
+> Metas chegam corretas em E3, E4, E5 e E6 via `dados/metas-resolvidas.json`.
+
+### Added
+
+- **`skills/collecting-data/scripts/resolve_metas.py`** (E2 Fase 3.5) — resolve metas de
+  3 fontes (`vw_ciclo_metas_ppi`, `dashboard_componente`, `meta_escritorio`) e grava
+  `dados/metas-resolvidas.json`. Offline-safe (`offline_fallback=true`). Substitui
+  `inject_metas_ppi.py` + `resolve_kpi_m1_meta.py`.
+
+### Removed
+
+- **`skills/consolidating-wbr/scripts/inject_metas_ppi.py`** — logica absorvida pelo `resolve_metas.py`.
+- **`skills/consolidating-wbr/scripts/resolve_kpi_m1_meta.py`** — idem.
+- **Modelo de Execucao E6 em 2 passadas** — eliminado; analyst roda uma unica vez com metas ja corretas.
+- **`fonte: m7Prata.ciclo_metas_ppi`** nos Cards — opt-in eliminado; `resolve_metas.py` cobre todos os indicadores por regra.
+
+### Changed
+
+- **`skills/collecting-data/SKILL.md`** — adicionada Fase 3.5 (rodar `resolve_metas.py`) e Exit Criteria de `metas-resolvidas.json`.
+- **`skills/consolidating-wbr/SKILL.md`** — modelo 1 passada; Fase 4.6 removida; todas as instrucoes de leitura de meta atualizadas para `metas-resolvidas.json`.
+- **`skills/analyzing-deviations/SKILL.md`** — Fase 1 le metas de `metas-resolvidas.json` (nao mais `metas_ppi:` do Card).
+- **`skills/configuring-cards/SKILL.md`** — secao opt-in reescrita para o modelo v7.0.0.
+- **`agents/analyst.md`** — fluxo de dados e instrucao E6 atualizados.
+- **`commands/next.md` + `run-weekly.md`** — nota E6 atualizada para 1 passada.
+- **Cards Cons N3, Seg WL N3, Seg RE N3** — `fonte:` removido; valores numericos mantidos como fallback offline.
+
+### Notes
+
+- Cards de Investimentos (N2) fora de escopo — ainda com `fonte:` (pendente sessao futura).
+- `META_ESCRITORIO_BUG_ACTIVE = True` em `resolve_metas.py` — pulando `quantidade_seguros` ate TI corrigir colunas da tabela.
+
 ## [6.5.0] - 2026-06-12
 
 > **Minor release retrocompativel** — Religa as metas de PPI de funil ao SoT

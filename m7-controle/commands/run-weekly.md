@@ -275,7 +275,7 @@ Se entry criteria **NAO atendido**: registrar erro no CICLO.md (Anomalias + Log)
 | E5 | projecting-results |
 | E6 | consolidating-wbr |
 
-> **E6 em 2 passadas (v6.5.0):** consolidating-wbr orquestra Passada 1 (canonical) → main thread roda `normalize_canonical` + `inject_metas_ppi` (Fase 4.6, metas SoT `m7Prata.ciclo_metas_ppi`) → Passada 2 (docs do canonical injetado) → gate `validate-painel`. Ver "Modelo de Execucao" no SKILL.md.
+> **E6 em 1 passada (v7.0.0):** consolidating-wbr invoca o analyst uma unica vez — metas ja corretas via `dados/metas-resolvidas.json` (gerado pelo `resolve_metas.py` ao final do E2). Nao ha inject pos-analise. Ver "Modelo de Execucao" no SKILL.md.
 
 > **MODO STRICT (2026-06-19 — run-weekly e unattended):** como este command roda sem
 > operador, ativar os gates opt-in para nao publicar com gap em silencio:
