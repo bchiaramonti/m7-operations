@@ -167,7 +167,7 @@ NAME_HINTS = {
     'volume_seguros': ['volume seguros', 'volume premio', 'premio mensal'],
     'volume_consorcio': ['volume consorcio', 'volume cartas'],
     'quantidade_seguros': ['quantidade apolices', 'quantidade seguros', 'qtde apolice'],
-    'quantidade_consorcio': ['quantidade consorcio', 'qtde cartas'],
+    'quantidade_consorcio': ['quantidade consorcio', 'qtde cartas', 'quantidade cartas'],
     'taxa_conversao': ['taxa conversao', 'taxa de conversao'],
     'ticket_medio_premio': ['ticket medio premio', 'ticket premio'],
     'ticket_medio_pipeline': ['ticket pipeline', 'ticket medio pipeline'],
@@ -260,6 +260,76 @@ def match_indicator(ind_id: str, painel_rows: list[dict[str, str]]) -> dict[str,
     return matches[0]
 
 
+def _strip_subnivel(s: str) -> str:
+    """Remove o sufixo de subnivel Seguros (`_wl`/`_re`) do fim de um indicator_id,
+    para comparar a 'familia' do indicador independente do subnivel. Usado pelo
+    match canonical p/ casar base e derivado quando o naming insere `_pct_ativas`
+    antes do subnivel (WL: `..._seg_pct_ativas_wl` vs base `..._seg_wl`)."""
+    for suf in ('_wl', '_re'):
+        if s.endswith(suf):
+            return s[:-len(suf)]
+    return s
+
+
+def _canon_entry_to_row(key: str, e: dict) -> dict[str, str]:
+    """Converte um entry do canonical em pseudo-row {indicador, meta, status}
+    compativel com is_meta_filled / is_status_colored."""
+    meta = e.get('meta_label')
+    if meta in (None, ''):
+        meta = e.get('meta')
+    meta_cell = '—' if meta in (None, '') else str(meta)
+    status = str(e.get('status') or e.get('semaforo') or '')
+    return {'indicador': key, 'meta': meta_cell, 'status': status,
+            'raw': f'canonical:{key}', '_via': 'canonical'}
+
+
+def match_indicator_canonical(ind_id: str,
+                              canonical_inds: dict) -> dict[str, str] | None:
+    """Resolve a cobertura de um indicator_id DIRETO no canonical .data.json (por id).
+
+    Melhoria #2 (2026-06-30): substitui o match por substring de label (NAME_HINTS)
+    quando o canonical esta disponivel. O canonical e o SoT e tem os indicator_id
+    como chaves — match por id e DETERMINISTICO e nao quebra a cada label novo
+    (o que forcava adicionar aliases a mao: Seg WL/RE 2026-05-20, 'quantidade cartas'
+    2026-06-30, ...). Como validate_artifact_consistency ja garante canonical==.md,
+    casar Card->canonical por id implica transitivamente Card->Painel.
+
+    Candidatas = id exato + derivados da mesma familia (ex: oportunidades_estagnadas_funil
+    tem meta no derivado `_pct_ativas`, nao no base qty). Entre as candidatas,
+    mesma preferencia do match_indicator legado: meta preenchida + status colorido
+    > meta preenchida > 1a. Isso preserva o fix order-independence de 2026-06-22
+    (a meta de estagnadas vive no % ativas) sem depender de label livre.
+
+    O naming do derivado de estagnadas DIVERGE entre verticais (memory
+    estagnadas_pct_naming_wl_re_divergence): Cons `..._funil_pct_ativas`; WL
+    `..._funil_seg_pct_ativas_wl` (o `_pct_ativas` e inserido ANTES do sufixo de
+    subnivel `_wl`). Por isso comparamos pelo STEM sem o sufixo `_wl`/`_re` — assim
+    `{base}_pct_ativas` casa o base independente de onde o subnivel aparece, e sem
+    colidir ativas vs estagnadas_pct_ativas (stems distintos).
+
+    Retorna pseudo-row ou None se nenhum id (exato/derivado) existe no canonical."""
+    idstem = _strip_subnivel(ind_id.lower())
+    cand_keys: list[str] = []
+    for k in canonical_inds:
+        kstem = _strip_subnivel(k.lower())
+        if kstem == idstem or kstem.startswith(idstem + '_'):
+            if k not in cand_keys:
+                cand_keys.append(k)
+    if not cand_keys:
+        return None
+    rows = [_canon_entry_to_row(k, canonical_inds[k])
+            for k in cand_keys if isinstance(canonical_inds[k], dict)]
+    if not rows:
+        return None
+    for r in rows:
+        if is_meta_filled(r['meta']) and is_status_colored(r['status']):
+            return r
+    for r in rows:
+        if is_meta_filled(r['meta']):
+            return r
+    return rows[0]
+
+
 # ───────────────────────────────────────────────────
 # Validacao
 # ───────────────────────────────────────────────────
@@ -277,8 +347,15 @@ def is_status_colored(cell: str) -> bool:
                                  '🟢', '🟡', '🔴'])
 
 
-def validate(card_path: Path, wbr_path: Path, strict: bool = False) -> tuple[int, list[str]]:
-    """Retorna (exit_code, mensagens)."""
+def validate(card_path: Path, wbr_path: Path, strict: bool = False,
+             canonical_path: Path | None = None) -> tuple[int, list[str]]:
+    """Retorna (exit_code, mensagens).
+
+    Melhoria #2 (2026-06-30): quando `canonical_path` (o .data.json SoT) e fornecido,
+    a cobertura Card->indicador e resolvida por indicator_id DIRETO no canonical, e
+    nao por substring de label no .md (NAME_HINTS). Match por id e deterministico e
+    elimina a recorrencia de falsos-negativos a cada label novo. O parse do .md por
+    NAME_HINTS so e usado no modo legado (sem --data)."""
     msgs: list[str] = []
 
     if not card_path.exists():
@@ -294,33 +371,52 @@ def validate(card_path: Path, wbr_path: Path, strict: bool = False) -> tuple[int
     if not painel_rows:
         return 1, ["FALHA: Painel de Indicadores nao encontrado ou vazio no WBR"]
 
+    # Carregar canonical (SoT) para match deterministico por id, se disponivel.
+    canonical_inds: dict | None = None
+    if canonical_path and Path(canonical_path).exists():
+        try:
+            cdata = json.loads(Path(canonical_path).read_text(encoding='utf-8'))
+            ci = cdata.get('indicadores')
+            if isinstance(ci, dict) and ci:
+                canonical_inds = ci
+        except (json.JSONDecodeError, OSError):
+            canonical_inds = None  # fallback silencioso p/ NAME_HINTS
+
+    match_mode = "canonical (por id)" if canonical_inds is not None else "painel-md (NAME_HINTS)"
     msgs.append(f"Card: {len(metas)} indicadores com regras_meta ou metas_ppi declaradas")
-    msgs.append(f"WBR Painel: {len(painel_rows)} linhas detectadas")
+    msgs.append(f"WBR Painel: {len(painel_rows)} linhas detectadas | match Card->indicador: {match_mode}")
     msgs.append("")
 
     failures: list[str] = []
     warnings: list[str] = []
 
+    def _resolve_row(ind_id: str):
+        if canonical_inds is not None:
+            return match_indicator_canonical(ind_id, canonical_inds)
+        return match_indicator(ind_id, painel_rows)
+
+    onde = "canonical (SoT)" if canonical_inds is not None else "Painel"
+
     for ind_id, info in metas.items():
-        row = match_indicator(ind_id, painel_rows)
+        row = _resolve_row(ind_id)
 
         # Caso A: meta declarada com valores numericos
         if info['has_meta']:
             if row is None:
                 failures.append(
-                    f"  [FALHA] '{ind_id}' tem meta em {info['source']} mas NAO aparece no Painel"
+                    f"  [FALHA] '{ind_id}' tem meta em {info['source']} mas NAO aparece no {onde}"
                 )
                 continue
             if not is_meta_filled(row['meta']):
                 failures.append(
                     f"  [FALHA] '{ind_id}' (meta em {info['source']}) "
-                    f"aparece no Painel mas Meta='{row['meta']}' (vazio/—)"
+                    f"aparece no {onde} mas Meta='{row['meta']}' (vazio/—)"
                 )
                 continue
             if not is_status_colored(row['status']):
                 failures.append(
                     f"  [FALHA] '{ind_id}' (meta em {info['source']}) "
-                    f"aparece no Painel mas Status='{row['status']}' (cinza, sem cor)"
+                    f"aparece no {onde} mas Status='{row['status']}' (cinza, sem cor)"
                 )
                 continue
 
@@ -328,7 +424,7 @@ def validate(card_path: Path, wbr_path: Path, strict: bool = False) -> tuple[int
         elif info['pendente_reason']:
             if row is None:
                 warnings.append(
-                    f"  [AVISO] '{ind_id}' marcado pendente no Card e nao aparece no Painel"
+                    f"  [AVISO] '{ind_id}' marcado pendente no Card e nao aparece no {onde}"
                 )
             elif strict:
                 failures.append(
@@ -1321,8 +1417,9 @@ def main():
                              'Default: advisory. Use em execucao unattended.')
     args = parser.parse_args()
 
-    # 1. Validacao Card -> Painel (sempre)
-    code, msgs = validate(Path(args.card), Path(args.wbr), strict=args.strict)
+    # 1. Validacao Card -> Painel (sempre). Com --data, casa por id no canonical (SoT).
+    code, msgs = validate(Path(args.card), Path(args.wbr), strict=args.strict,
+                          canonical_path=Path(args.data) if args.data else None)
     for m in msgs:
         print(m)
 
