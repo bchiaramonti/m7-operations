@@ -50,34 +50,23 @@ Esta skill consolida os outputs de E2 (qualidade), E3 (desvios), E4 (acoes) e E5
 - CICLO.md indica E6 como etapa atual
 - Dados numericos consistentes entre relatorios (verificar na consolidacao)
 
-## Modelo de Execucao — 2 passadas do analyst (NOVO v6.5.0 — 2026-06-12)
+## Modelo de Execucao — 1 passada do analyst (v7.0.0 — 2026-06-29)
 
-> **MUDANCA DE CONTRATO DO E6.** Para que as metas do SoT `m7Prata.ciclo_metas_ppi`
-> (Fase 4.6) entrem coerentes em TODOS os artefatos (canonical + Estruturado +
-> Narrativo + gate), o E6 roda em **2 invocacoes do agente `analyst`** com um passo
-> deterministico do **main thread** (que tem Bash) no meio. O analyst NAO tem Bash —
-> quem roda os scripts (`normalize_canonical`, `inject_metas_ppi`, `validate-painel`,
-> `html-to-pdf`) e SEMPRE o main thread executor do skill.
+> **Modelo simplificado.** As metas ja chegam corretas no canonical via `metas-resolvidas.json`
+> (gerado pelo `resolve_metas.py` ao final do E2, Fase 3.5). O analyst NAO precisa parar
+> entre canonical e docs — escreve tudo em uma unica invocacao. O inject tardio (Fase 4.6)
+> foi removido porque o problema que ele resolvia (metas stale) foi eliminado na raiz.
 
 Sequencia obrigatoria:
 
-1. **PASSADA 1 — analyst (Fases 1 → 4.5, incl. 4.5.a–g):** consolida E2–E5 e escreve
-   **SOMENTE o canonical** `wbr-{vertical}-{data}.data.json`. **PARE aqui** — NAO escreva
-   ainda Estruturado/Narrativo (eles dependem do canonical pos-inject).
-2. **MAIN THREAD (bash) — Fase 4.6:** roda `normalize_canonical.py` (conserta shape),
-   `inject_metas_ppi.py` (injeta metas PPI do SoT nos indicadores opted-in) e
-   `resolve_kpi_m1_meta.py` (grava a meta REAL do mes seguinte nos KPIs receita/volume/
-   quantidade a partir dos dados coletados — corrige a heranca de meta M0 no M+1). Ver Fase 4.6.
-3. **PASSADA 2 — analyst (Fases 5 → 7):** **LE o canonical ja injetado** e escreve
-   Estruturado (5) + Narrativo MD (6) + HTML (6b) + spot-check (7). **REGRA CRITICA:**
-   nesta passada o canonical e a fonte de verdade — NAO reescrever `indicadores.*`
-   (so ler para formatar os docs).
-4. **MAIN THREAD (bash) — Fases 6c + 7.5:** PDF (6c) + gate `validate-painel.py` (7.5).
-   Como os docs da Passada 2 ja derivam do canonical injetado, o gate cross-artifact bate.
+1. **analyst (Fases 1 → 7):** le `dados/metas-resolvidas.json`, constroi o canonical
+   com metas corretas (Fase 4.5) e em seguida escreve Estruturado (5) + Narrativo MD (6) +
+   HTML (6b) + spot-check (7). Uma invocacao, sem interrupcao.
+2. **MAIN THREAD (bash) — Fase 6c + 7.5:** PDF (6c) + gate `validate-painel.py` (7.5).
+   O analyst NAO tem Bash — main thread roda esses scripts.
 
-> **Offline / sem opt-in:** se o ClickHouse estiver fora (office-only) ou nenhum Card
-> declarar `fonte:`, o `inject_metas_ppi` e NO-OP — o canonical permanece com o cache do
-> Card e o fluxo segue identico ao legado (1 passada efetiva). Sem regressao.
+> **Offline:** se `metas-resolvidas.json` tem `offline_fallback=true`, o analyst emite
+> WARN nos indicadores afetados e usa os valores do Card como fallback. Sem bloqueio.
 
 ## Workflow
 
@@ -140,11 +129,12 @@ Montar as 6 secoes obrigatorias do WBR:
 
 Tabela consolidada de TODOS os indicadores do Card de Performance, em posicao fixa e previsivel. Serve como fonte de dados para o m7-ritual-gestao (Slide 2 — Matriz de Status).
 
-> **OBRIGATORIO antes de montar o Painel**: Ler **TODAS** as fontes de meta do Card. Metas estao em DOIS lugares:
-> 1. `kpi_references[].regras_meta` — KPIs principais (Receita, Volume etc.)
-> 2. `metas_ppi:` — bloco SEPARADO no top-level com metas dos PPIs de funil
+> **OBRIGATORIO antes de montar o Painel**: Ler **TODAS** as fontes de meta. Fontes em ordem de prioridade:
+> 1. `dados/metas-resolvidas.json` — **SoT** produzido pelo `resolve_metas.py` pre-E3 (PPIs funil + KPIs mensais + fixas). Se ausente ou `offline_fallback=true`, emitir WARN e usar fallback abaixo.
+> 2. `kpi_references[].regras_meta` — KPIs principais (Receita, Volume etc.) para complementar
+> 3. `metas_ppi:` do Card — **fallback** quando `offline_fallback=true` ou indicador nao resolvido por tabela
 >
-> Use `Grep('^metas_ppi', card_path)` para confirmar existencia do bloco. Se existe, leia integralmente. PPIs em `metas_ppi` NAO sao "cinza" — recebem semaforo pela regra a (verde>=100% / amarelo 70-99% / vermelho <70%, com cap 200% para `menor_melhor`).
+> PPIs em `metas-resolvidas.json` (ou fallback `metas_ppi:`) NAO sao "cinza" — recebem semaforo pela regra a (verde>=100% / amarelo 70-99% / vermelho <70%, com cap 200% para `menor_melhor`).
 >
 > **SKIP indicators SO-fechamento (2026-05-25):** quando `kpi_references[X].matrix_views[*].slide_visibility == ["fechamento"]` em TODAS as views, o indicador NAO entra no Painel WBR semanal. Aplicado a `tempo_de_ciclo_funil_*` (indicador retrospectivo — base parcial MTD nao tem valor analitico semanal; so renderiza em slide de Fechamento mensal). Validate-painel.py respeita essa regra automaticamente.
 >
@@ -158,7 +148,7 @@ Tabela consolidada de TODOS os indicadores do Card de Performance, em posicao fi
 
 1. **Ler o Card de Performance** da vertical via `Glob('**/Cards-de-Performance/{Vertical}/card_*.yaml')`
 2. **Extrair `kpi_references[]`** — lista completa de indicadores com `papel`, `unidade`, `criterio_desvio_critico`
-3. **Extrair `metas_ppi:` do Card** — cada chave e meta de PPI a aplicar com regra a (100/70/menor_melhor com cap 200%)
+3. **Ler `dados/metas-resolvidas.json`** (SoT) — PPIs e KPIs com metas do ciclo; fallback para `metas_ppi:` do Card quando `offline_fallback=true`. Regra a (100/70/menor_melhor com cap 200%)
 4. **Para cada indicador**, buscar em `dados/dados-consolidados-{vertical}.json`:
    - Valor realizado (N1 consolidado + desdobrado por especialista N2)
    - Meta (se disponivel — verificar AMBAS as fontes acima)
@@ -398,9 +388,9 @@ A entrada original de `oportunidades_estagnadas_funil_*` (qty) deve ser preserva
 
 #### Fase 4.5.b — Leitura de `por_especialista` (meta N2 individual)
 
-Para Cards com subbloco `por_especialista:` em qualquer chave de `metas_ppi.{ppi}` (ex: `oportunidades_ativas_funil_seg.por_especialista`), o agente DEVE popular `n2.{especialista}.meta` no canonical JSON com o valor correspondente:
+Para indicadores com meta N2 individual por especialista, o agente DEVE popular `n2.{especialista}.meta` no canonical JSON:
 
-- Para cada especialista em `metadata.responsaveis` ou `apresentacao.responsaveis`, ler `metas_ppi.{ppi}.por_especialista[especialista].{qty|volume|ticket_medio}` e gravar em `indicadores.{indicator_id}.n2.{especialista}.meta`
+- Para cada especialista em `metadata.responsaveis` ou `apresentacao.responsaveis`, ler `metas-resolvidas.json["indicadores"][{ppi}]["N2"][especialista].{value|value_volume}` e gravar em `indicadores.{indicator_id}.n2.{especialista}.meta`. Fallback: `metas_ppi.{ppi}.por_especialista[especialista].{qty|volume}` do Card quando `offline_fallback=true`
 - Calcular `n2.{especialista}.pct` e `n2.{especialista}.status` aplicando a mesma regra de semaforo do indicador (regra a com `direction`)
 - Se o subbloco `por_especialista` nao existir, manter comportamento atual (so realizado N2, sem meta N2)
 
@@ -489,7 +479,7 @@ Para cada item de `riscos_principais`, `destaques_positivos` ou `anomalias`, emi
 3. **Popular canonical:**
    - `canonical.indicadores.{derived_id}.realizado` = value N1 calculado
    - `canonical.indicadores.{derived_id}.n2.{esp_or_canal}.realizado` = value N2 calculado
-   - `canonical.indicadores.{derived_id}.meta` = lido do Card (`metas_ppi.{derived_id}.{field_meta}` ou padrao do schema)
+   - `canonical.indicadores.{derived_id}.meta` = lido de `metas-resolvidas.json["indicadores"][{derived_id}]["N1"].value` (fallback: `metas_ppi.{derived_id}.{field_meta}` do Card quando `offline_fallback=true`)
    - `canonical.indicadores.{derived_id}.aggregation_rule_applied = true` (flag)
    - `canonical.indicadores.{derived_id}.direction` = lido do YAML do derivado (geralmente `menor_melhor`)
    - Calcular `pct_atingimento`, `gap_abs`, `status` aplicando regra de semaforo do indicador (`metas_ppi_a_menor_melhor` para % estagnadas, etc.)
@@ -526,71 +516,15 @@ Para cada item de `riscos_principais`, `destaques_positivos` ou `anomalias`, emi
 **Consumo downstream pelo build_deck.py (rotina `_esp_proj_section`):**
 
 - **proj_m0 / proj_m1 (valor base)**: prefer `canonical.projecoes.{ind}.{horizon}.por_especialista.{esp}.base` → fallback `indicadores.{ind}.n2.{esp}.projecao_mes_corrente` → fallback prorata N1 share.
-- **meta_m0 / meta_m1**: prefer `Card.metas_ppi.{ind}.por_especialista.{esp}.{valor|valor_proximo_mes}` → fallback `canonical.projecoes.{ind}.{horizon}.por_especialista.{esp}.meta_mes` (NOVO v1.3) → fallback meta_m0 herdado.
+- **meta_m0 / meta_m1**: prefer `metas-resolvidas.json["indicadores"][{ind}]["N2"][esp].value` → fallback `canonical.projecoes.{ind}.{horizon}.por_especialista.{esp}.meta_mes` (NOVO v1.3) → fallback meta_m0 herdado do N1.
 - **classificacao**: prefer `M0/M+1.por_especialista.{esp}.classificacao` → fallback `indicadores.{ind}.n2.{esp}.classificacao_mes_corrente/seguinte`.
 
-**Backwards compat v1.2 → v1.3:** WBRs antigos sem `por_especialista` continuam validos. Build_deck aplica fallbacks (prorata) e Card.metas_ppi continua sendo a fonte autoritativa de meta_m1 quando declarado.
-
-> **FIM DA PASSADA 1 do analyst.** O canonical esta escrito (com metas do cache
-> `metas_ppi:` do Card). O analyst RETORNA aqui. O main thread assume e executa a Fase 4.6
-> ANTES de invocar a Passada 2 (Fases 5–7).
-
-### Fase 4.6 — Inject SoT `m7Prata.ciclo_metas_ppi` (MAIN THREAD, bash — NOVO v6.5.0 2026-06-12)
-
-> **Roda no MAIN THREAD (tem Bash), entre as 2 passadas do analyst.** Substitui as metas
-> dos indicadores **OPTED-IN** pelos valores do SoT da tabela e recalcula
-> `pct_atingimento`/`gap`/`status`. Tira o LLM do loop de transcrever metas e garante que
-> a Passada 2 (Estruturado/Narrativo) derive do canonical ja injetado.
-
-**Passo 1 — normalize (conserta shape ANTES do inject):**
-```bash
-python3 {plugin_path}/skills/consolidating-wbr/scripts/normalize_canonical.py \
-  --cycle-folder {cycle_folder} --vertical {vertical} [--subnivel {subnivel}]
-```
-
-**Passo 2 — inject:**
-```bash
-python3 {plugin_path}/skills/consolidating-wbr/scripts/inject_metas_ppi.py \
-  --data {cycle_folder}/wbr/wbr-{vertical}-{data}.data.json \
-  --card {path_to_card} --vertical {consorcios|seguros_wl|seguros_re}
-  # --mes deriva de data_referencia; --dry-run p/ preview
-```
-
-Garantias do script:
-1. **OPT-IN:** so altera indicadores cujo Card declara `fonte: m7Prata.ciclo_metas_ppi` no bloco `metas_ppi.{ind}`. Sem opt-in → **NO-OP** (cache do Card permanece; rollback trivial).
-2. **ESCOPO count/BRL:** injeta apenas metas de unidade nao-ambigua — `oportunidades_ativas_funil` (qty + volume; substancia real da migracao, formula corrigida), `oportunidades_criadas_funil`, `oportunidades_sem_atividade_planejada_funil`. **NAO** injeta ratio/days (`taxa_conversao`, `tempo_de_ciclo`, `estagnadas_pct_ativas`) — constantes de gestao identicas em Card e tabela, com unidade inconsistente no canonical (percent vs ratio) e naming WL/RE divergente. Esses ficam no Card (canonical via Fase 4.5).
-3. **N1/N2 corretos:** le `m7Prata.vw_ciclo_metas_ppi` (ultimo snapshot via `argMax(data_ref)`); N1 = SUM(squad) p/ count/BRL; N2 por `id_colaborador`/`nome_referencia`. Cada Card filtra SO o seu squad (Seg WL ≠ Seg RE, mesmo `vertical='Seg'`; a linha N1 literal da tabela = WL+RE somados, NAO usar).
-4. **Offline-safe:** ClickHouse fora (office-only) → WARN + exit 0, canonical intacto, cache do Card vale. NUNCA bloqueia.
-5. **Auditavel:** backup `.bak`, atualiza `meta_fonte`, imprime diff (de→para).
-
-> Pre-requisito antes de declarar `fonte:` num Card novo: rodar `compare_metas_card_vs_tabela.py --vertical {v}` e revisar divergencias. PJ2 NAO usa esta fase (canonical por canal — pendente, ver build_deck_pj2).
-
-**Passo 3 — resolver META de M+1 dos KPIs a partir dos dados coletados (NOVO 2026-06-22):**
-```bash
-python3 {plugin_path}/skills/consolidating-wbr/scripts/resolve_kpi_m1_meta.py \
-  --data {cycle_folder}/wbr/wbr-{vertical}-{data}.data.json \
-  --raw-dir {cycle_folder}/dados/raw \
-  --sidecar {cycle_folder}/analise/projection-by-especialista.json
-  # --dry-run p/ preview
-```
-
-Garantia: para os KPIs de meta-mensal-por-tabela (`receita_*`, `volume_*`,
-`quantidade_*`), grava em `projecoes.{ind}.M+1.meta_mes` (N1) e
-`.por_especialista.{esp}.meta_mes` (N2) a meta REAL do mes seguinte — lida da
-linha do mes M+1 em `dados/raw/{ind}.json` (o script de coleta ja traz TODOS os
-meses). Recomputa `gap_meta` + `classificacao` de M+1. **Corrige o bug em que o
-E5 HERDAVA a meta de M0 no M+1** (ex Cons: receita jul real R$ 289K vs jun R$ 243K;
-a meta lagging cresce mes a mes). PPIs de funil NAO sao tocados (meta vem do
-`ciclo_metas_ppi`, Passo 2). Se o mes seguinte nao estiver cadastrado na tabela,
-mantem o valor existente e marca `m1_meta_inherited=true` (transparente — nunca
-inventa meta). Idempotente, backup `.bak`. Sem dependencia nova de office: a meta
-de M+1 ja foi coletada no E2.
+**Backwards compat v1.2 → v1.3:** WBRs antigos sem `por_especialista` continuam validos. Build_deck aplica fallbacks (prorata). Quando `metas-resolvidas.json` ausente ou `offline_fallback=true`, usar `Card.metas_ppi.{ind}.por_especialista.{esp}` como fallback de meta_m1.
 
 ### Fase 5 — Validar e Salvar WBR Estruturado
 
-> **PASSADA 2 do analyst — Fases 5 a 7.** Reinvocar o analyst para escrever os docs LENDO
-> o canonical JSON **ja injetado/normalizado** (Fase 4.6). **NAO reescrever `indicadores.*`**
-> — o canonical e a fonte de verdade; aqui so se LE para formatar.
+> O canonical ja contem metas corretas (lidas de `metas-resolvidas.json` na Fase 4.5).
+> NAO reescrever `indicadores.*` — o canonical e a fonte de verdade; aqui so se LE para formatar.
 
 1. Executar checklist de coerencia (ver [wbr-structure.md](references/wbr-structure.md))
 2. Salvar `wbr/wbr-{vertical}-{data}.md` (na pasta do ciclo)
@@ -699,9 +633,7 @@ deterministico que conserta divergencias de FORMA recorrentes do analyst (indica
 list->dict, status->semaforo, painel.indicadores->top-level, acoes.em_dia->em_dia_priorizadas,
 projecoes.M+1 null removido). Idempotente — no-op quando ja conforme.
 
-> **NOTA v6.5.0:** este normalize JA rodou na **Fase 4.6** (antes do inject). Rodar de novo
-> aqui e safety idempotente (cobre shapes que a Passada 2 do analyst possa ter reintroduzido
-> nos docs/canonical). Mantido.
+> **NOTA v7.0.0:** normalize roda uma unica vez aqui (Fase 7). Nao ha mais Fase 4.6 nem inject pos-analise. Idempotente — no-op quando canonical ja conforme.
 
 ```bash
 python3 {plugin_path}/skills/consolidating-wbr/scripts/normalize_canonical.py \
@@ -723,7 +655,7 @@ python3 {plugin_path}/skills/consolidating-wbr/scripts/validate-painel.py \
 
 **Validacoes em sequencia (exit final = max de todas):**
 
-1. **Painel (GATE)**: confere que toda meta em `kpi_references[].regras_meta` ou `metas_ppi:` aparece no Painel do Estruturado com Meta preenchida e Status colorido. Falha (exit 1) bloqueia o ciclo.
+1. **Painel (GATE)**: confere que toda meta em `kpi_references[].regras_meta` ou `metas-resolvidas.json["indicadores"]` aparece no Painel do Estruturado com Meta preenchida e Status colorido. Falha (exit 1) bloqueia o ciclo.
 
 2. **Cross-Artifact (ADVISORY, gate opt-in)**: confere que numeros criticos (realizado + meta de cada indicador) do canonical JSON aparecem em estruturado/narrativo/html dentro de tolerancia 5%. Default = AVISO (exit 0) — revisao manual (numeros podem divergir por formatacao legitima, ex "121,7K" vs "121.713"). Com `--strict-cross-artifact` (execucao unattended), divergencia vira FALHA (exit 1).
 
@@ -771,7 +703,7 @@ Registrar em CICLO.md > Log: `[{timestamp}] SCRIPT:validate-painel — painel=ex
 - [ ] **Validacao JSON Schema** (S2a B6.25) — `wbr-{vertical}-{data}.data.json` valida contra `m7-operations/_schema/v1.2/wbr-canonical-data.schema.json` antes de prosseguir para Fase 5 (WBR Estruturado MD). Se schema violation, BLOQUEAR emissao do MD — canonical malformado propaga bug para deck e briefing.
 - [ ] WBR Estruturado gerado com 6 secoes obrigatorias presentes e nao vazias (incluindo 1.5 Painel) — **lido a partir do canonical JSON**
 - [ ] Painel de Indicadores (Secao 1.5) contem TODOS os indicadores do Card de Performance
-- [ ] **`metas_ppi:` do Card foi lido e aplicado** no Painel (verificar via `Grep('^metas_ppi', card_path)`)
+- [ ] **`dados/metas-resolvidas.json` foi lido e aplicado** no Painel (SoT; ou fallback `metas_ppi:` do Card quando `offline_fallback=true`)
 - [ ] **`validate-painel.py` retornou exit 0 no Painel** (Fase 7.5) — gate obrigatorio antes de concluir E6
 - [ ] Cross-artifact validation rodada (advisory) — divergencias residuais revisadas e aceitas/corrigidas
 - [ ] Painel com colunas N2 por especialista conforme Card `metadata.responsaveis`

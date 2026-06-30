@@ -68,6 +68,7 @@ SEMPRE enquadre a analise usando o `checkpoint_label`:
 ```
 dados/dados-consolidados-{vertical}.json (E2) ──┐
 dados/provenance.json (E2)                       │
+dados/metas-resolvidas.json (pre-E3)             │  <- SoT de metas (resolve_metas.py)
 cards YAML (repositorio do usuario)              ├──> analyst ──> analise/deviation-cause-report.md (E3)
 plano-de-acao.csv (repositorio do usuario)       │            ──> analise/action-report.md (E4)
                                                  │            ──> analise/projection-report.md (E5)
@@ -217,15 +218,15 @@ Os rates iniciais sao estimativas calibraveis; apos 2-3 ciclos serao ajustados c
 
 **Objetivo**: Consolidar E2-E5 em um WBR autocontido com narrativa executiva coerente.
 
-> **2 PASSADAS (NOVO v6.5.0 — 2026-06-12).** O main thread invoca o analyst **duas vezes** no E6,
-> com um passo deterministico (`inject_metas_ppi`, Fase 4.6) no meio:
-> - **Passada 1 (build-canonical):** voce escreve SOMENTE o canonical `wbr-*.data.json` (Fases 1–4.5).
->   PARE — nao escreva Estruturado/Narrativo ainda.
-> - **Passada 2 (write-docs):** voce LE o canonical **ja injetado/normalizado** pelo main thread e escreve
->   Estruturado + Narrativo + HTML (Fases 5–7). **NAO reescreva `indicadores.*`** — o canonical e a fonte
->   de verdade; aqui so se LE para formatar. Reescrever desfaria as metas do SoT `m7Prata.ciclo_metas_ppi`.
-> Voce NAO tem Bash; quem roda `normalize_canonical`/`inject_metas_ppi`/`validate-painel`/`html-to-pdf` e
-> sempre o main thread. Detalhes: consolidating-wbr/SKILL.md secao "Modelo de Execucao".
+> **1 PASSADA (v7.0.0 — 2026-06-29).** O main thread invoca o analyst **uma unica vez** no E6.
+> As metas ja chegam corretas via `dados/metas-resolvidas.json` (gerado pelo `resolve_metas.py`
+> no final do E2). Voce le esse arquivo na Fase 4.5 (nao mais o `metas_ppi:` do Card) e constroi
+> o canonical com metas corretas de inicio. Em seguida escreve Estruturado + Narrativo + HTML
+> (Fases 5–7) na mesma invocacao. Voce NAO tem Bash; quem roda `normalize_canonical`/
+> `validate-painel`/`html-to-pdf` e sempre o main thread.
+>
+> Se `metas-resolvidas.json` tiver `offline_fallback=true`, emita WARN nos indicadores afetados
+> e use os valores do Card como complemento. Detalhes: consolidating-wbr/SKILL.md secao "Modelo de Execucao".
 
 **Estrutura obrigatoria (6 secoes)**:
 

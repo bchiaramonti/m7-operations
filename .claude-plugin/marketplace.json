@@ -10,8 +10,8 @@
   "plugins": [
     {
       "name": "m7-controle",
-      "description": "Ciclo de controle de performance M7. Operacionaliza o processo G2.2 com 7 etapas: configuracao de Cards de Performance (E1), coleta de dados via scripts Python + Fase 1.5 ClickUp MCP (E2), analise de desvios com semaforo e segmentacao (E3), acompanhamento de acoes ClickUp com flag `criada_em_ritual_anterior` (E4), projecao YAML-driven com `pipeline_conversion_extended_v2` cycle-time-aware (Cons + Seguros WL/RE) e Fase 6.6 consolidacao N1 (E5), consolidacao do WBR em 2 passadas do analyst com inject de metas SoT `m7Prata.ciclo_metas_ppi` (Fase 4.6) e `close_mode` para fechamento mensal (E6 v6.5.0), e licoes aprendidas mensais cross-vertical (E7).",
-      "version": "6.5.0",
+      "description": "Ciclo de controle de performance M7. Operacionaliza o processo G2.2 com 7 etapas: configuracao de Cards de Performance (E1), coleta de dados via scripts Python + Fase 1.5 ClickUp MCP + Fase 3.5 resolve_metas.py (E2), analise de desvios com semaforo e segmentacao lendo metas-resolvidas.json (E3), acompanhamento de acoes ClickUp com flag `criada_em_ritual_anterior` (E4), projecao YAML-driven com `pipeline_conversion_extended_v2` cycle-time-aware (Cons + Seguros WL/RE) e Fase 6.6 consolidacao N1 (E5), consolidacao do WBR em 1 passada do analyst com metas ja resolvidas pre-E3 e `close_mode` para fechamento mensal (E6 v7.0.0), e licoes aprendidas mensais cross-vertical (E7).",
+      "version": "7.0.0",
       "author": {
         "name": "Bruno Chiaramonti"
       },

@@ -492,6 +492,27 @@ python3 {path_to_plugin}/skills/collecting-data/scripts/collect.py consolidate \
 
 4. **Registrar no CICLO.md > Log**: `[{timestamp}] SKILL:collecting-data — Consolidacao concluida: {N} indicadores processados`
 
+### Fase 3.5 — Resolver Metas (pre-E3)
+
+Roda `resolve_metas.py` UMA VEZ apos a consolidacao e ANTES de invocar E3. Produz `dados/metas-resolvidas.json` — unica fonte de verdade de metas para E3, E4, E5 e E6 deste ciclo. Substitui o inject tardio da Fase 4.6 (removido em v7.0.0).
+
+```bash
+PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python3 \
+  {plugin_path}/skills/collecting-data/scripts/resolve_metas.py \
+  --card {path_to_card} \
+  --vertical {vertical} \
+  --mes {YYYY-MM-01} \
+  --cycle-folder {cycle_folder}
+  # --bib-scripts {path_bib} se meta_resolver.py nao estiver no PATH padrao
+```
+
+Fontes consultadas (em ordem): `vw_ciclo_metas_ppi` (PPIs funil) → `dashboard_componente` (KPIs mensais) → `meta_escritorio` (quantidade_seguros) → Card YAML (fallback offline + fixas).
+
+- **Exit 0**: online, metas do SoT. E3 usa `metas-resolvidas.json` diretamente.
+- **Exit 1**: ClickHouse offline (`offline_fallback=true` no JSON). E3 recebe WARN e usa Card como complemento. Prosseguir com ressalva.
+
+5. **Registrar no CICLO.md > Log**: `[{timestamp}] SKILL:collecting-data — Metas resolvidas, offline_fallback={true|false}`
+
 ### Fase 4 — Gate de Qualidade
 
 1. **Ler `dados-consolidados-{vertical}.json`** e verificar campo `metadata.qualidade_geral`
@@ -538,6 +559,7 @@ Registrar conclusao no CICLO.md:
 - [ ] dados-consolidados-{vertical}.json gerado com script_execution_log e _verification
 - [ ] provenance.json gerado com SHA-256 de cada output file
 - [ ] data-quality-report.md gerado
+- [ ] **`dados/metas-resolvidas.json` gerado por resolve_metas.py (Fase 3.5)** — SoT de metas para E3-E6
 - [ ] Nenhum alerta critico (caso contrario, pipeline bloqueia)
 - [ ] Tabela de proveniencia apresentada ao usuario (Fase 5)
 

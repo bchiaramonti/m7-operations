@@ -178,28 +178,26 @@ Algumas metas vem de fontes manuais enquanto colunas no banco nao existem. Docum
 - Onde virá no banco quando coluna for criada
 - Tracking em `_estudo-metas-ppi/TODO-MIGRACAO.md`
 
-**Opt-in da tabela SoT `m7Prata.ciclo_metas_ppi` (2026-06-12):**
+**Como as metas chegam ao pipeline (v7.0.0 — 2026-06-29):**
 
-As metas mensais de PPI de funil agora vivem na tabela `m7Prata.ciclo_metas_ppi` (carga TI 2026-05-27; N1 + N2 por especialista/canal, 12 meses). Para que o pipeline LEIA a meta da tabela em vez do hardcode, declare `fonte:` no PPI — o numero no Card vira **cache** (fallback offline) e a tabela vira SoT:
+A partir da v7.0.0, o mecanismo de opt-in via `fonte:` foi eliminado. O script `resolve_metas.py` roda automaticamente ao final do E2 (Fase 3.5) e produz `dados/metas-resolvidas.json` — unico SoT de metas para todo o ciclo (E3, E4, E5, E6). O analyst le esse arquivo; o Card YAML serve apenas como fallback offline.
 
 ```yaml
 metas_ppi:
   oportunidades_ativas_funil_seg_wl:
-    qty: 7              # CACHE (snapshot do SoT; usado se ClickHouse offline)
-    volume: 317558      # CACHE
+    qty: 7              # fallback offline (SoT: metas-resolvidas.json via vw_ciclo_metas_ppi)
+    volume: 317558      # fallback offline
     direction: maior_melhor
-    fonte: m7Prata.ciclo_metas_ppi    # <- opt-in: E6 Fase 4.5.h injeta o valor da tabela
-    por_especialista:                 # CACHE N2 (idem)
+    por_especialista:                 # fallback offline N2
       "Claudia Moraes": { qty: 3, volume: 139129 }
       "Tarcisio Catunda": { qty: 4, volume: 178429 }
 ```
 
-Como funciona o opt-in:
-- `inject_metas_ppi.py` (E6 Fase 4.6, main thread) substitui `meta`/`meta_volume`/`n2.{esp}.meta` no canonical pelo valor da tabela e recalcula semaforo. Sem `fonte:`, NO-OP (cache do Card vale).
-- `build_deck.py` defere ao canonical (= tabela) para PPIs com `fonte: ciclo_metas_ppi`; sem isso, o Card continua vencendo.
-- **ESCOPO: declarar `fonte:` APENAS em PPIs de unidade count/BRL** — `oportunidades_ativas_funil*` (qty+volume), `oportunidades_criadas_funil*`, `oportunidades_sem_atividade_planejada_funil*`. **NAO** declarar em ratio/days (`taxa_conversao`, `tempo_de_ciclo`, `oportunidades_estagnadas*` pct): sao constantes de gestao identicas em Card e tabela, com unidade inconsistente no canonical (percent vs ratio) e naming WL/RE divergente — o inject as PULA e o gate do build_deck nao deve deferir (evita corrupcao de unidade). A substancia da migracao e o `ativas` (formula corrigida).
-- **Antes de declarar `fonte:`**, rode `consolidating-wbr/scripts/compare_metas_card_vs_tabela.py --vertical <v>` e revise divergencias >5% (a tabela usa a formula corrigida de `ativas` = won/(sem×c); valores caem vs o hardcode antigo — comportamento esperado).
-- Cada Card filtra so o seu squad: Seg WL e RE compartilham `vertical='Seg'` mas resolvem N1=SUM(squad) distinto. PJ2 e por canal (`canal_pj2`), nao por especialista (pendente — build_deck_pj2).
+Regras para o bloco `metas_ppi:`:
+- **NAO declarar `fonte:`** — a chave foi eliminada; `resolve_metas.py` cobre todos os indicadores por regra.
+- Os valores numericos (qty, volume, por_especialista) **devem ser mantidos** como snapshot offline: se o ClickHouse estiver indisponivel, o `resolve_metas.py` grava `offline_fallback=true` e o analyst usa o Card.
+- Atualizar os valores snapshot sempre que a meta mudar na tabela (para evitar desvio muito grande no fallback).
+- `pct_ativas_max` e `direction` continuam validos — sao lidos pelo `resolve_metas.py` e copiados para o JSON com `source: card_fixo`.
 - Cobertura da tabela: 7 PPIs de funil (Cons/Seg) + receitas PJ2. Receita/Volume/Qty/Ticket MENSAIS de Cons/Seg seguem na tabela universal `dashboard_componente_universal` (fonte distinta).
 
 ### Passo 5: Configurar Distribuicao

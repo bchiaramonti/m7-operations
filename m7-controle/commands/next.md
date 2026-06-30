@@ -67,7 +67,7 @@ Avanca o pipeline G2.2 para a proxima fase pendente de uma vertical (ou Card esp
    | E5 | projecting-results |
    | E6 | consolidating-wbr |
 
-   > **E6 roda em 2 passadas do analyst (v6.5.0):** a skill consolidating-wbr orquestra Passada 1 (canonical) → **main thread roda `normalize_canonical` + `inject_metas_ppi` (Fase 4.6)** → Passada 2 (Estruturado/Narrativo do canonical injetado) → gate `validate-painel`. Seguir a secao "Modelo de Execucao" do SKILL.md — NAO tratar E6 como uma unica chamada do analyst.
+   > **E6 roda em 1 passada do analyst (v7.0.0):** as metas ja chegam corretas via `dados/metas-resolvidas.json` (gerado pelo `resolve_metas.py` no final do E2). Nao ha inject pos-analise nem Fase 4.6. Seguir a secao "Modelo de Execucao" do SKILL.md.
 
    Contexto disponivel para a skill: vertical, periodo (YYYY-MM), granularidade, checkpoint_label, data_inicio, data_fim, dias_uteis_totais, dias_uteis_decorridos, dias_uteis_restantes, caminho da pasta do ciclo e artefatos anteriores. Todos estes valores sao lidos do header do CICLO.md.
 
