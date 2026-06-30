@@ -94,7 +94,7 @@ def _fetch_dashboard_comp(u, mes: str, mes_next: str,
     df = u.query_clickhouse(
         "SELECT id_dashboard_componente, data, meta "
         "FROM m7Bronze.investimento_tb_dashboard_componente_universal_dados "
-        "WHERE id_escritorio = 35 "
+        "WHERE id_escritorio = '35' "
         f"  AND id_dashboard_componente IN ({ids_str}) "
         f"  AND data IN ('{mes}', '{mes_next}') "
         "ORDER BY id_dashboard_componente, data",
@@ -123,7 +123,7 @@ def _fetch_meta_escritorio(u) -> float | None:
         df = u.query_clickhouse(
             "SELECT apolice_seguros "
             "FROM m7Bronze.investimento_tb_meta_escritorio "
-            "WHERE id_escritorio = 35 "
+            "WHERE id_escritorio = '35' "
             "ORDER BY data_ref DESC LIMIT 1"
         )
         if df.empty:
@@ -140,8 +140,60 @@ def _fetch_meta_escritorio(u) -> float | None:
 # ---------------------------------------------------------------------------
 
 def _card_metas_ppi(card: dict) -> dict[str, dict]:
-    return {k: v for k, v in (card.get("metas_ppi") or {}).items()
-            if isinstance(v, dict)}
+    # metas_ppi top-level (PPIs de funil)
+    result = {k: v for k, v in (card.get("metas_ppi") or {}).items()
+              if isinstance(v, dict)}
+    # kpi_references com regras_meta (KPIs mensais como receita/volume/taxa_conversao)
+    for ref in card.get("kpi_references") or []:
+        ind_id = ref.get("indicator_id")
+        if ind_id and ind_id not in result and ref.get("regras_meta"):
+            result[ind_id] = dict(ref["regras_meta"])
+    return result
+
+
+def _expected_meta_indicators(card: dict) -> set[str]:
+    """Enumera, de forma INDEPENDENTE de _card_metas_ppi, todo indicator_id do
+    Card que deveria ter meta resolvida. Usado pelo guard de cobertura (Melhoria #3).
+
+    Deliberadamente NAO reusa _card_metas_ppi: se aquela funcao regredir (ex: parar
+    de ler kpi_references, como o bug de 2026-06-30), o guard ainda enumera o
+    indicador aqui e detecta que ficou sem meta — em E2, nao 4 fases depois no E6.
+
+    Criterio de 'deveria ter meta': aparece em metas_ppi (top-level) OU e um
+    kpi_reference com regras_meta nao-vazio. Indicadores informativos (kpi_reference
+    sem regras_meta) ficam de fora — nao se espera meta deles."""
+    expected: set[str] = set()
+    for k, v in (card.get("metas_ppi") or {}).items():
+        if isinstance(v, dict):
+            expected.add(k)
+    for ref in card.get("kpi_references") or []:
+        ind_id = ref.get("indicator_id")
+        if ind_id and ref.get("regras_meta"):
+            expected.add(ind_id)
+    return expected
+
+
+def _has_resolved_meta(entry: dict) -> bool:
+    """True se o entry resolvido tem ALGUMA meta numerica utilizavel (N1, M+1,
+    N2/por_canal, derivado ou _pending conhecido). Distingue 'tem entry' de
+    'tem meta' — quantidade pode ter N1=card_fixo SEM valor mas M+1 com valor."""
+    if not isinstance(entry, dict):
+        return False
+    if entry.get("source") == "derivado" or "_pending" in entry:
+        return True
+    _NUM_FIELDS = ("value", "value_volume", "qty", "valor", "volume", "pct_ativas_max")
+    for nivel in ("N1", "M+1", "M0"):
+        sub = entry.get(nivel)
+        if isinstance(sub, dict) and any(sub.get(f) is not None for f in _NUM_FIELDS):
+            return True
+    for grp in ("N2", "por_canal"):
+        sub = entry.get(grp)
+        if isinstance(sub, dict):
+            for ref_vals in sub.values():
+                if isinstance(ref_vals, dict) and any(
+                        ref_vals.get(f) is not None for f in _NUM_FIELDS):
+                    return True
+    return False
 
 
 def _mes_seguinte(mes: str) -> str:
@@ -158,10 +210,31 @@ def _mes_seguinte(mes: str) -> str:
 
 def resolve(card: dict, vertical: str, mes: str, mr, u) -> tuple[dict, bool]:
     offline = False
+    query_errors: list[str] = []  # erros de QUERY/SCHEMA (bug, nao offline) — Melhoria #1
     mes_next = _mes_seguinte(mes)
     indicadores: dict[str, Any] = {}
     sources_used: list[str] = []
     card_metas = _card_metas_ppi(card)
+    query_err_cls = getattr(sys.modules.get("meta_resolver", None),
+                            "MetaResolverQueryError", None)
+    offline_cls = getattr(sys.modules.get("meta_resolver", None),
+                          "MetaResolverOffline", None)
+
+    def _handle_ch_exc(stage: str, e: Exception) -> bool:
+        """Classifica excecao de fetch. Retorna True se foi OFFLINE (rede).
+        Query/schema error → registra em query_errors (NAO marca offline)."""
+        if query_err_cls and isinstance(e, query_err_cls):
+            print(f"  ERRO QUERY {stage} (bug deterministico, NAO e offline): {e}")
+            query_errors.append(f"{stage}: {e}")
+            return False
+        if offline_cls and isinstance(e, offline_cls):
+            print(f"  WARN OFFLINE {stage}: {e}")
+            return True
+        # Excecao inesperada (nao veio classificada do meta_resolver): tratar como
+        # bug visivel, nao mascarar como offline.
+        print(f"  ERRO {stage} (nao classificado, tratado como bug): {e}")
+        query_errors.append(f"{stage}: {e}")
+        return False
 
     # --- 1. PPIs de funil via vw_ciclo_metas_ppi ----------------------------
     try:
@@ -206,13 +279,8 @@ def resolve(card: dict, vertical: str, mes: str, mr, u) -> tuple[dict, bool]:
         sources_used.append("ciclo_metas_ppi")
 
     except Exception as e:
-        offline_cls = getattr(sys.modules.get("meta_resolver", None),
-                              "MetaResolverOffline", None)
-        if offline_cls and isinstance(e, offline_cls):
-            print(f"  WARN OFFLINE ciclo_metas_ppi: {e}")
-        else:
-            print(f"  WARN ciclo_metas_ppi: {e}")
-        offline = True
+        if _handle_ch_exc("ciclo_metas_ppi", e):
+            offline = True
 
     # --- 2. KPIs mensais via dashboard_componente ---------------------------
     relevant = {ind: cid for ind, cid in DASHBOARD_COMP.items()
@@ -239,8 +307,8 @@ def resolve(card: dict, vertical: str, mes: str, mr, u) -> tuple[dict, bool]:
                     })
             sources_used.append("dashboard_componente")
         except Exception as e:
-            print(f"  WARN OFFLINE dashboard_componente: {e}")
-            offline = True
+            if _handle_ch_exc("dashboard_componente", e):
+                offline = True
 
     # --- 3. quantidade_seguros via meta_escritorio --------------------------
     _QTDE_SEG = ("quantidade_seguros_mensal_wl", "quantidade_seguros_mensal_re",
@@ -291,13 +359,24 @@ def resolve(card: dict, vertical: str, mes: str, mr, u) -> tuple[dict, bool]:
     if "card_fixo" not in sources_used:
         sources_used.append("card_fixo")
 
+    # --- Guard de cobertura (Melhoria #3) -----------------------------------
+    # Todo indicador do Card que deveria ter meta foi resolvido com valor?
+    # Enumeracao independente p/ pegar regressao de _card_metas_ppi na origem (E2).
+    expected = _expected_meta_indicators(card)
+    coverage_gaps = sorted(
+        ind_id for ind_id in expected
+        if not _has_resolved_meta(indicadores.get(ind_id, {}))
+    )
+
     return {
-        "_schema": "metas-resolvidas v1.0",
+        "_schema": "metas-resolvidas v1.1",
         "_generated_at": datetime.now(timezone.utc).isoformat(),
         "vertical": vertical,
         "mes": mes,
         "mes_seguinte": mes_next,
         "offline_fallback": offline,
+        "query_errors": query_errors,
+        "coverage_gaps": coverage_gaps,
         "sources_used": sources_used,
         "indicadores": indicadores,
     }, offline
@@ -342,20 +421,39 @@ def main() -> int:
 
     print(f"  {n_total} indicadores: {n_tabela} de tabela | "
           f"{n_fixo} fixos Card | {n_deriv} derivados")
-    if offline:
-        print("  WARN: ClickHouse offline -- offline_fallback=true no JSON")
 
-    if args.dry_run:
+    query_errors = data.get("query_errors") or []
+    coverage_gaps = data.get("coverage_gaps") or []
+    if query_errors:
+        print(f"  ERRO: {len(query_errors)} erro(s) de QUERY/SCHEMA (bug, NAO offline):")
+        for qe in query_errors:
+            print(f"    - {qe}")
+    if coverage_gaps:
+        print(f"  ERRO COBERTURA: {len(coverage_gaps)} indicador(es) do Card SEM meta resolvida:")
+        for g in coverage_gaps:
+            print(f"    - {g}")
+    if offline:
+        print("  WARN: ClickHouse offline (rede) -- offline_fallback=true no JSON")
+
+    if not args.dry_run:
+        out_dir = Path(args.cycle_folder) / "dados"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "metas-resolvidas.json"
+        out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2),
+                            encoding="utf-8")
+        print(f"  -> {out_path}")
+    else:
         print("\n--- DRY-RUN: metas-resolvidas.json ---")
         print(json.dumps(data, ensure_ascii=False, indent=2))
-        return 0
 
-    out_dir = Path(args.cycle_folder) / "dados"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "metas-resolvidas.json"
-    out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2),
-                        encoding="utf-8")
-    print(f"  -> {out_path}")
+    # Exit codes (aditivos; 0=ok, !=0=atencao):
+    #   2 = erro de query/schema (bug deterministico — corrigir o script/SQL)
+    #   3 = gap de cobertura (meta declarada no Card nao resolvida)
+    #   1 = offline por rede (fallback card_fixo aplicado — pode ser aceitavel)
+    if query_errors:
+        return 2
+    if coverage_gaps:
+        return 3
     return 1 if offline else 0
 
 
