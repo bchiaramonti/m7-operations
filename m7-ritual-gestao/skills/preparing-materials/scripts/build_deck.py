@@ -653,20 +653,28 @@ def _esp_kpi_value(data: dict, esp: str, kind: str, aspect: str = None, field_le
         "volume": ["vol", "volume", "vol_total", "volume_total", "realizado"],
     }
 
+    base_id_for_kind = _kpi_id(data, kind)
+
     # Tentativa 1: ID com aspect (SEG-split)
     if aspect:
         aspect_id = _kpi_id(data, kind, aspect=aspect)
         if aspect_id:
             ind = indicadores.get(aspect_id, {}) or {}
             n2_esp = (ind.get("n2") or {}).get(esp, {}) or {}
+            aliases = aspect_field_aliases.get(aspect, ["realizado"])
+            # FIX (2026-06-30): 'realizado' so e VOLUME quando o aspect_id e um split
+            # dedicado (SEG, aspect_id != base_id). No id base multi-aspecto (CON),
+            # n2.realizado e a QUANTIDADE — usa-lo como volume gerava "Volume R$ 27".
+            if aspect == "volume" and aspect_id == base_id_for_kind:
+                aliases = [a for a in aliases if a != "realizado"]
             # Tenta aliases do aspect antes do generico "realizado"
-            for fkey in aspect_field_aliases.get(aspect, ["realizado"]):
+            for fkey in aliases:
                 v = n2_esp.get(fkey)
                 if v is not None:
                     return v
             # tentar por_especialista.{esp}.realizado tambem (variant)
             pe_esp = (ind.get("por_especialista") or {}).get(esp, {}) or {}
-            for fkey in aspect_field_aliases.get(aspect, ["realizado"]):
+            for fkey in aliases:
                 v = pe_esp.get(fkey)
                 if v is not None:
                     return v
@@ -686,6 +694,19 @@ def _esp_kpi_value(data: dict, esp: str, kind: str, aspect: str = None, field_le
                 return v
         # 2b. n2.{esp}.{aspect aliases} (caso por_especialista vazio)
         n2_esp = (ind.get("n2") or {}).get(esp, {}) or {}
+        # FIX (2026-06-30): para aspect VOLUME no ID base (CON multi-aspecto), o
+        # n2.{esp}.realizado e a QUANTIDADE, nao o volume. Nunca usar 'realizado'
+        # como volume (gerava "Volume ativo R$ 27" e "Ticket R$ 1" nos tiles do esp).
+        # Le os campos genuinos de volume; se ausentes, o aspecto vive so no
+        # dados-consolidados (snapshot raw) — soma a row agregada N2 do esp.
+        if aspect == "volume":
+            for fkey in ("vol", "volume", "vol_total", "volume_total"):
+                v = n2_esp.get(fkey)
+                if v is not None:
+                    return v
+            dv = _aspect_sum_from_dados(data, base_id, "n2", esp,
+                                        ["volume", "vol", "valor_total"])
+            return dv  # None quando indisponivel — NUNCA cai em realizado (qty)
         # Try aspect aliases primeiro, depois "realizado" / field_legacy
         candidates = []
         if aspect:
@@ -2345,6 +2366,16 @@ def _card_meta_is_pendente(card: dict, parent_ind_id: str, aspect: str = None, e
 
 def _resolve_n1(mr: dict, data: dict) -> dict:
     """Resolve valores N1 para uma matrix_row. Retorna {realizado, meta} ou None."""
+    # FIX (2026-06-30): "Oport. Estagnadas (qty)" declara source_indicator = indicador
+    # derivado _pct_ativas (so para herdar a cor do semaforo). A QUANTIDADE de
+    # estagnadas, porem, vive no indicador BASE (parent_indicator).realizado (53),
+    # nao no derivado (cujo realizado e o percentual 81,5%). Resolve a qty do base.
+    if (str(mr.get("source_indicator", "")).endswith("_pct_ativas")
+            and (mr.get("value_field") or "").rsplit(".", 1)[-1].lower()
+                in ("qtd_estagnados", "qty_estagnadas")):
+        base = data["wbr"].get("indicadores", {}).get(mr.get("parent_indicator"), {}) or {}
+        rv = base.get("realizado")
+        return {"realizado": rv if isinstance(rv, (int, float)) else None, "meta": None}
     # Caso especial: Ticket Medio Pipeline em SEG-split (cross-id volume/qty)
     # FIX 2026-05-14 (Bug 2 N1 "R$ 1"): so executa o cross-id quando qty_id != vol_id.
     # Em RE (sem aspect-split), qty e volume coexistem na mesma entry —
@@ -2375,12 +2406,27 @@ def _resolve_n1(mr: dict, data: dict) -> dict:
         fallback_v = _try_value_fallbacks(ind_entry, mr.get("value_field_fallbacks") or [])
         if fallback_v not in (None, 0, 0.0):
             realizado = fallback_v
+    # FIX (2026-06-30): aspecto Volume/Ticket ausente no canonical → le do
+    # dados-consolidados (Vol Oportunidades Ativas, Ticket Medio Pipeline).
+    if realizado in (None, 0, 0.0):
+        aspect_v = _aspect_value_from_dados(data, mr, "n1")
+        if isinstance(aspect_v, (int, float)) and aspect_v != 0:
+            realizado = aspect_v
     # FIX rodada 5 — no_meta: true → nunca render meta
     if mr.get("no_meta"):
         meta_v = None
     elif mr.get("compute_meta"):
         # FIX rodada 6 issue 8 — meta computada via formula (ex: meta_volume / meta_qty)
         meta_v = _eval_compute(mr["compute_meta"], ind_entry)
+        # FIX (2026-06-30): Ticket Medio meta = meta_volume / meta_qty. meta_volume
+        # vive no Card.metas_ppi (aspect volume), meta_qty no canonical. Quando o eval
+        # direto falha (canonical sem meta_volume), resolve cada parte separadamente.
+        if meta_v is None and "/" in mr["compute_meta"]:
+            mv = _meta_from_card_metas_ppi(
+                data.get("card"), mr.get("parent_indicator"), aspect="volume")
+            mq = _extract_field(ind_entry, "meta_qty", _N1_META_FALLBACKS)
+            if isinstance(mv, (int, float)) and isinstance(mq, (int, float)) and mq:
+                meta_v = mv / mq
     else:
         meta_v = _extract_field(ind_entry, mr["meta_field"], _N1_META_FALLBACKS)
         # Refator 2026-05-07: Card.metas_ppi OVERRIDE para N1 quando definido (usuario SoT).
@@ -2491,6 +2537,11 @@ def _derive_n1_raw_from_dados(data: dict, mr: dict, field_override: str = None):
     total = 0.0
     matched = 0
     for r in rows:
+        # FIX (2026-06-30): dados-consolidados emite, alem da row agregada (estagio
+        # vazio), uma row por estagio do funil. Somar todas double-counta o N1.
+        # So a row agregada (estagio vazio) representa o N1 verdadeiro.
+        if r.get("estagio"):
+            continue
         mes = (r.get("mes") or r.get("data_referencia") or "")[:7]
         if mes != mes_corr:
             continue
@@ -2509,6 +2560,153 @@ def _derive_n1_raw_from_dados(data: dict, mr: dict, field_override: str = None):
     return total if matched > 0 else None
 
 
+# ---------------------------------------------------------------------------
+# FIX (2026-06-30) — Aspecto secundario (Volume / Ticket Medio) ausente no canonical.
+#
+# Indicadores de funil multi-aspecto (Card `unidade: "count + BRL"`, ex:
+# oportunidades_ativas_funil) tem APENAS o aspecto primario (qty) consolidado no
+# WBR canonical do E6 (`realizado`/`meta`). O aspecto Volume e o Ticket Medio
+# (= volume/qty) vivem so no dados-consolidados (snapshot raw, com volume por
+# nivel/especialista). As matrix_views "Vol Oportunidades Ativas" e "Ticket Medio
+# Pipeline" pedem `volume_total`/`volume` (+ compute volume/qty) — campos que o
+# canonical nao carrega. Estas helpers leem o valor agregado do dados-consolidados
+# para preencher essas views. O canonical permanece o SoT do painel (semaforo/qty);
+# o dados-consolidados e o SoT da quebra granular — consistente com a arquitetura
+# (build_deck ja recebe --dados-consolidados justamente para quebras).
+_DADOS_ASPECT_COLS = {
+    "volume": ["volume", "vol", "valor_total"],
+    "volume_total": ["volume", "vol", "valor_total"],
+    "vol_total": ["volume", "vol"],
+    "vol": ["volume", "vol"],
+    "qty": ["quantidade", "qtd"],
+    "realizado_qty": ["quantidade", "qtd"],
+}
+
+
+def _dados_aspect_cols(field):
+    """Colunas do dados-consolidados para um value_field de aspecto (volume/qty).
+    Retorna None quando o field NAO e um aspecto conhecido — assim o fallback so
+    dispara para Volume/Ticket e nunca rouba views que ja vem do canonical."""
+    if not field:
+        return None
+    f = str(field).lower()
+    cols = _DADOS_ASPECT_COLS.get(f)
+    if cols:
+        return cols
+    if "." in f:
+        return _DADOS_ASPECT_COLS.get(f.rsplit(".", 1)[-1])
+    return None
+
+
+def _aspect_sum_from_dados(data, source_ind, level, esp, cols):
+    """Soma `cols` sobre as rows AGREGADAS (estagio vazio) do indicador no
+    dados-consolidados, no nivel pedido. `estagio` vazio evita o double-count das
+    rows por-estagio. level='n1' -> N1-Escritorio; level='n2' -> N2-Especialista
+    filtrado por `esp`. Retorna None quando nada casou."""
+    if not source_ind or not cols:
+        return None
+    dados = (data or {}).get("dados_consolidados") or {}
+    inds = dados.get("indicadores") or []
+    target = None
+    for ind in inds:
+        iid = ind.get("indicator_id") or ind.get("id") or ""
+        if iid == source_ind:
+            target = ind
+            break
+    if not target:
+        return None
+    rows = target.get("data") or target.get("rows") or []
+    mes_corr = ((data.get("wbr") or {}).get("data_referencia") or "")[:7]
+    total = 0.0
+    matched = 0
+    for r in rows:
+        if r.get("estagio"):            # so rows agregadas (estagio vazio)
+            continue
+        mes = (r.get("mes") or r.get("data_referencia") or "")[:7]
+        if mes_corr and mes and mes != mes_corr:
+            continue
+        nivel = (r.get("nivel") or "").lower()
+        if level == "n1":
+            if "n1" not in nivel and not nivel.startswith("escritorio"):
+                continue
+        else:
+            if "especialista" not in nivel:
+                continue
+            if (r.get("especialista") or "") != esp:
+                continue
+        for c in cols:
+            v = r.get(c)
+            if isinstance(v, (int, float)):
+                total += v
+                matched += 1
+                break
+    return total if matched else None
+
+
+def _aspect_value_from_dados(data, mr, level, esp=None):
+    """Resolve o valor de aspecto (Volume direto ou Ticket Medio via compute
+    'a / b') de uma matrix_view a partir do dados-consolidados. Retorna None
+    quando a view nao e de aspecto volume/qty (deixa o canonical mandar)."""
+    src = mr.get("source_indicator")
+    if not src:
+        return None
+    comp = (mr.get("n2_compute") if level == "n2" else mr.get("compute")) or ""
+    if "/" in comp:
+        a, b = [x.strip() for x in comp.split("/", 1)]
+        cols_a = _dados_aspect_cols(a)
+        cols_b = _dados_aspect_cols(b)
+        if not cols_a or not cols_b:
+            return None
+        va = _aspect_sum_from_dados(data, src, level, esp, cols_a)
+        vb = _aspect_sum_from_dados(data, src, level, esp, cols_b)
+        if va is None or not vb:
+            return None
+        return va / vb
+    field = mr.get("n2_value_field") if level == "n2" else mr.get("value_field")
+    cols = _dados_aspect_cols(field)
+    if not cols:
+        return None
+    return _aspect_sum_from_dados(data, src, level, esp, cols)
+
+
+def _aspect_sem_esp_from_dados(data, mr):
+    """Sem Especialista para aspecto Volume/Ticket = N1 agregado - SUM(esps conhecidos),
+    tudo lido do dados-consolidados. Suporta compute 'a / b' (Ticket). Retorna None
+    quando a view nao e de aspecto (deixa o fluxo Sem Esp padrao seguir)."""
+    src = mr.get("source_indicator")
+    if not src:
+        return None
+    n2_dict = (data["wbr"].get("indicadores", {}).get(src, {}) or {}).get("n2") or {}
+    esp_list = [k for k in n2_dict.keys() if k != "Sem Especialista"]
+    if not esp_list:
+        return None
+
+    def _se(field, comp):
+        if comp and "/" in comp:
+            a, b = [x.strip() for x in comp.split("/", 1)]
+            num = _se(a, None)
+            den = _se(b, None)
+            return (num / den) if (num is not None and den) else None
+        cols = _dados_aspect_cols(field)
+        if not cols:
+            return None
+        n1v = _aspect_sum_from_dados(data, src, "n1", None, cols)
+        if n1v is None:
+            return None
+        s = 0.0
+        got = False
+        for _e in esp_list:
+            ev = _aspect_sum_from_dados(data, src, "n2", _e, cols)
+            if isinstance(ev, (int, float)):
+                s += ev
+                got = True
+        if not got:
+            return None
+        return n1v - s
+
+    return _se(mr.get("n2_value_field"), mr.get("n2_compute"))
+
+
 def _resolve_n2(mr: dict, esp: str, data: dict, n_esps: int = 0,
                  esp_list: list = None) -> dict:
     """Resolve valores N2 (especialista) para uma matrix_row. Retorna {realizado, meta, status} ou None.
@@ -2525,6 +2723,18 @@ def _resolve_n2(mr: dict, esp: str, data: dict, n_esps: int = 0,
         special = _resolve_ticket_medio_pipeline_split(mr, esp, data)
         if special.get("realizado") is not None or special.get("meta") is not None:
             return special
+
+    # FIX (2026-06-30): "Oport. Estagnadas (qty)" N2 — qty vive no indicador BASE
+    # (parent_indicator).n2.{esp}.realizado, nao no derivado _pct_ativas (= percentual).
+    if (str(mr.get("source_indicator", "")).endswith("_pct_ativas")
+            and (mr.get("n2_value_field") or "").rsplit(".", 1)[-1].lower()
+                in ("qtd_estagnados", "qty_estagnadas")):
+        base = data["wbr"].get("indicadores", {}).get(mr.get("parent_indicator"), {}) or {}
+        e_base = (base.get("n2") or {}).get(esp, {}) or {}
+        rv = e_base.get("realizado")
+        return {"realizado": rv if isinstance(rv, (int, float)) else None,
+                "meta": None, "status": e_base.get("status"),
+                "_sem_esp": (esp == "Sem Especialista")}
 
     ind_entry = data["wbr"].get("indicadores", {}).get(mr["source_indicator"], {}) or {}
     n2_dict = ind_entry.get("n2") or ind_entry.get("por_especialista") or {}
@@ -2597,6 +2807,13 @@ def _resolve_n2(mr: dict, esp: str, data: dict, n_esps: int = 0,
 
     # FIX img1: Sem Especialista derivado para indicadores aditivos quando JSON nao traz
     if e is None and esp == "Sem Especialista" and esp_list:
+        # FIX (2026-06-30): Sem Esp para aspecto Volume/Ticket via dados-consolidados
+        # (N1 agregado - SUM esps conhecidos). So dispara para views de aspecto;
+        # views nao-aspecto retornam None aqui e seguem o fluxo padrao abaixo.
+        se_aspect = _aspect_sem_esp_from_dados(data, mr)
+        if isinstance(se_aspect, (int, float)) and se_aspect != 0:
+            return {"realizado": se_aspect, "meta": None, "status": None,
+                    "_derived": True, "_sem_esp": True}
         unidade = mr.get("unidade", "count")
         n2_compute = mr.get("n2_compute")
         # FIX rodada 6 issue 2 — Sem Esp derivado para indicadores compute (ex: Ticket Medio)
@@ -2661,6 +2878,16 @@ def _resolve_n2(mr: dict, esp: str, data: dict, n_esps: int = 0,
         fallback_v = _try_value_fallbacks(e, mr.get("n2_value_field_fallbacks") or [])
         if fallback_v not in (None, 0, 0.0):
             realizado = fallback_v
+    # FIX (2026-06-30): aspecto Volume/Ticket N2 ausente no canonical → dados-consolidados.
+    # Sem Especialista nao existe como linha no dados-consolidados (sao assessores
+    # nao-mapeados); deriva como N1 agregado - SUM(esps conhecidos).
+    if realizado in (None, 0, 0.0):
+        if esp == "Sem Especialista":
+            aspect_v = _aspect_sem_esp_from_dados(data, mr)
+        else:
+            aspect_v = _aspect_value_from_dados(data, mr, "n2", esp)
+        if isinstance(aspect_v, (int, float)) and aspect_v != 0:
+            realizado = aspect_v
 
     # FIX rodada 5 — `no_meta: true`: nunca renderiza meta
     if mr.get("no_meta"):
@@ -2671,6 +2898,23 @@ def _resolve_n2(mr: dict, esp: str, data: dict, n_esps: int = 0,
         if meta_v is None:
             # Fallback: ratios tem mesma meta entre N1 e N2 — avalia contra ind_entry
             meta_v = _eval_compute(mr["n2_compute_meta"], ind_entry)
+        # FIX (2026-06-30): Ticket Medio N2 meta = meta_volume/meta_qty. meta_volume
+        # (por esp) vive no Card.metas_ppi; meta_qty no canonical. Resolve cada parte
+        # quando o eval direto falha (canonical n2 sem meta_volume) — evita o "ref"
+        # (meta ausente) no Dashboard do especialista.
+        if meta_v is None and "/" in mr["n2_compute_meta"]:
+            mv = _meta_from_card_metas_ppi(
+                data.get("card"), mr.get("parent_indicator"), esp=esp, aspect="volume")
+            if not isinstance(mv, (int, float)):
+                n1mv = _meta_from_card_metas_ppi(
+                    data.get("card"), mr.get("parent_indicator"), aspect="volume")
+                if isinstance(n1mv, (int, float)) and n_esps:
+                    mv = n1mv / n_esps
+            mq = e.get("meta")
+            if not isinstance(mq, (int, float)):
+                mq = _extract_field(e, "meta_qty", _N2_META_FALLBACKS)
+            if isinstance(mv, (int, float)) and isinstance(mq, (int, float)) and mq:
+                meta_v = mv / mq
     else:
         # FIX (2026-05-14) bug Vol Ativas meta=19 qty: quando n2_meta_field nao declarado
         # e n2_value_field e volume-family, inferir meta_volume — evita fallback cair em
@@ -3490,6 +3734,11 @@ def _matriz_row_v2(mr: dict, esp_list: list, data: dict, all_rows: list = None) 
         src_ind_entry.get("aggregation_rule_applied") is True
         or (mr.get("unidade") or "").lower() in ("ratio", "pct", "percent", "percentual", "%")
         or (src_ind_entry.get("unit") or "").lower() in ("ratio", "pct", "percent", "percentual", "%")
+        # FIX (2026-06-30): views com formula (compute/n2_compute) sao ratios derivados
+        # (ex: Ticket Medio = volume/qty). Nao-aditivas: o Total e o ratio dos totais
+        # (via _resolve_n1), NUNCA a soma das celulas N2. Sem este guard, a derivacao
+        # de Sem Esp ligava o bridge aditivo e o Total somava 1,7M+1,0M+0,1M = 2,8M.
+        or bool(mr.get("compute") or mr.get("n2_compute"))
     )
     sem_esp_was_derived = (sem_esp_data.get("_sem_esp")
                             and isinstance(sem_esp_data.get("realizado"), (int, float))
@@ -7163,6 +7412,20 @@ def _esp_proj_bars(esp: str, data: dict, ind_id: str) -> str:
             share_m1 = meta_card_m1 / total_meta_m1
             proj_m1 = n1_base_m1 * share_m1
             proj_m1_is_prorata = True
+
+    # FIX (2026-06-30): Proj M0 por especialista ausente — o canonical do E6 so emite
+    # projecoes.{ind}.M0.por_especialista no N1, nunca por especialista (so M+1 tem).
+    # No fechamento (dias uteis restantes = 0) M0 == Realizado do especialista; mesmo
+    # mid-month, o Realizado e o piso correto de M0 (nunca menor). Deriva do Realizado
+    # consolidado (MTD/lagging) do esp quando nenhuma fonte de projecao M0 existe.
+    if proj_m0 is None:
+        _m0_real = None
+        if isinstance(real_mtd, (int, float)) and real_mtd > 0:
+            _m0_real = real_mtd
+        if isinstance(lagging_m0, (int, float)) and (lagging_m0 or 0) > (_m0_real or 0):
+            _m0_real = lagging_m0
+        if _m0_real is not None:
+            proj_m0 = _m0_real
 
     # Normalize widths
     candidates = [v for v in (real_mtd, lagging_m0, proj_m0, proj_m1, meta_mes) if isinstance(v, (int, float))]
